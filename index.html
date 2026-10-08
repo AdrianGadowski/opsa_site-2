@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Odlewnie Polskie - Ewidencja czasu pracy</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="css/login.css" />
+  <link rel="stylesheet" href="css/menu.css" />
+</head>
+<body>
+
+  <div id="auth-overlay">
+
+    <!-- Warstwy tła: odlewnia -->
+    <i class="fa-solid fa-gear foundry-gear gear-a" aria-hidden="true"></i>
+    <i class="fa-solid fa-gear foundry-gear gear-b" aria-hidden="true"></i>
+    <i class="fa-solid fa-gear foundry-gear gear-c" aria-hidden="true"></i>
+    <div class="foundry-glow" aria-hidden="true"></div>
+
+    <!-- Płynne żeliwo -->
+    <div class="foundry-floor" aria-hidden="true">
+      <div class="molten-wave wave-back">
+        <svg viewBox="0 0 2880 120" preserveAspectRatio="none">
+          <defs>
+            <linearGradient id="moltenBack" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stop-color="#FCD444" />
+              <stop offset="1" stop-color="#B45309" />
+            </linearGradient>
+          </defs>
+          <path fill="url(#moltenBack)" d="M0 46 Q180 6 360 46 T720 46 T1080 46 T1440 46 T1800 46 T2160 46 T2520 46 T2880 46 V120 H0 Z" />
+        </svg>
+      </div>
+      <div class="molten-wave wave-front">
+        <svg viewBox="0 0 2880 120" preserveAspectRatio="none">
+          <defs>
+            <linearGradient id="moltenFront" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stop-color="#FCD444" />
+              <stop offset="0.45" stop-color="#F59E0B" />
+              <stop offset="1" stop-color="#C2410C" />
+            </linearGradient>
+          </defs>
+          <path fill="url(#moltenFront)" d="M0 62 Q180 100 360 62 T720 62 T1080 62 T1440 62 T1800 62 T2160 62 T2520 62 T2880 62 V120 H0 Z" />
+        </svg>
+      </div>
+    </div>
+
+    <canvas id="foundry-sparks" aria-hidden="true"></canvas>
+
+    <!-- Karta logowania -->
+    <div class="unified-auth-card">
+      <div class="molten-bar" aria-hidden="true"></div>
+
+      <div id="auth-icon-box" class="morph-icon-box">
+        <div id="icon-factory" class="icon-layer">
+          <i class="fa-solid fa-industry"></i>
+        </div>
+        <div id="icon-checkmark" class="icon-layer">
+          <svg id="auth-checkmark-svg" viewBox="0 0 52 52">
+            <path class="checkmark-check" fill="none" d="M14 27 l8 8 l16 -16" />
+          </svg>
+        </div>
+        <div id="icon-user" class="icon-layer">
+          <i class="fa-solid fa-user-check"></i>
+        </div>
+      </div>
+
+      <div class="card-steps-stage">
+
+        <div id="step-login" class="card-body-step active">
+          <h2>Odlewnie Polskie S.A.</h2>
+          <div class="subtitle">System Ewidencji Czasu Pracy</div>
+
+          <div class="form-group" style="width: 100%; margin-bottom: 12px;">
+            <label for="login-input">Login</label>
+            <input type="text" id="login-input" class="form-control" placeholder="Wprowadź login" autocomplete="username" />
+          </div>
+
+          <div class="form-group" style="width: 100%; margin-bottom: 4px;">
+            <label for="password-input">Hasło</label>
+            <input type="password" id="password-input" class="form-control" placeholder="Wprowadź hasło" autocomplete="current-password" />
+          </div>
+
+          <div class="error-slot">
+            <span id="login-error-msg" role="alert">Zły login lub hasło</span>
+          </div>
+
+          <button id="btn-login" class="btn-primary" onclick="handleLogin()">Zaloguj się</button>
+          <button class="link-btn" onclick="toggleModal('modal-forgot-password', true)">Nie pamiętasz hasła?</button>
+        </div>
+
+        <div id="step-success" class="card-body-step">
+          <div class="success-label">Zalogowano pomyślnie</div>
+        </div>
+
+        <div id="step-welcome" class="card-body-step">
+          <div id="welcome-text"></div>
+
+          <div id="welcome-user-meta">
+            <span id="welcome-role"></span>
+            <span class="welcome-meta-divider">•</span>
+            <span id="welcome-dept"></span>
+          </div>
+
+          <div class="loader-box">
+            <div class="progress-bar-bg">
+              <div id="welcome-progress-bar" class="progress-bar-fill"></div>
+            </div>
+            <p id="welcome-status-text" class="status-subtext">Inicjalizacja...</p>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <div class="auth-footer-copyright">
+      &copy; 2026 Adrian Gadowski
+    </div>
+  </div>
+
+  <div id="app-container">
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <i class="fa-solid fa-industry"></i> Odlewnie Polskie
+      </div>
+
+      <ul class="sidebar-menu" id="navigation-list">
+        <li class="menu-item" data-tab="dashboard" id="nav-dashboard" style="display: none;">
+          <button class="menu-btn" onclick="navigateTo('dashboard')">
+            <i class="fa-solid fa-chart-pie"></i> Dashboard
+          </button>
+        </li>
+        <li class="menu-item" data-tab="employee_list" id="nav-employee_list" style="display: none;">
+          <button class="menu-btn" onclick="navigateTo('employee_list')">
+            <i class="fa-solid fa-users"></i> Baza pracowników
+          </button>
+        </li>
+        <li class="menu-item" data-tab="report_time" id="nav-report_time" style="display: none;">
+          <button class="menu-btn" onclick="navigateTo('report_time')">
+            <i class="fa-solid fa-clock"></i> Rozliczanie czasu
+          </button>
+        </li>
+        <li class="menu-item" data-tab="reports" id="nav-reports" style="display: none;">
+          <button class="menu-btn" onclick="navigateTo('reports')">
+            <i class="fa-solid fa-file-lines"></i> Lista raportów
+          </button>
+        </li>
+        <li class="menu-item" data-tab="users" id="nav-users" style="display: none;">
+          <button class="menu-btn" onclick="navigateTo('users')">
+            <i class="fa-solid fa-user-gear"></i> Użytkownicy
+          </button>
+        </li>
+        <li class="menu-item" data-tab="updates" id="nav-updates" style="display: none;">
+          <button class="menu-btn" onclick="navigateTo('updates')">
+            <i class="fa-solid fa-rotate"></i> Aktualizacje
+          </button>
+        </li>
+      </ul>
+
+      <div class="user-footer">
+        <div class="user-info-wrapper">
+          <span id="current-user-name" class="user-fullname">Użytkownik</span>
+          <div class="user-meta">
+            <span id="current-user-role" class="user-role">Ranga</span>
+            <span class="user-meta-divider">•</span>
+            <span id="current-user-dept" class="user-dept">Dział</span>
+          </div>
+        </div>
+        <button class="link-btn" onclick="handleLogout()" title="Wyloguj" aria-label="Wyloguj"><i class="fa-solid fa-right-from-bracket"></i></button>
+      </div>
+    </aside>
+
+    <main class="content-area">
+      <header class="topbar">
+        <div class="page-title" id="topbar-title">System</div>
+        <div>
+          <span style="font-size: 12px; color: var(--text-muted);">Wersja: testowa</span>
+        </div>
+      </header>
+
+      <section class="main-body" id="main-content">
+      </section>
+    </main>
+  </div>
+
+  <div id="modal-forgot-password" class="modal">
+    <div class="modal-box">
+      <h3 style="color: var(--primary); margin-bottom: 15px;">Odzyskiwanie hasła</h3>
+      <div class="form-group">
+        <label>Login</label>
+        <input type="text" id="forgot-login" class="form-control" placeholder="Wpisz login" />
+      </div>
+      <div class="form-group">
+        <label>E-mail</label>
+        <input type="email" id="forgot-email" class="form-control" placeholder="Wpisz adres e-mail" />
+      </div>
+      <button class="btn-primary" onclick="handleForgotPassword()">Wyślij hasło</button>
+      <button class="link-btn" style="width: 100%; text-align: center; margin-top: 10px;" onclick="toggleModal('modal-forgot-password', false)">Anuluj</button>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/app.js"></script>
+  <script src="js/login-fx.js"></script>
+  <script src="js/menu-fx.js"></script>
+</body>
+</html>

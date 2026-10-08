@@ -1,0 +1,435 @@
+:root {
+  --primary: #08584B;
+  --primary-hover: #053D34;
+  --accent: #FCD444;
+  --accent-hover: #E0BC3C;
+  --bg-main: #F5F5F7;
+  --card-bg: #FFFFFF;
+  --text-dark: #333333;
+  --text-muted: #888888;
+  --danger: #D9383A;
+  --danger-hover: #b52b2d;
+  --border-color: #E5E5E5;
+  --sidebar-width: 230px;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  font-family: 'Montserrat', sans-serif;
+}
+
+body {
+  background-color: var(--bg-main);
+  color: var(--text-dark);
+  min-height: 100vh;
+  display: flex;
+}
+
+/* ==========================================
+   WIDOK LOGOWANIA I TŁO
+   ========================================== */
+
+.login-card h2 {
+  color: var(--primary);
+  margin-bottom: 4px;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.login-card .subtitle {
+  color: var(--text-muted);
+  font-size: 13px;
+  margin-bottom: 22px;
+}
+
+/* Wyśrodkowanie w polach formularza logowania */
+#step-login .form-control {
+  text-align: center;
+}
+
+#step-login .form-control::placeholder {
+  text-align: center;
+}
+
+/* Obsługa błędów logowania */
+.input-error {
+  border-color: var(--danger) !important;
+  box-shadow: 0 0 0 2px rgba(217, 56, 58, 0.15) !important;
+  background-color: #fff8f8;
+}
+
+/* ==========================================
+   GŁÓWNY UKŁAD APLIKACJI
+   ========================================== */
+#app-container {
+  display: none;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* Sidebar */
+.sidebar {
+  width: var(--sidebar-width);
+  background-color: #FFFFFF;
+  border-right: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  flex-shrink: 0;
+}
+
+.sidebar-header {
+  padding: 20px 18px;
+  font-weight: 700;
+  color: var(--primary);
+  font-size: 15px;
+  border-bottom: 1px solid #EAEAEA;
+}
+
+.sidebar-menu {
+  flex: 1;
+  list-style: none;
+  padding-top: 10px;
+  overflow-y: auto;
+}
+
+.menu-item {
+  position: relative;
+}
+
+.menu-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  padding: 12px 18px;
+  border: none;
+  background: transparent;
+  color: var(--text-dark);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.2s, color 0.2s;
+}
+
+.menu-btn i {
+  margin-right: 12px;
+  font-size: 16px;
+  width: 20px;
+  text-align: center;
+}
+
+.menu-btn:hover,
+.menu-item.active .menu-btn {
+  background-color: var(--accent);
+  color: var(--text-dark);
+  font-weight: 600;
+}
+
+.menu-item.active::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 6px;
+  background-color: var(--primary);
+}
+
+.user-footer {
+  padding: 15px 18px;
+  border-top: 1px solid #EAEAEA;
+  background-color: #FAFAFA;
+  font-size: 13px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* Obszar treści */
+.content-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--bg-main);
+  overflow-y: auto;
+}
+
+.topbar {
+  height: 60px;
+  background: #FFFFFF;
+  border-bottom: 1px solid #EAEAEA;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 30px;
+  flex-shrink: 0;
+}
+
+.page-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--primary);
+}
+
+.main-body {
+  padding: 30px;
+  flex: 1;
+}
+
+/* ==========================================
+   KARTY I KONTENERY
+   ========================================== */
+.card {
+  background: #FFFFFF;
+  border-radius: 8px;
+  padding: 24px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  margin-bottom: 20px;
+}
+
+.card h3 {
+  color: var(--primary);
+  margin-bottom: 10px;
+  font-size: 18px;
+}
+
+.view-loader {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  color: var(--primary);
+  font-weight: 600;
+  gap: 10px;
+}
+
+/* ==========================================
+   FORMULARZE I KONTROLKI
+   ========================================== */
+.form-group {
+  margin-bottom: 15px;
+  text-align: left;
+}
+
+.form-group label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 6px;
+  color: var(--text-dark);
+}
+
+.form-control {
+  width: 100%;
+  padding: 11px 13px;
+  border-radius: 6px;
+  border: 1.5px solid #D9D9D9;
+  font-size: 14px;
+  color: var(--text-dark);
+  background-color: #FFFFFF;
+  text-align: left; /* Standardowo w całej aplikacji do lewej */
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.form-control:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(8, 88, 75, 0.1);
+}
+
+.form-control:disabled {
+  background-color: #F5F5F5;
+  color: var(--text-muted);
+  cursor: not-allowed;
+}
+
+/* Stylizacja Checkboxów */
+input[type="checkbox"] {
+  accent-color: var(--primary);
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+/* Przyciski */
+.btn-primary {
+  width: 100%;
+  padding: 12px;
+  border: none;
+  border-radius: 6px;
+  background-color: var(--primary);
+  color: #FFFFFF;
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background-color 0.2s, color 0.2s, opacity 0.2s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background-color: var(--primary-hover);
+}
+
+.btn-primary:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+  background-color: var(--primary);
+}
+
+.btn-secondary {
+  width: 100%;
+  padding: 12px;
+  border: 1.5px solid #D9D9D9;
+  border-radius: 6px;
+  background-color: #FFFFFF;
+  color: var(--text-dark);
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background-color 0.2s, border-color 0.2s, color 0.2s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-secondary:hover {
+  background-color: #F5F5F7;
+  border-color: #C0C0C0;
+}
+
+.btn-danger {
+  width: 100%;
+  padding: 12px;
+  border: none;
+  border-radius: 6px;
+  background-color: var(--danger);
+  color: #FFFFFF;
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background-color 0.2s, color 0.2s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-danger:hover {
+  background-color: var(--danger-hover);
+}
+
+.link-btn {
+  background: none;
+  border: none;
+  color: var(--primary);
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.2s, opacity 0.2s;
+}
+
+.link-btn:hover {
+  color: var(--primary-hover);
+  opacity: 0.85;
+}
+
+/* ==========================================
+   TABELA UŻYTKOWNIKÓW (USERS TABLE)
+   ========================================== */
+.users-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 0.9rem;
+}
+
+.users-table thead tr {
+  background: #F9FAFB !important;
+  border-bottom: 1px solid var(--border-color) !important;
+  color: #4B5563 !important;
+}
+
+.users-table th {
+  padding: 14px 16px;
+  font-weight: 600;
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.users-table td {
+  padding: 14px 16px;
+  border-bottom: 1px solid #F0F0F0;
+  color: var(--text-dark);
+}
+
+.users-table tbody tr:hover {
+  background-color: #FAFAFA;
+}
+
+/* ==========================================
+   MODALE (OKNA DIALOGOWE)
+   ========================================== */
+.modal {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(2px);
+  justify-content: center;
+  align-items: center;
+  z-index: 1002;
+  padding: 15px;
+}
+
+.modal.active {
+  display: flex;
+}
+
+.modal-box {
+  background: #FFFFFF;
+  padding: 26px;
+  border-radius: 10px;
+  width: 100%;
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.18);
+  animation: modalFadeIn 0.2s ease-out;
+}
+
+.modal-btn-row {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+}
+
+.modal-btn-row > button {
+  flex: 1;
+}
+
+@keyframes modalFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+#modal-delete-confirm #delete-user-target-name {
+  color: var(--text-dark) !important;
+}
+
+#modal-user-form label {
+  color: var(--text-dark) !important;
+}

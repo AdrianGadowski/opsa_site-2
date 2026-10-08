@@ -1,0 +1,15 @@
+<div class="card">
+  <h3>Rozliczanie czasu pracy</h3>
+  <p style="color: var(--text-muted); margin-bottom: 15px;">Formularz wprowadzania czasu pracy dla poszczególnych pracowników.</p>
+  <form onsubmit="event.preventDefault(); alert('Zapisano godziny');">
+    <div class="form-group" style="max-width: 400px;">
+      <label>Data</label>
+      <input type="date" class="form-control" />
+    </div>
+    <div class="form-group" style="max-width: 400px;">
+      <label>Liczba godzin</label>
+      <input type="number" class="form-control" min="1" max="24" value="8" />
+    </div>
+    <button type="submit" class="btn-primary" style="max-width: 200px;">Zapisz rozliczenie</button>
+  </form>
+</div>

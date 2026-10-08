@@ -1,0 +1,15 @@
+Dashboard → allow_dashboard
+
+Baza pracowników → allow_employees
+
+Rozliczanie czasu → allow_time_reporting
+
+Lista raportów → allow_reports
+
+Absencja → allow_absences
+
+Raporty absencji → allow_absence_reports
+
+Użytkownicy → allow_users
+
+Aktualizacje → allow_updates

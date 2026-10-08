@@ -1,0 +1,179 @@
+<div class="card" style="margin-bottom: 20px;">
+  <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;">
+    <div>
+      <h3 style="margin: 0; font-size: 1.3rem;">Użytkownicy systemu</h3>
+      <p style="color: var(--text-muted); margin: 5px 0 0 0; font-size: 0.9rem;">
+        Zarządzanie kontami dostępowymi oraz uprawnieniami modułowymi.
+      </p>
+    </div>
+    <button class="btn-primary" style="width: auto; padding: 10px 18px;" onclick="openCreateUserModal()">
+      <i class="fa-solid fa-user-plus"></i> Dodaj użytkownika
+    </button>
+  </div>
+</div>
+
+<!-- Tabela użytkowników -->
+<div class="card" style="padding: 0; overflow: hidden;">
+  <div style="overflow-x: auto;">
+    <table class="users-table" style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.9rem;">
+      <thead>
+        <tr style="background: rgba(255, 255, 255, 0.03); border-bottom: 1px solid rgba(255, 255, 255, 0.08); color: var(--text-muted);">
+          <th style="padding: 14px 16px;">Imię</th>
+          <th style="padding: 14px 16px;">Nazwisko</th>
+          <th style="padding: 14px 16px;">Login</th>
+          <th style="padding: 14px 16px;">Ranga</th>
+          <th style="padding: 14px 16px;">Dział</th>
+          <th style="padding: 14px 16px;">Uprawnienia</th>
+          <th style="padding: 14px 16px; text-align: center; width: 110px;">Akcje</th>
+        </tr>
+      </thead>
+      <tbody id="users-table-body">
+        <tr>
+          <td colspan="7" style="text-align: center; padding: 30px; color: var(--text-muted);">
+            <i class="fa-solid fa-spinner fa-spin"></i> Ładowanie listy użytkowników...
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Modal tworzenia i edycji użytkownika -->
+<div id="modal-user-form" class="modal">
+  <div class="modal-box" style="max-width: 620px; width: 95%; max-height: 90vh; overflow-y: auto; position: relative;">
+    <h3 id="modal-user-title" style="color: var(--primary); margin: 0 0 20px 0; text-align: center; width: 100%; font-size: 1.25rem;">
+      Nowy użytkownik
+    </h3>
+    <button class="link-btn" onclick="toggleModal('modal-user-form', false)" style="position: absolute; top: 22px; right: 22px; font-size: 1.2rem; cursor: pointer;">
+      <i class="fa-solid fa-xmark"></i>
+    </button>
+
+    <form id="user-form" onsubmit="handleSaveUser(event)">
+      <!-- Ukryte pole określające tryb: 'create' lub 'edit' -->
+      <input type="hidden" id="user-form-mode" value="create" />
+      <input type="hidden" id="original-user-login" value="" />
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+        <div class="form-group">
+          <label for="form-user-name">Imię</label>
+          <input type="text" id="form-user-name" class="form-control" placeholder="np. Jan" required />
+        </div>
+        <div class="form-group">
+          <label for="form-user-lastname">Nazwisko</label>
+          <input type="text" id="form-user-lastname" class="form-control" placeholder="np. Kowalski" required />
+        </div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+        <div class="form-group">
+          <label for="form-user-login">Login</label>
+          <input type="text" id="form-user-login" class="form-control" placeholder="np. jkowalski" required />
+        </div>
+        <div class="form-group">
+          <label for="form-user-password" id="label-form-user-password">Hasło</label>
+          <input type="password" id="form-user-password" class="form-control" placeholder="••••••••" required />
+          <small id="password-hint" style="display: none; color: var(--text-muted); font-size: 0.75rem;">Pozostaw puste, aby nie zmieniać hasła</small>
+        </div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+        <div class="form-group">
+          <label for="form-user-role-id">Ranga</label>
+          <select id="form-user-role-id" class="form-control" required>
+            <option value="">Wybierz rangę...</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="form-user-department-id">Dział</label>
+          <select id="form-user-department-id" class="form-control" required>
+            <option value="">Wybierz dział...</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Uprawnienia modułowe -->
+      <div style="margin-top: 15px; margin-bottom: 20px;">
+        <label style="font-size: 0.9rem; font-weight: 600; color: #fff; display: block; margin-bottom: 10px;">
+          Uprawnienia do modułów:
+        </label>
+        
+        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; background: rgba(255, 255, 255, 0.02); padding: 14px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.08);">
+          <label style="display: flex; align-items: center; gap: 10px; font-size: 0.88rem; cursor: pointer;">
+            <input type="checkbox" id="perm-dashboard" /> Dashboard
+          </label>
+          <label style="display: flex; align-items: center; gap: 10px; font-size: 0.88rem; cursor: pointer;">
+            <input type="checkbox" id="perm-employees" /> Baza pracowników
+          </label>
+          <label style="display: flex; align-items: center; gap: 10px; font-size: 0.88rem; cursor: pointer;">
+            <input type="checkbox" id="perm-time-reporting" /> Rozliczanie czasu
+          </label>
+          <label style="display: flex; align-items: center; gap: 10px; font-size: 0.88rem; cursor: pointer;">
+            <input type="checkbox" id="perm-reports" /> Lista raportów
+          </label>
+          <label style="display: flex; align-items: center; gap: 10px; font-size: 0.88rem; cursor: pointer;">
+            <input type="checkbox" id="perm-users" /> Użytkownicy
+          </label>
+          <label style="display: flex; align-items: center; gap: 10px; font-size: 0.88rem; cursor: pointer;">
+            <input type="checkbox" id="perm-updates" /> Aktualizacje
+          </label>
+        </div>
+      </div>
+
+      <div id="user-form-msg" style="display: none; font-size: 0.88rem; margin-bottom: 12px;"></div>
+
+      <div style="display: flex; justify-content: flex-end; gap: 12px;">
+        <button type="button" class="link-btn" onclick="toggleModal('modal-user-form', false)">Anuluj</button>
+        <button type="submit" id="btn-save-user" class="btn-primary" style="width: auto; padding: 10px 22px;">
+          Zapisz
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Modal potwierdzenia usunięcia użytkownika -->
+<div id="modal-delete-confirm" class="modal">
+  <div class="modal-box" style="max-width: 440px; width: 92%; text-align: center; padding: 25px 20px;">
+    <div style="width: 55px; height: 55px; border-radius: 50%; background: rgba(217, 56, 58, 0.1); color: var(--danger); display: flex; align-items: center; justify-content: center; font-size: 1.6rem; margin: 0 auto 15px auto;">
+      <i class="fa-solid fa-triangle-exclamation"></i>
+    </div>
+    
+    <h3 style="margin: 0 0 10px 0; font-size: 1.25rem;">Usuwanie użytkownika</h3>
+    
+    <p style="color: var(--text-muted); font-size: 0.95rem; margin-bottom: 24px; line-height: 1.5;">
+      Czy na pewno chcesz usunąć użytkownika <br/>
+      <strong id="delete-user-target-name" style="color: var(--text-dark); font-size: 1.05rem;"></strong>?
+    </p>
+
+    <div class="modal-btn-row">
+      <button type="button" class="btn-secondary" onclick="closeDeleteConfirmModal()">
+        Nie
+      </button>
+      <button type="button" id="btn-confirm-delete" class="btn-danger" disabled onclick="confirmDeleteUser()">
+        Tak (3s)
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal informacyjny: próba usunięcia własnego konta -->
+<div id="modal-self-delete-info" class="modal">
+  <div class="modal-box" style="max-width: 440px; width: 92%; text-align: center; padding: 25px 20px;">
+    <div style="width: 55px; height: 55px; border-radius: 50%; background: rgba(217, 56, 58, 0.1); color: var(--danger); display: flex; align-items: center; justify-content: center; font-size: 1.6rem; margin: 0 auto 15px auto;">
+      <i class="fa-solid fa-triangle-exclamation"></i>
+    </div>
+    
+    <h3 style="margin: 0 0 10px 0; font-size: 1.25rem;">Usuwanie użytkownika</h3>
+    
+    <p style="color: var(--text-muted); font-size: 0.95rem; margin-bottom: 24px; line-height: 1.5;">
+      Nie możesz usunąć aktualnie używanego konta.<br/>
+      Jeśli chcesz usunąć to konto, zaloguj się na innego użytkownika z odpowiednimi uprawnieniami.
+    </p>
+
+    <div class="modal-btn-row">
+      <button type="button" class="btn-primary" onclick="toggleModal('modal-self-delete-info', false)">
+        Rozumiem
+      </button>
+    </div>
+  </div>
+</div>

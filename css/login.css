@@ -1,0 +1,534 @@
+/* =========================================================
+   EKRAN LOGOWANIA - ODLEWNIA ŻELIWA
+   Paleta: zieleń #08584B, żółć #FCD444, + ciepły odcień
+   rozgrzanego metalu (#F59E0B) tylko w efektach "płynnego żeliwa".
+   Ten plik zastępuje blok <style> z index.html.
+   ========================================================= */
+
+@property --ring-angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+
+/* ---------- Nakładka i tło hali ---------- */
+#auth-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  overflow: hidden;
+  background-color: #03241e;
+  background-image:
+    radial-gradient(at 0% 0%, rgba(252, 212, 68, 0.12) 0px, transparent 48%),
+    radial-gradient(at 100% 100%, rgba(8, 88, 75, 0.85) 0px, transparent 55%),
+    radial-gradient(at 50% 15%, rgba(16, 128, 110, 0.45) 0px, transparent 50%),
+    radial-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+  background-size: 100% 100%, 100% 100%, 100% 100%, 28px 28px;
+  transition: opacity 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Zębatki w tle (bardzo subtelne) */
+.foundry-gear {
+  position: absolute;
+  color: rgba(252, 212, 68, 0.05);
+  pointer-events: none;
+  animation: gearSpin 90s linear infinite;
+}
+.foundry-gear.gear-a { font-size: 560px; top: -210px; left: -190px; }
+.foundry-gear.gear-b { font-size: 760px; top: -120px; right: -300px; animation-duration: 140s; animation-direction: reverse; }
+.foundry-gear.gear-c { font-size: 300px; bottom: 60px; left: 9%; animation-duration: 70s; animation-direction: reverse; opacity: 0.8; }
+
+@keyframes gearSpin { to { transform: rotate(360deg); } }
+
+/* Poświata żaru za kartą */
+.foundry-glow {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 780px;
+  height: 780px;
+  max-width: 140vw;
+  max-height: 140vw;
+  transform: translate(-50%, -46%);
+  background: radial-gradient(circle,
+    rgba(245, 158, 11, 0.22) 0%,
+    rgba(252, 212, 68, 0.08) 35%,
+    transparent 68%);
+  pointer-events: none;
+  animation: heatPulse 5s ease-in-out infinite;
+}
+
+@keyframes heatPulse {
+  0%, 100% { opacity: 0.75; transform: translate(-50%, -46%) scale(1); }
+  50%      { opacity: 1;    transform: translate(-50%, -46%) scale(1.07); }
+}
+
+/* Iskry (canvas) */
+#foundry-sparks {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* ---------- Płynne żeliwo u dołu ---------- */
+.foundry-floor {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 96px;
+  overflow: hidden;
+  z-index: 1;
+  pointer-events: none;
+  filter: drop-shadow(0 -8px 22px rgba(245, 158, 11, 0.5));
+}
+
+.molten-wave {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 200%;
+  height: 100%;
+}
+.molten-wave svg { display: block; width: 100%; height: 100%; }
+
+.molten-wave.wave-back  { opacity: 0.5; height: 108%; animation: waveSlide 26s linear infinite reverse; }
+.molten-wave.wave-front { animation: waveSlide 15s linear infinite; }
+
+@keyframes waveSlide { to { transform: translateX(-50%); } }
+
+/* ---------- Karta ---------- */
+.unified-auth-card {
+  position: relative;
+  z-index: 3;
+  background: #FFFFFF;
+  border: 1px solid #FCD444;
+  border-radius: 20px;
+  padding: 40px 34px 34px;
+  width: 90%;
+  max-width: 420px;
+  height: 520px;
+  box-shadow:
+    0 30px 60px -12px rgba(0, 0, 0, 0.5),
+    0 0 60px rgba(245, 158, 11, 0.16),
+    0 0 0 1px rgba(255, 255, 255, 0.85) inset;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  overflow: hidden;
+  animation: cardIn 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+@keyframes cardIn {
+  from { opacity: 0; transform: translateY(28px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* Pasek płynnego metalu na górze karty */
+.molten-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 6px;
+  background: linear-gradient(90deg, #08584B 0%, #FCD444 25%, #F59E0B 50%, #FCD444 75%, #08584B 100%);
+  background-size: 200% 100%;
+  animation: moltenFlow 5s linear infinite;
+}
+.molten-bar::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  height: 22px;
+  background: linear-gradient(180deg, rgba(245, 158, 11, 0.22), transparent);
+}
+
+@keyframes moltenFlow { to { background-position: -200% 0; } }
+
+/* ---------- Ikona (stany: domyślny / success / welcome) ---------- */
+.morph-icon-box {
+  width: 68px;
+  height: 68px;
+  border-radius: 20px;
+  background: rgba(8, 88, 75, 0.08);
+  border: 1.5px solid rgba(8, 88, 75, 0.2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  color: var(--primary);
+  margin-bottom: 18px;
+  flex-shrink: 0;
+  position: relative;
+  transition: all 0.65s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Obracający się pierścień żaru wokół ikony */
+.morph-icon-box::before {
+  content: "";
+  position: absolute;
+  inset: -7px;
+  border-radius: 26px;
+  padding: 2.5px;
+  background: conic-gradient(from var(--ring-angle),
+    transparent 0%, transparent 55%,
+    rgba(245, 158, 11, 0.9) 85%, #FCD444 100%);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#fff 0 0) content-box exclude, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  animation: ringSpin 2.8s linear infinite;
+  transition: opacity 0.4s ease;
+  pointer-events: none;
+}
+@keyframes ringSpin { to { --ring-angle: 360deg; } }
+
+.morph-icon-box.state-success {
+  width: 82px;
+  height: 82px;
+  border-radius: 22px;
+  background: rgba(16, 185, 129, 0.12);
+  border: 2px solid #10B981;
+  box-shadow: 0 12px 30px rgba(16, 185, 129, 0.25);
+}
+.morph-icon-box.state-success::before { opacity: 0; }
+
+.morph-icon-box.state-welcome {
+  width: 68px;
+  height: 68px;
+  border-radius: 20px;
+  background: rgba(252, 212, 68, 0.18);
+  border: 1.5px solid rgba(252, 212, 68, 0.65);
+  color: #8c6a00;
+  box-shadow: 0 0 0 0 rgba(252, 212, 68, 0.45);
+  animation: pulseThemeGlow 2.2s infinite ease-in-out;
+}
+
+.icon-layer {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.35s ease, transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  pointer-events: none;
+}
+
+#icon-factory   { opacity: 1; transform: scale(1); }
+#icon-checkmark { opacity: 0; transform: scale(0.6); }
+#icon-user      { opacity: 0; transform: scale(0.6); }
+
+#auth-checkmark-svg { width: 48px; height: 48px; }
+
+.morph-icon-box.state-success #icon-factory   { opacity: 0; transform: scale(0.6); }
+.morph-icon-box.state-success #icon-checkmark { opacity: 1; transform: scale(1); }
+.morph-icon-box.state-success #icon-user      { opacity: 0; transform: scale(0.6); }
+
+.morph-icon-box.state-welcome #icon-factory   { opacity: 0 !important; transform: scale(0.6); }
+.morph-icon-box.state-welcome #icon-checkmark { opacity: 0; transform: scale(0.6); }
+.morph-icon-box.state-welcome #icon-user      { opacity: 1; transform: scale(1); }
+
+.checkmark-check {
+  stroke: #10B981;
+  stroke-width: 4.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 50;
+  stroke-dashoffset: 50;
+}
+.morph-icon-box.state-success .checkmark-check {
+  animation: drawCheck 0.45s 0.15s cubic-bezier(0.65, 0, 0.45, 1) forwards;
+}
+@keyframes drawCheck { 100% { stroke-dashoffset: 0; } }
+
+@keyframes pulseThemeGlow {
+  0%, 100% { transform: scale(1);    box-shadow: 0 0 0 0 rgba(252, 212, 68, 0.45); }
+  50%      { transform: scale(1.04); box-shadow: 0 0 20px 4px rgba(252, 212, 68, 0.35); }
+}
+
+/* ---------- Kroki karty ---------- */
+.card-steps-stage {
+  display: grid;
+  grid-template-columns: 1fr;
+  width: 100%;
+  align-items: center;
+}
+
+.card-body-step {
+  grid-column: 1;
+  grid-row: 1;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transition: opacity 0.45s ease, transform 0.45s cubic-bezier(0.4, 0, 0.2, 1);
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(10px);
+}
+.card-body-step.active {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+/* Krok: logowanie */
+#step-login h2 {
+  color: var(--primary);
+  margin-bottom: 4px;
+  font-size: 23px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+#step-login .subtitle {
+  color: var(--text-muted);
+  font-size: 13px;
+  margin-bottom: 18px;
+}
+#step-login .form-control { text-align: center; }
+#step-login .form-control::placeholder { text-align: center; }
+
+#step-login .form-control:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(252, 212, 68, 0.45);
+}
+
+/* Jednorazowe wejście elementów formularza (jedna choreografia) */
+#step-login > * { animation: fieldIn 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+#step-login > :nth-child(1) { animation-delay: 0.35s; }
+#step-login > :nth-child(2) { animation-delay: 0.42s; }
+#step-login > :nth-child(3) { animation-delay: 0.5s; }
+#step-login > :nth-child(4) { animation-delay: 0.58s; }
+#step-login > :nth-child(5) { animation-delay: 0.66s; }
+#step-login > :nth-child(6) { animation-delay: 0.72s; }
+#step-login > :nth-child(7) { animation-delay: 0.78s; }
+@keyframes fieldIn {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Przycisk logowania - płynny metal, błysk przy najechaniu */
+#btn-login {
+  position: relative;
+  overflow: hidden;
+  margin-top: 2px;
+  letter-spacing: 0.01em;
+  transition: background-color 0.25s, color 0.25s, box-shadow 0.25s, transform 0.15s;
+}
+#btn-login::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -60%;
+  width: 40%;
+  background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.45), transparent);
+  transform: skewX(-20deg);
+}
+#btn-login:hover:not(:disabled) {
+  background-color: var(--accent);
+  color: var(--text-dark);
+  box-shadow: 0 8px 22px rgba(245, 158, 11, 0.4);
+}
+#btn-login:hover:not(:disabled)::after { animation: btnShine 0.8s ease; }
+#btn-login:active:not(:disabled) { transform: translateY(1px); }
+@keyframes btnShine { to { left: 130%; } }
+
+#step-login .link-btn { margin-top: 10px; }
+
+/* Błędy */
+.input-error {
+  border-color: var(--danger) !important;
+  box-shadow: 0 0 0 2px rgba(217, 56, 58, 0.15) !important;
+  background-color: #fff8f8;
+}
+#step-login .form-control.input-error { animation: fieldShake 0.4s ease; }
+@keyframes fieldShake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-6px); }
+  40% { transform: translateX(5px); }
+  60% { transform: translateX(-4px); }
+  80% { transform: translateX(2px); }
+}
+
+.error-slot {
+  height: 22px;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  margin-top: 2px;
+  margin-bottom: 8px;
+}
+#login-error-msg {
+  color: var(--danger);
+  font-size: 0.84rem;
+  font-weight: 500;
+  text-align: left;
+  opacity: 0;
+  transform: translateY(-3px);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  pointer-events: none;
+}
+#login-error-msg.visible { opacity: 1; transform: translateY(0); }
+
+/* Krok: sukces */
+#step-success .success-label {
+  color: var(--primary);
+  font-size: 1.35rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  margin: 10px 0;
+}
+
+/* Krok: powitanie */
+#welcome-text {
+  font-size: 1.45rem;
+  font-weight: 700;
+  color: var(--primary);
+  margin: 0;
+  min-height: 2.2rem;
+  letter-spacing: -0.01em;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+#welcome-user-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-dark);
+  margin-top: 14px;
+  margin-bottom: 22px;
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity 0.35s ease, transform 0.35s ease;
+  background: #F4F6F5;
+  border: 1px solid #E2E8E5;
+  padding: 7px 18px;
+  border-radius: 999px;
+}
+#welcome-user-meta.visible { opacity: 1; transform: translateY(0); }
+.welcome-meta-divider { color: var(--primary); opacity: 0.4; }
+
+.loader-box {
+  width: 100%;
+  max-width: 320px;
+  margin-top: 8px;
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 0.35s ease, transform 0.35s ease;
+}
+.loader-box.visible { opacity: 1; transform: translateY(0); }
+
+.progress-bar-bg {
+  width: 100%;
+  height: 10px;
+  background: #EEF1F0;
+  border-radius: 999px;
+  overflow: hidden;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+
+/* Pasek postępu jako wlewane żeliwo */
+.progress-bar-fill {
+  width: 0%;
+  height: 100%;
+  background: linear-gradient(90deg, #E0BC3C, #FCD444 40%, #F59E0B 70%, #FCD444);
+  background-size: 200% 100%;
+  border-radius: 999px;
+  transition: width 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 0 14px rgba(245, 158, 11, 0.7);
+  animation: moltenFlow 1.6s linear infinite;
+}
+
+.status-subtext {
+  margin-top: 14px;
+  font-size: 0.83rem;
+  color: var(--text-muted);
+  min-height: 1.2rem;
+  font-weight: 500;
+}
+
+/* Stopka z prawami autorskimi - na żarze, więc ciemny tekst */
+.auth-footer-copyright {
+  position: absolute;
+  bottom: 14px;
+  left: 0;
+  right: 0;
+  z-index: 4;
+  text-align: center;
+  font-size: 12px;
+  letter-spacing: 0.05em;
+  color: rgba(3, 36, 30, 0.8);
+  font-weight: 700;
+  pointer-events: none;
+  user-select: none;
+}
+
+/* ---------- Stopka użytkownika w panelu bocznym (z dawnego <style>) ---------- */
+.user-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  gap: 10px;
+}
+.user-info-wrapper { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.user-fullname {
+  font-weight: 600;
+  font-size: 0.92rem;
+  color: var(--primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.user-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.74rem;
+  color: var(--text-muted);
+  margin-top: 3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.user-role { font-weight: 500; }
+.user-meta-divider { opacity: 0.4; }
+.user-dept { opacity: 0.85; overflow: hidden; text-overflow: ellipsis; }
+
+/* ---------- Małe ekrany ---------- */
+@media (max-width: 480px) {
+  .unified-auth-card { padding: 36px 22px 28px; height: 510px; }
+  .foundry-floor { height: 70px; }
+  .foundry-gear.gear-c { display: none; }
+}
+@media (max-height: 620px) {
+  .foundry-gear.gear-c { display: none; }
+  .auth-footer-copyright { display: none; }
+}
+
+/* ---------- Ograniczenie ruchu ---------- */
+@media (prefers-reduced-motion: reduce) {
+  .foundry-gear,
+  .foundry-glow,
+  .molten-wave,
+  .molten-bar,
+  .morph-icon-box::before,
+  .progress-bar-fill { animation: none !important; }
+  .unified-auth-card,
+  #step-login > * { animation-duration: 0.01s !important; animation-delay: 0s !important; }
+}

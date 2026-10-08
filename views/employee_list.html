@@ -1,0 +1,183 @@
+<!-- Karta nagłówka z przyciskiem dodawania -->
+<div class="card" style="margin-bottom: 20px;">
+  <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;">
+    <div>
+      <h3 style="margin: 0; font-size: 1.3rem;">Baza pracowników</h3>
+      <p style="color: var(--text-muted); margin: 5px 0 0 0; font-size: 0.9rem;">
+        Ewidencja pracowników, przypisanie do firm zewnętrznych i działów wewnętrznych.
+      </p>
+    </div>
+    <button class="btn-primary" style="width: auto; padding: 10px 18px;" onclick="openCreateEmployeeModal()">
+      <i class="fa-solid fa-user-plus"></i> Dodaj pracownika
+    </button>
+  </div>
+</div>
+
+<!-- Karta filtrów i wyszukiwania -->
+<div class="card" style="margin-bottom: 20px; padding: 16px 20px;">
+  <div style="display: grid; grid-template-columns: 2fr 1.2fr 1.2fr auto; gap: 14px; align-items: end;">
+    <div class="form-group" style="margin-bottom: 0;">
+      <label for="emp-filter-search" style="font-size: 0.8rem; text-transform: uppercase; color: var(--text-muted);">
+        Szukaj (Imię / Nazwisko)
+      </label>
+      <div style="position: relative;">
+        <input 
+          type="text" 
+          id="emp-filter-search" 
+          class="form-control" 
+          placeholder="Wpisz imię lub nazwisko..." 
+          oninput="applyEmployeeFilters()"
+          style="padding-left: 36px;"
+        />
+        <i class="fa-solid fa-magnifying-glass" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 0.9rem;"></i>
+      </div>
+    </div>
+
+    <div class="form-group" style="margin-bottom: 0;">
+      <label for="emp-filter-business" style="font-size: 0.8rem; text-transform: uppercase; color: var(--text-muted);">
+        Firma (Business)
+      </label>
+      <select id="emp-filter-business" class="form-control" onchange="applyEmployeeFilters()">
+        <option value="">Wszystkie firmy</option>
+      </select>
+    </div>
+
+    <div class="form-group" style="margin-bottom: 0;">
+      <label for="emp-filter-dept" style="font-size: 0.8rem; text-transform: uppercase; color: var(--text-muted);">
+        Dział (Department)
+      </label>
+      <select id="emp-filter-dept" class="form-control" onchange="applyEmployeeFilters()">
+        <option value="">Wszystkie działy</option>
+      </select>
+    </div>
+
+    <div>
+      <button 
+        type="button" 
+        class="btn-secondary" 
+        style="height: 42px; padding: 0 16px; font-size: 0.85rem;" 
+        onclick="resetEmployeeFilters()"
+        title="Wyczyść filtry"
+      >
+        <i class="fa-solid fa-rotate-left" style="margin-right: 6px;"></i> Reset
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Karta z tabelą pracowników -->
+<div class="card" style="padding: 0; overflow: hidden;">
+  <div style="overflow-x: auto;">
+    <table class="users-table" style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.9rem;">
+      <thead>
+        <tr style="background: #F9FAFB; border-bottom: 1px solid var(--border-color); color: #4B5563;">
+          <th style="padding: 14px 18px;">Pracownik</th>
+          <th style="padding: 14px 18px;">Telefon</th>
+          <th style="padding: 14px 18px;">Firma</th>
+          <th style="padding: 14px 18px;">Dział</th>
+          <th style="padding: 14px 18px; text-align: center; width: 110px;">Akcje</th>
+        </tr>
+      </thead>
+      <tbody id="employees-table-body">
+        <tr>
+          <td colspan="5" style="text-align: center; padding: 30px; color: var(--text-muted);">
+            <i class="fa-solid fa-spinner fa-spin"></i> Ładowanie pracowników...
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Modal tworzenia / edycji pracownika -->
+<div id="modal-employee-form" class="modal">
+  <div class="modal-box" style="max-width: 540px; width: 92%; position: relative;">
+    <h3 id="modal-employee-title" style="color: var(--primary); margin: 0 0 20px 0; text-align: center; font-size: 1.25rem;">
+      Nowy pracownik
+    </h3>
+    <button class="link-btn" onclick="toggleModal('modal-employee-form', false)" style="position: absolute; top: 22px; right: 22px; font-size: 1.2rem; cursor: pointer;">
+      <i class="fa-solid fa-xmark"></i>
+    </button>
+
+    <form id="employee-form" onsubmit="handleSaveEmployee(event)">
+      <input type="hidden" id="employee-form-mode" value="create" />
+      <input type="hidden" id="employee-form-id" value="" />
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+        <div class="form-group">
+          <label for="form-emp-first-name">Imię *</label>
+          <input type="text" id="form-emp-first-name" class="form-control" placeholder="np. Jan" required />
+        </div>
+        <div class="form-group">
+          <label for="form-emp-last-name">Nazwisko *</label>
+          <input type="text" id="form-emp-last-name" class="form-control" placeholder="np. Kowalski" required />
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="form-emp-phone">Numer telefonu</label>
+        <div style="position: relative;">
+          <input 
+            type="tel" 
+            id="form-emp-phone" 
+            class="form-control" 
+            placeholder="np. +48 500 123 456" 
+            style="padding-left: 36px;"
+          />
+          <i class="fa-solid fa-phone" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 0.9rem;"></i>
+        </div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+        <div class="form-group">
+          <label for="form-emp-business-id">Firma *</label>
+          <select id="form-emp-business-id" class="form-control" required>
+            <option value="">Wybierz firmę...</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="form-emp-dept-id">Dział *</label>
+          <select id="form-emp-dept-id" class="form-control" required>
+            <option value="">Wybierz dział...</option>
+          </select>
+        </div>
+      </div>
+
+      <input type="hidden" id="form-emp-active" value="true" />
+
+      <div id="employee-form-msg" style="display: none; font-size: 0.88rem; margin-bottom: 14px;"></div>
+
+      <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 15px;">
+        <button type="button" class="link-btn" onclick="toggleModal('modal-employee-form', false)">Anuluj</button>
+        <button type="submit" id="btn-save-employee" class="btn-primary" style="width: auto; padding: 10px 24px;">
+          Zapisz
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Modal potwierdzenia usunięcia pracownika (odliczanie 3s) -->
+<div id="modal-employee-delete-confirm" class="modal">
+  <div class="modal-box" style="max-width: 440px; width: 92%; text-align: center; padding: 25px 20px;">
+    <div style="width: 55px; height: 55px; border-radius: 50%; background: rgba(217, 56, 58, 0.1); color: var(--danger); display: flex; align-items: center; justify-content: center; font-size: 1.6rem; margin: 0 auto 15px auto;">
+      <i class="fa-solid fa-triangle-exclamation"></i>
+    </div>
+    
+    <h3 style="margin: 0 0 10px 0; font-size: 1.25rem;">Usuwanie pracownika</h3>
+    
+    <p style="color: var(--text-muted); font-size: 0.95rem; margin-bottom: 24px; line-height: 1.5;">
+      Czy na pewno chcesz usunąć pracownika <br/>
+      <strong id="delete-employee-target-name" style="color: var(--text-dark); font-size: 1.05rem;"></strong>?
+    </p>
+
+    <div class="modal-btn-row">
+      <button type="button" class="btn-secondary" onclick="closeDeleteEmployeeModal()">
+        Nie
+      </button>
+      <button type="button" id="btn-confirm-delete-employee" class="btn-danger" disabled onclick="confirmDeleteEmployee()">
+        Tak (3s)
+      </button>
+    </div>
+  </div>
+</div>
