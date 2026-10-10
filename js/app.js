@@ -6,6 +6,10 @@ const SUPABASE_ANON_KEY = "sb_publishable_64Xg3rGa9kuBZo5KjGgCrg_X8felZMu";
 
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+// Numer wydania doklejany do adresów plików, żeby przeglądarka nie używała starych kopii.
+// Zmieniaj przy każdej publikacji - tutaj i w index.html (?v=...).
+const APP_BUILD = "20261011";
+
 let currentUser = null;
 let cachedUsers = [];
 let userToDeleteLogin = null;
@@ -339,7 +343,7 @@ async function navigateTo(viewName) {
   `;
 
   try {
-    const response = await fetch(`views/${viewName}.html`);
+    const response = await fetch(`views/${viewName}.html?v=${APP_BUILD}`);
     if (!response.ok) {
       throw new Error(`Nie udało się odnaleźć pliku views/${viewName}.html (Status: ${response.status})`);
     }
