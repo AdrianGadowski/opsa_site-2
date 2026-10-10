@@ -1,7 +1,124 @@
+<style>
+  /* ===== Moje konto ===== */
+  .us-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; margin-bottom: 16px; }
+  .us-panel { background: #fff; border-radius: 14px; border: 1px solid var(--border-color); box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04); padding: 22px; }
+  .us-panel h4 { margin: 0; font-size: 1rem; font-weight: 700; color: var(--text-dark); }
+  .us-panel .sub { margin: 3px 0 18px 0; font-size: 0.82rem; color: var(--text-muted); }
+
+  /* --- Dane --- */
+  .us-id { display: flex; align-items: center; gap: 14px; padding-bottom: 18px; margin-bottom: 6px; border-bottom: 1px solid #F1F1F4; }
+  .us-avatar {
+    width: 58px; height: 58px; flex: none; border-radius: 16px; display: grid; place-items: center;
+    font-size: 1.2rem; font-weight: 800; color: #03241E;
+    background: linear-gradient(135deg, #FCD444, #F59E0B); box-shadow: 0 6px 16px rgba(245, 158, 11, 0.3);
+  }
+  .us-id .name { font-size: 1.15rem; font-weight: 700; color: var(--text-dark); overflow-wrap: anywhere; }
+  .us-id .role { display: inline-block; margin-top: 5px; padding: 3px 10px; border-radius: 999px; font-size: 0.74rem; font-weight: 700; background: #E6F4EA; color: var(--primary); }
+
+  .us-rows { margin: 0; }
+  .us-rows div { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; padding: 11px 0; border-bottom: 1px solid #F5F5F7; }
+  .us-rows div:last-child { border-bottom: none; padding-bottom: 0; }
+  .us-rows dt { font-size: 0.8rem; font-weight: 600; color: var(--text-muted); }
+  .us-rows dd { margin: 0; font-size: 0.92rem; font-weight: 600; color: var(--text-dark); text-align: right; overflow-wrap: anywhere; }
+
+  /* --- Hasło --- */
+  .us-pass { position: relative; }
+  .us-pass .form-control { padding-right: 44px; }
+  .us-pass button {
+    position: absolute; right: 4px; top: 50%; transform: translateY(-50%);
+    width: 36px; height: 36px; border: none; border-radius: 8px; background: transparent; color: var(--text-muted); cursor: pointer;
+  }
+  .us-pass button:hover { background: #F1F3F5; color: var(--text-dark); }
+  .us-pass button:focus-visible { outline: 3px solid rgba(8, 88, 75, 0.35); }
+  .us-hint { display: block; margin-top: 5px; font-size: 0.75rem; color: var(--text-muted); }
+  .us-msg { display: none; align-items: flex-start; gap: 8px; padding: 10px 12px; border-radius: 8px; margin-bottom: 14px; font-size: 0.86rem; font-weight: 500; }
+  .us-msg.visible { display: flex; }
+  .us-msg.error { background: rgba(217, 56, 58, 0.08); color: #9b1c1f; border: 1px solid rgba(217, 56, 58, 0.3); }
+  .us-msg.success { background: rgba(16, 185, 129, 0.1); color: #0b7a57; border: 1px solid rgba(16, 185, 129, 0.35); }
+  .us-msg i { margin-top: 2px; }
+
+  /* --- Uprawnienia --- */
+  .us-perms { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 10px; }
+  .us-perm { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--border-color); background: #FAFAFB; }
+  .us-perm .ico { width: 36px; height: 36px; flex: none; border-radius: 10px; display: grid; place-items: center; font-size: 0.9rem; background: #ECEEF1; color: #8B919A; }
+  .us-perm .lbl { font-size: 0.88rem; font-weight: 600; color: #8B919A; }
+  .us-perm .st { display: flex; align-items: center; gap: 5px; margin-top: 2px; font-size: 0.74rem; color: #8B919A; }
+  .us-perm.on { background: #fff; border-color: rgba(8, 88, 75, 0.3); }
+  .us-perm.on .ico { background: #E6F4EA; color: var(--primary); }
+  .us-perm.on .lbl { color: var(--text-dark); }
+  .us-perm.on .st { color: #0b7a57; font-weight: 600; }
+</style>
+
 <div class="page-hero">
   <div>
     <div class="eyebrow">Konto</div>
-    <h3>Ustawienia</h3>
-    <p>Zarządzanie kontami dostępowymi oraz uprawnieniami modułowymi.</p>
+    <h3>Moje konto</h3>
+    <p>Twoje dane, uprawnienia do modułów oraz zmiana hasła.</p>
   </div>
+</div>
+
+<div class="us-grid">
+  <!-- Dane użytkownika -->
+  <div class="us-panel">
+    <h4>Moje dane</h4>
+    <p class="sub">Dane konta może zmienić administrator.</p>
+
+    <div class="us-id">
+      <div class="us-avatar" id="us-avatar" aria-hidden="true">?</div>
+      <div>
+        <div class="name" id="us-fullname">—</div>
+        <span class="role" id="us-role-chip">—</span>
+      </div>
+    </div>
+
+    <dl class="us-rows">
+      <div><dt>Imię</dt><dd id="us-name">—</dd></div>
+      <div><dt>Nazwisko</dt><dd id="us-lastname">—</dd></div>
+      <div><dt>Login</dt><dd id="us-login">—</dd></div>
+      <div><dt>Ranga</dt><dd id="us-role">—</dd></div>
+      <div><dt>Dział</dt><dd id="us-dept">—</dd></div>
+    </dl>
+  </div>
+
+  <!-- Zmiana hasła -->
+  <div class="us-panel">
+    <h4>Zmiana hasła</h4>
+    <p class="sub">Po zmianie logujesz się nowym hasłem.</p>
+
+    <div id="us-msg" class="us-msg" role="status"></div>
+
+    <form onsubmit="event.preventDefault(); usChangePassword();" autocomplete="off">
+      <div class="form-group">
+        <label for="us-pass-current">Obecne hasło</label>
+        <div class="us-pass">
+          <input type="password" id="us-pass-current" class="form-control" autocomplete="current-password" />
+          <button type="button" onclick="usTogglePass('us-pass-current', this)" aria-label="Pokaż hasło"><i class="fa-solid fa-eye"></i></button>
+        </div>
+      </div>
+      <div class="form-group">
+        <label for="us-pass-new">Nowe hasło</label>
+        <div class="us-pass">
+          <input type="password" id="us-pass-new" class="form-control" autocomplete="new-password" />
+          <button type="button" onclick="usTogglePass('us-pass-new', this)" aria-label="Pokaż hasło"><i class="fa-solid fa-eye"></i></button>
+        </div>
+        <small class="us-hint">Co najmniej 6 znaków.</small>
+      </div>
+      <div class="form-group">
+        <label for="us-pass-repeat">Powtórz nowe hasło</label>
+        <div class="us-pass">
+          <input type="password" id="us-pass-repeat" class="form-control" autocomplete="new-password" />
+          <button type="button" onclick="usTogglePass('us-pass-repeat', this)" aria-label="Pokaż hasło"><i class="fa-solid fa-eye"></i></button>
+        </div>
+      </div>
+
+      <button type="submit" id="us-pass-save" class="btn-primary"><i class="fa-solid fa-key"></i> Zmień hasło</button>
+    </form>
+  </div>
+</div>
+
+<!-- Uprawnienia -->
+<div class="us-panel">
+  <h4>Moje uprawnienia</h4>
+  <p class="sub">Moduły, do których masz dostęp. Uprawnienia nadaje administrator.</p>
+  <div class="us-perms" id="us-perms"></div>
 </div>

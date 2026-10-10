@@ -196,7 +196,7 @@ async function initReportTimeView() {
   } catch (err) {
     console.error("Błąd ładowania widoku rozliczania czasu:", err);
     if (tbody) {
-      tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;color:var(--danger);padding:25px;">
+      tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;color:var(--danger);padding:25px;">
         Nie udało się pobrać pracowników: ${rtEsc(err.message || err)}</td></tr>`;
     }
   }
@@ -235,8 +235,7 @@ function rtRowHtml(emp) {
 
   return `
     <tr id="rt-row-${id}" class="${rtRowClass(id)}" style="border-bottom: 1px solid #F0F0F0;">
-      <td style="font-weight: 600; color: var(--primary);">${rtEsc(emp.first_name)}</td>
-      <td style="font-weight: 600; color: var(--primary);">${rtEsc(emp.last_name)}</td>
+      <td class="rt-name" style="font-weight: 600; color: var(--primary);">${rtEsc(emp.first_name)} ${rtEsc(emp.last_name)}</td>
       <td>
         <span style="background: rgba(8, 88, 75, 0.06); color: var(--primary); padding: 4px 9px; border-radius: 4px; font-size: 0.82rem; font-weight: 600; border: 1px solid rgba(8, 88, 75, 0.15);">
           ${rtEsc(emp.business?.business || "-")}
@@ -276,7 +275,7 @@ function rtRenderTable() {
   const list = rtVisibleEmployees();
 
   if (list.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;color:var(--text-muted);padding:30px;">
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:30px;">
       Brak pracowników spełniających podane kryteria.</td></tr>`;
     return;
   }
@@ -369,7 +368,11 @@ function rtClearRow(id) {
 
 function rtClearAll() {
   if (Object.keys(rtDraft).length === 0) return;
-  if (!confirm("Wyczyścić wszystkie uzupełnione godziny?")) return;
+  toggleModal("modal-rt-clear-confirm", true);
+}
+
+function rtConfirmClearAll() {
+  toggleModal("modal-rt-clear-confirm", false);
   rtDraft = {};
   rtShowErrors = false;
   rtRenderTable();

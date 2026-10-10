@@ -205,9 +205,9 @@ function dbRenderKpis(total, reportCount, dayCount, empCount) {
   document.getElementById("db-kpis").innerHTML =
     tile("lead", "fa-clock", "Godziny obecne", dbNum(total.present), "h",
       `Średnio ${dbNum(perEmp)} h na pracownika`) +
-    tile("", "fa-user-xmark", "Godziny nieobecne", dbNum(total.absent), "h",
+    tile("absent", "fa-user-xmark", "Godziny nieobecne", dbNum(total.absent), "h",
       `z ${dbNum(all)} h zgłoszonych łącznie`) +
-    tile("", "fa-percent", "Wskaźnik absencji", dbNum(rate), "%",
+    tile("rate", "fa-percent", "Wskaźnik absencji", dbNum(rate), "%",
       "Udział godzin nieobecnych w zgłoszonych",
       `<div class="db-meter" aria-hidden="true"><span style="width: ${Math.min(rate, 100)}%;"></span></div>`) +
     tile("", "fa-file-lines", "Raporty", dbNum(reportCount, 0), "",
@@ -232,6 +232,7 @@ function dbRenderTime(byTime, year, month) {
   });
 
   title.textContent = month ? "Godziny dzień po dniu" : "Godziny w kolejnych miesiącach";
+  document.getElementById("db-legend-weekend").style.display = month ? "" : "none";
   const maxTotal = Math.max(...points.map(p => p.present + p.absent));
 
   if (maxTotal <= 0) {
@@ -259,11 +260,15 @@ function dbRenderTime(byTime, year, month) {
         ${p.absent > 0 ? `<span class="seg a" style="flex: ${p.absent} 0 0;"></span>` : ""}
         ${p.present > 0 ? `<span class="seg p" style="flex: ${p.present} 0 0;"></span>` : ""}
       </div>` : "";
-    const label = `${p.full}: obecne ${dbHours(p.present)}, nieobecne ${dbHours(p.absent)}`;
+    // Weekend (tylko w widoku dni): sobota i niedziela mają własne tło kolumny
+    const weekday = month ? new Date(Number(year), Number(month) - 1, p.key).getDay() : -1;
+    const dayClass = weekday === 6 ? " sat" : weekday === 0 ? " sun" : "";
+    const dayName = weekday === 6 ? " (sobota)" : weekday === 0 ? " (niedziela)" : "";
+    const label = `${p.full}${dayName}: obecne ${dbHours(p.present)}, nieobecne ${dbHours(p.absent)}`;
 
     return `
-      <div class="db-col" tabindex="0" role="img" aria-label="${rtEsc(label)}"
-           data-tip="${dbTipAttr(p.full, dbHoursLines(p.present, p.absent))}">
+      <div class="db-col${dayClass}" tabindex="0" role="img" aria-label="${rtEsc(label)}"
+           data-tip="${dbTipAttr(p.full + dayName, dbHoursLines(p.present, p.absent))}">
         <div class="area">${stack}</div>
         <div class="xl${minor}">${rtEsc(p.axis)}</div>
       </div>`;

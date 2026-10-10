@@ -1,3 +1,9 @@
+<style>
+  /* Telefon, Firma i Dział wyśrodkowane (nagłówki i komórki) */
+  .emp-table th:nth-child(n+2):nth-child(-n+4),
+  .emp-table td:nth-child(n+2):nth-child(-n+4) { text-align: center; }
+</style>
+
 <!-- Karta nagłówka z przyciskiem dodawania -->
 <div class="page-hero">
   <div>
@@ -67,7 +73,7 @@
 <!-- Karta z tabelą pracowników -->
 <div class="card" style="padding: 0; overflow: hidden;">
   <div style="overflow-x: auto;">
-    <table class="users-table" style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.9rem;">
+    <table class="users-table emp-table" style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.9rem;">
       <thead>
         <tr style="background: #F9FAFB; border-bottom: 1px solid var(--border-color); color: #4B5563;">
           <th style="padding: 14px 18px;">Pracownik</th>

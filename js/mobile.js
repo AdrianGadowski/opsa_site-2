@@ -27,7 +27,7 @@
 
     // Wybór pozycji lub wylogowanie zamyka panel
     sidebar.addEventListener("click", (e) => {
-      if (e.target.closest(".menu-btn, .user-footer .link-btn")) setOpen(false);
+      if (e.target.closest(".menu-btn, .user-footer .link-btn, .user-avatar, .user-info-wrapper")) setOpen(false);
     });
     document.addEventListener("keydown", (e) => {
       if (e.key === "Escape") setOpen(false);

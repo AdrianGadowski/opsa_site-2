@@ -8,7 +8,7 @@ const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // Numer wydania doklejany do adresów plików, żeby przeglądarka nie używała starych kopii.
 // Zmieniaj przy każdej publikacji - tutaj i w index.html (?v=...).
-const APP_BUILD = "20261014";
+const APP_BUILD = "20261024";
 
 let currentUser = null;
 let cachedUsers = [];
@@ -21,8 +21,14 @@ const viewTitles = {
   report_time: "Rozliczanie czasu pracy",
   reports: "Lista raportów",
   users: "Zarządzanie użytkownikami",
-  updates: "Aktualizacje systemu"
+  updates: "Aktualizacje systemu",
+  user: "Moje konto"
 };
+
+// Kliknięcie w awatar lub dane użytkownika w stopce menu otwiera "Moje konto"
+document.querySelector(".user-footer")?.addEventListener("click", (e) => {
+  if (currentUser && e.target.closest(".user-avatar, .user-info-wrapper")) navigateTo("user");
+});
 
 const permissionMap = {
   dashboard: { elementId: "nav-dashboard", column: "allow_dashboard" },
@@ -383,6 +389,9 @@ async function onViewLoaded(viewName) {
     case 'updates':
       await initUpdatesView();
       break;
+    case 'user':
+      initUserView();
+      break;
   }
 }
 
@@ -654,7 +663,7 @@ async function loadUsersList() {
       console.error("Błąd pobierania użytkowników:", error);
       tbody.innerHTML = `
         <tr>
-          <td colspan="7" style="text-align: center; color: var(--danger); padding: 20px;">
+          <td colspan="6" style="text-align: center; color: var(--danger); padding: 20px;">
             Wystąpił błąd podczas pobierania użytkowników: ${error.message}
           </td>
         </tr>
@@ -667,7 +676,7 @@ async function loadUsersList() {
     if (!users || users.length === 0) {
       tbody.innerHTML = `
         <tr>
-          <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 25px;">
+          <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 25px;">
             Brak zarejestrowanych użytkowników w bazie.
           </td>
         </tr>
@@ -698,8 +707,7 @@ async function loadUsersList() {
 
       return `
         <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.05);">
-          <td style="padding: 12px 16px; color: var(--text-muted);">${u.name || '-'}</td>
-          <td style="padding: 12px 16px; color: var(--text-muted);">${u.last_name || '-'}</td>
+          <td style="padding: 12px 16px; color: var(--text-muted);">${`${u.name || ''} ${u.last_name || ''}`.trim() || '-'}</td>
           <td style="padding: 12px 16px; color: var(--text-muted);">${u.login}</td>
           <td style="padding: 12px 16px;">
             <span style="background: rgba(255, 255, 255, 0.05); padding: 3px 8px; border-radius: 4px; font-size: 0.8rem; border: 1px solid rgba(255, 255, 255, 0.5); color: var(--text-muted);">
@@ -724,7 +732,7 @@ async function loadUsersList() {
 
   } catch (err) {
     console.error("Niespodziewany błąd:", err);
-    tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--danger); padding: 20px;">Błąd wczytywania danych.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--danger); padding: 20px;">Błąd wczytywania danych.</td></tr>`;
   }
 }
 

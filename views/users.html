@@ -1,3 +1,9 @@
+<style>
+  /* Wszystkie kolumny wyśrodkowane, pierwsza (Użytkownik) do lewej */
+  .usr-table th, .usr-table td { text-align: center; }
+  .usr-table th:first-child, .usr-table td:first-child:not([colspan]) { text-align: left; }
+</style>
+
 <div class="page-hero">
   <div>
     <div class="eyebrow">Administracja</div>
@@ -14,11 +20,10 @@
 <!-- Tabela użytkowników -->
 <div class="card" style="padding: 0; overflow: hidden;">
   <div style="overflow-x: auto;">
-    <table class="users-table" style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.9rem;">
+    <table class="users-table usr-table" style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.9rem;">
       <thead>
         <tr style="background: rgba(255, 255, 255, 0.03); border-bottom: 1px solid rgba(255, 255, 255, 0.08); color: var(--text-muted);">
-          <th style="padding: 14px 16px;">Imię</th>
-          <th style="padding: 14px 16px;">Nazwisko</th>
+          <th style="padding: 14px 16px;">Użytkownik</th>
           <th style="padding: 14px 16px;">Login</th>
           <th style="padding: 14px 16px;">Ranga</th>
           <th style="padding: 14px 16px;">Dział</th>
@@ -28,7 +33,7 @@
       </thead>
       <tbody id="users-table-body">
         <tr>
-          <td colspan="7" style="text-align: center; padding: 30px; color: var(--text-muted);">
+          <td colspan="6" style="text-align: center; padding: 30px; color: var(--text-muted);">
             <i class="fa-solid fa-spinner fa-spin"></i> Ładowanie listy użytkowników...
           </td>
         </tr>

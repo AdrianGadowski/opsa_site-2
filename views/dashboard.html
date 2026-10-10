@@ -3,6 +3,8 @@
   .db-root {
     --db-present: #08584B;      /* godziny obecne */
     --db-absent: #E5484D;       /* godziny nieobecne */
+    --db-sat: #FFF4C7;          /* tło kolumny: sobota */
+    --db-sun: #FDE3E3;          /* tło kolumny: niedziela */
     --db-track: #EEF0F3;
     --db-grid: #E9EBEF;
     --db-ink: #1F2328;
@@ -33,6 +35,20 @@
   .db-kpi.lead .lbl, .db-kpi.lead .note { color: rgba(255, 255, 255, 0.78); }
   .db-kpi.lead .ico { background: rgba(255, 255, 255, 0.14); color: var(--accent); }
   .db-kpi.lead .val, .db-kpi.lead .val small { color: #fff; }
+  /* Godziny nieobecne: czerwony kafelek */
+  .db-kpi.absent { background: linear-gradient(135deg, #E5484D 0%, #D9383A 50%, #B52B2D 100%); border-color: transparent; box-shadow: 0 8px 22px rgba(217, 56, 58, 0.25); }
+  .db-kpi.absent .lbl, .db-kpi.absent .note { color: rgba(255, 255, 255, 0.85); }
+  .db-kpi.absent .ico { background: rgba(255, 255, 255, 0.18); color: #fff; }
+  .db-kpi.absent .val, .db-kpi.absent .val small { color: #fff; }
+
+  /* Wskaźnik absencji: żółty kafelek z ciemnym tekstem */
+  .db-kpi.rate { background: linear-gradient(135deg, #FFE27A 0%, #FCD444 50%, #F2BE2E 100%); border-color: transparent; box-shadow: 0 8px 22px rgba(224, 188, 60, 0.3); }
+  .db-kpi.rate .lbl, .db-kpi.rate .note { color: #5C4E0E; }
+  .db-kpi.rate .ico { background: rgba(43, 38, 9, 0.12); color: #2B2609; }
+  .db-kpi.rate .val, .db-kpi.rate .val small { color: #2B2609; }
+  .db-kpi.rate .db-meter { background: rgba(43, 38, 9, 0.15); }
+  .db-kpi.rate .db-meter span { background: #2B2609; }
+
   .db-meter { height: 6px; border-radius: 999px; background: var(--db-track); overflow: hidden; margin-top: 10px; }
   .db-meter span { display: block; height: 100%; border-radius: 999px; background: var(--db-absent); }
 
@@ -61,6 +77,14 @@
   .db-col .seg:first-child { border-radius: 4px 4px 0 0; }
   .db-col .xl { height: 22px; line-height: 22px; text-align: center; font-size: 0.7rem; color: var(--db-ink-3); overflow: hidden; }
   .db-col:hover, .db-col:focus-visible { background: rgba(8, 88, 75, 0.06); }
+
+  /* Weekend: sobota jasnożółta, niedziela jasnoczerwona */
+  .db-col.sat { background: var(--db-sat); }
+  .db-col.sun { background: var(--db-sun); }
+  .db-col.sat:hover, .db-col.sat:focus-visible { background: #FBE9A0; }
+  .db-col.sun:hover, .db-col.sun:focus-visible { background: #F9CFCF; }
+  .db-legend .sat { background: var(--db-sat); border: 1px solid #E8D48A; }
+  .db-legend .sun { background: var(--db-sun); border: 1px solid #F0BDBD; }
   .db-col:hover .xl, .db-col:focus-visible .xl { color: var(--db-ink); font-weight: 700; }
 
   /* --- Listy słupków poziomych --- */
@@ -129,6 +153,10 @@
       <div class="db-legend">
         <span><i class="p"></i> Obecne</span>
         <span><i class="a"></i> Nieobecne</span>
+        <span id="db-legend-weekend" style="gap: 16px;">
+          <span><i class="sat"></i> Sobota</span>
+          <span><i class="sun"></i> Niedziela</span>
+        </span>
       </div>
     </div>
     <div id="db-time"></div>

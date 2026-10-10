@@ -248,6 +248,14 @@
   box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
 }
 
+/* Awatar i dane użytkownika otwierają "Moje konto" */
+.sidebar .user-avatar,
+.sidebar .user-info-wrapper { cursor: pointer; }
+.sidebar .user-info-wrapper { flex: 1; min-width: 0; border-radius: 8px; transition: opacity 0.2s; }
+.sidebar .user-info-wrapper:hover { opacity: 0.8; }
+.sidebar .user-avatar { transition: transform 0.2s; }
+.sidebar .user-avatar:hover { transform: scale(1.06); }
+
 .sidebar .user-fullname { color: #FFFFFF; }
 .sidebar .user-meta { color: rgba(255, 255, 255, 0.6); }
 

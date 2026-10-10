@@ -21,6 +21,8 @@
   .rt-table thead th { position: sticky; top: 0; z-index: 2; background: #F9FAFB; }
 
   .rt-table td { vertical-align: middle; padding: 10px 14px; }
+  .rt-table th, .rt-table td { text-align: center; }
+  .rt-table th.rt-name, .rt-table td.rt-name { text-align: left; }
   .rt-row.is-filled { background: rgba(16, 185, 129, 0.06); }
   .rt-row.is-absent { background: rgba(217, 56, 58, 0.06); }
   .rt-row.is-error { background: rgba(252, 212, 68, 0.22); }
@@ -120,26 +122,25 @@
     #main-content .rt-table tbody tr.rt-row td::before { content: none; }
 
     /* 1. linia: imię, nazwisko, firma po prawej; 2. linia: dział */
-    #main-content .rt-table tr.rt-row td:nth-child(1),
-    #main-content .rt-table tr.rt-row td:nth-child(2) { flex: 0 0 auto; font-size: 1rem; }
-    #main-content .rt-table tr.rt-row td:nth-child(3) { flex: 0 0 auto; margin-left: auto; }
-    #main-content .rt-table tr.rt-row td:nth-child(4) { flex: 0 0 100%; }
+    #main-content .rt-table tr.rt-row td:nth-child(1) { flex: 0 0 auto; font-size: 1rem; }
+    #main-content .rt-table tr.rt-row td:nth-child(2) { flex: 0 0 auto; margin-left: auto; }
+    #main-content .rt-table tr.rt-row td:nth-child(3) { flex: 0 0 100%; }
 
     /* 3. linia: Od, Do, Suma z podpisami nad polami */
-    #main-content .rt-table tr.rt-row td:nth-child(5),
-    #main-content .rt-table tr.rt-row td:nth-child(6) { flex: 1 1 34%; }
-    #main-content .rt-table tr.rt-row td:nth-child(7) { flex: 0 0 22%; text-align: center !important; }
+    #main-content .rt-table tr.rt-row td:nth-child(4),
+    #main-content .rt-table tr.rt-row td:nth-child(5) { flex: 1 1 34%; }
+    #main-content .rt-table tr.rt-row td:nth-child(6) { flex: 0 0 22%; text-align: center !important; }
+    #main-content .rt-table tr.rt-row td:nth-child(4)::before,
     #main-content .rt-table tr.rt-row td:nth-child(5)::before,
-    #main-content .rt-table tr.rt-row td:nth-child(6)::before,
-    #main-content .rt-table tr.rt-row td:nth-child(7)::before {
+    #main-content .rt-table tr.rt-row td:nth-child(6)::before {
       content: attr(data-label); position: static; display: block; width: auto; margin-bottom: 3px;
     }
-    #main-content .rt-table tr.rt-row td:nth-child(7)::before { text-align: center; }
+    #main-content .rt-table tr.rt-row td:nth-child(6)::before { text-align: center; }
     .rt-time { width: 100%; padding: 10px 8px; font-size: 0.95rem; }
 
     /* 4. linia: suwak nieobecności i czyszczenie wiersza */
-    #main-content .rt-table tr.rt-row td:nth-child(8) { flex: 1 1 60%; padding-top: 4px !important; }
-    #main-content .rt-table tr.rt-row td:nth-child(9) { flex: 0 0 auto; margin-left: auto; }
+    #main-content .rt-table tr.rt-row td:nth-child(7) { flex: 1 1 60%; padding-top: 4px !important; }
+    #main-content .rt-table tr.rt-row td:nth-child(8) { flex: 0 0 auto; margin-left: auto; }
     .rt-clear { padding: 8px 12px; font-size: 1rem; }
 
     /* Dolny pasek: statystyki nad przyciskami */
@@ -209,8 +210,7 @@
     <table class="users-table rt-table" style="width: 100%; border-collapse: collapse; text-align: left;">
       <thead>
         <tr>
-          <th>Imię</th>
-          <th>Nazwisko</th>
+          <th class="rt-name">Pracownik</th>
           <th>Firma</th>
           <th>Dział</th>
           <th>Od</th>
@@ -222,7 +222,7 @@
       </thead>
       <tbody id="rt-table-body">
         <tr>
-          <td colspan="9" style="text-align: center; padding: 30px; color: var(--text-muted);">
+          <td colspan="8" style="text-align: center; padding: 30px; color: var(--text-muted);">
             <i class="fa-solid fa-spinner fa-spin"></i> Ładowanie pracowników...
           </td>
         </tr>
@@ -295,6 +295,31 @@
       <button type="button" class="btn-secondary" style="width: auto; padding: 11px 20px;" onclick="rtCloseConfirm()">Wróć do edycji</button>
       <button type="button" id="rt-btn-save" class="btn-primary" style="width: auto; padding: 11px 24px;" onclick="rtSaveReport()">
         Zatwierdź i zapisz
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal potwierdzenia wyczyszczenia wszystkich godzin -->
+<div id="modal-rt-clear-confirm" class="modal">
+  <div class="modal-box" style="max-width: 440px; width: 92%; text-align: center; padding: 25px 20px;">
+    <div style="width: 55px; height: 55px; border-radius: 50%; background: rgba(217, 56, 58, 0.1); color: var(--danger); display: flex; align-items: center; justify-content: center; font-size: 1.6rem; margin: 0 auto 15px auto;">
+      <i class="fa-solid fa-triangle-exclamation"></i>
+    </div>
+
+    <h3 style="margin: 0 0 10px 0; font-size: 1.25rem;">Czyszczenie danych</h3>
+
+    <p style="color: var(--text-muted); font-size: 0.95rem; margin-bottom: 24px; line-height: 1.5;">
+      Czy na pewno chcesz wyczyścić <br/>
+      <strong style="color: var(--text-dark); font-size: 1.05rem;">wszystkie uzupełnione godziny</strong>?
+    </p>
+
+    <div class="modal-btn-row">
+      <button type="button" class="btn-secondary" onclick="toggleModal('modal-rt-clear-confirm', false)">
+        Nie
+      </button>
+      <button type="button" class="btn-danger" onclick="rtConfirmClearAll()">
+        Tak
       </button>
     </div>
   </div>

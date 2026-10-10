@@ -17,6 +17,15 @@
   .rp-table-wrap { overflow: auto; }
   .rp-table td { vertical-align: middle; white-space: nowrap; }
   .rp-table .rp-c { text-align: center; }
+  /* Kolumny godzin: obecne jasnozielone, nieobecne jasnoczerwone */
+  .rp-table td.rp-hours-ok { background: #E8F6EF; transition: background-color 0.15s; }
+  .rp-table td.rp-hours-absent { background: #FDE8E8; transition: background-color 0.15s; }
+  /* Po najechaniu na wiersz oba kolory lekko ciemnieją */
+  .rp-table tbody tr:hover td.rp-hours-ok { background: #D3EDE0; }
+  .rp-table tbody tr:hover td.rp-hours-absent { background: #FAD3D3; }
+  .rp-table thead th.rp-col-ok, .rp-table thead th.rp-col-absent { width: 160px; min-width: 160px; white-space: nowrap; }
+  .rp-table thead th.rp-col-ok { background: #D9F0E4; color: #0b7a57; }
+  .rp-table thead th.rp-col-absent { background: #FAD9D9; color: #9b1c1f; }
   .rp-num { font-weight: 700; color: var(--primary); }
   .rp-num-db { font-weight: 500; color: var(--text-muted); font-size: 0.82rem; }
   .rp-hours-ok { font-weight: 600; color: #0b7a57; }
@@ -98,6 +107,11 @@
   /* ===== Telefon ===== */
   @media (max-width: 768px) {
     .rp-filters > :first-child { grid-column: 1 / -1; }
+    /* Na karcie kolorowe pola godzin mają zaokrąglenie i odstęp od krawędzi */
+    #main-content .rp-table td.rp-hours-ok,
+    #main-content .rp-table td.rp-hours-absent { padding-right: 10px !important; border-radius: 6px; margin: 2px 0; }
+    #main-content .rp-table td.rp-hours-ok::before,
+    #main-content .rp-table td.rp-hours-absent::before { left: 10px; }
     #rp-filter-info { grid-column: 1 / -1; text-align: left !important; padding-bottom: 0 !important; }
 
     /* Okno raportu przewija się całe, bez wewnętrznego okienka */
@@ -160,10 +174,10 @@
           <th class="rp-c">Nr</th>
           <th class="rp-c">Data raportu</th>
           <th class="rp-c">Zmiana</th>
-          <th>Utworzył</th>
+          <th class="rp-c">Utworzył</th>
           <th class="rp-c">Pracowników</th>
-          <th class="rp-c">Godz. obecne</th>
-          <th class="rp-c">Godz. nieobecne</th>
+          <th class="rp-c rp-col-ok">Godz. obecne</th>
+          <th class="rp-c rp-col-absent">Godz. nieobecne</th>
           <th class="rp-c">Data utworzenia</th>
           <th style="width: 120px;"></th>
         </tr>
