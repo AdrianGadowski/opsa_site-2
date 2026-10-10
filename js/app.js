@@ -34,6 +34,34 @@ function hasPermission(columnName) {
   return currentUser[columnName] === true || currentUser[columnName] === 1;
 }
 
+// Aktualna wersja systemu w prawym górnym rogu (tabela Check_version, wiersz "aktualna_wersja")
+function setTopbarVersion(version) {
+  const el = document.getElementById("topbar-version");
+  if (el) el.innerText = `Wersja: ${version || "—"}`;
+}
+
+async function loadTopbarVersion() {
+  try {
+    const { data, error } = await supabaseClient
+      .from("Check_version")
+      .select("version")
+      .ilike("name", "aktualna_wersja")
+      .limit(1);
+    if (error) throw error;
+    setTopbarVersion(data && data.length ? String(data[0].version || "").trim() : "");
+  } catch (err) {
+    console.error("Błąd pobierania aktualnej wersji:", err);
+    setTopbarVersion("");
+  }
+}
+
+// Raport może zmieniać tylko jego autor albo administrator
+function canModifyReport(creatorId) {
+  if (!currentUser) return false;
+  if (String(currentUser.role?.role || "").toLowerCase() === "administrator") return true;
+  return currentUser.id != null && creatorId != null && Number(currentUser.id) === Number(creatorId);
+}
+
 // ==========================================
 // OBSŁUGA BŁĘDÓW LOGOWANIA (BEZ ROZPYCHANIA KARTY)
 // ==========================================
@@ -96,8 +124,9 @@ async function handleLogin() {
     const { data: user, error } = await supabaseClient
       .from("users")
       .select(`
-        login, 
-        password, 
+        id,
+        login,
+        password,
         name, 
         last_name, 
         role_id,
@@ -126,6 +155,7 @@ async function handleLogin() {
     }
 
     currentUser = user;
+    loadTopbarVersion();
 
     const iconBox = document.getElementById("auth-icon-box");
     const stepLogin = document.getElementById("step-login");
@@ -338,6 +368,15 @@ async function onViewLoaded(viewName) {
     case 'users':
       await loadRoleAndDepartmentDropdowns();
       await loadUsersList();
+      break;
+    case 'report_time':
+      await initReportTimeView();
+      break;
+    case 'reports':
+      await initReportsView();
+      break;
+    case 'updates':
+      await initUpdatesView();
       break;
   }
 }

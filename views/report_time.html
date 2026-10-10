@@ -1,15 +1,300 @@
-<div class="card">
-  <h3>Rozliczanie czasu pracy</h3>
-  <p style="color: var(--text-muted); margin-bottom: 15px;">Formularz wprowadzania czasu pracy dla poszczególnych pracowników.</p>
-  <form onsubmit="event.preventDefault(); alert('Zapisano godziny');">
-    <div class="form-group" style="max-width: 400px;">
-      <label>Data</label>
-      <input type="date" class="form-control" />
+<style>
+  /* ===== Rozliczanie czasu pracy ===== */
+  .rt-banner {
+    display: none;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    position: sticky; top: 8px; z-index: 6;
+    background-color: #fff;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
+  }
+  .rt-banner.visible { display: flex; }
+  .rt-banner.success { background-image: linear-gradient(rgba(16, 185, 129, 0.1), rgba(16, 185, 129, 0.1)); color: #0b7a57; border: 1px solid rgba(16, 185, 129, 0.35); }
+  .rt-banner.warning { background-image: linear-gradient(rgba(252, 212, 68, 0.25), rgba(252, 212, 68, 0.25)); color: #7a5c00; border: 1px solid rgba(224, 188, 60, 0.6); }
+
+  .rt-table-wrap { max-height: calc(100vh - 430px); min-height: 260px; overflow: auto; }
+  .rt-table thead th { position: sticky; top: 0; z-index: 2; background: #F9FAFB; }
+
+  .rt-table td { vertical-align: middle; padding: 10px 14px; }
+  .rt-row.is-filled { background: rgba(16, 185, 129, 0.06); }
+  .rt-row.is-absent { background: rgba(217, 56, 58, 0.06); }
+  .rt-row.is-error { background: rgba(252, 212, 68, 0.22); }
+
+  .rt-time {
+    width: 92px;
+    padding: 7px 8px;
+    border-radius: 6px;
+    border: 1.5px solid #D9D9D9;
+    background: #fff;
+    font-size: 0.88rem;
+    text-align: center;
+    color: var(--text-dark);
+    cursor: pointer;
+  }
+  .rt-time:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(8, 88, 75, 0.1); }
+  .rt-row.is-error .rt-time:invalid,
+  .rt-row.is-error .rt-time.rt-bad { border-color: var(--danger); }
+
+  .rt-sum { font-weight: 700; color: var(--primary); white-space: nowrap; min-width: 70px; }
+  .rt-sum.empty { color: var(--text-muted); font-weight: 500; }
+
+  /* Suwak: nieobecność */
+  .rt-switch { position: relative; display: inline-flex; align-items: center; gap: 10px; cursor: pointer; user-select: none; }
+  .rt-switch input[type="checkbox"] { position: absolute; opacity: 0; width: 0; height: 0; }
+  .rt-switch .track {
+    width: 42px; height: 24px; border-radius: 999px; background: #D1D5DB;
+    position: relative; transition: background 0.2s; flex-shrink: 0;
+  }
+  .rt-switch .track::after {
+    content: ""; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px;
+    border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.25);
+    transition: transform 0.2s;
+  }
+  .rt-switch input:checked + .track { background: var(--danger); }
+  .rt-switch input:checked + .track::after { transform: translateX(18px); }
+  .rt-switch input:focus-visible + .track { outline: 3px solid rgba(8, 88, 75, 0.35); outline-offset: 2px; }
+  .rt-switch .lbl { font-size: 0.8rem; color: var(--text-muted); min-width: 78px; }
+  .rt-switch input:checked ~ .lbl { color: var(--danger); font-weight: 600; }
+
+  .rt-clear { opacity: 0.35; padding: 4px 8px; }
+  .rt-clear.visible { opacity: 1; }
+
+  /* Pasek zatwierdzania */
+  .rt-footer {
+    position: sticky; bottom: 0; z-index: 5;
+    display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px;
+    margin-top: 16px; padding: 14px 20px;
+    background: #fff; border-radius: 8px; border: 1px solid var(--border-color);
+    box-shadow: 0 -4px 14px rgba(0, 0, 0, 0.06);
+  }
+  .rt-footer-stats { display: flex; gap: 22px; flex-wrap: wrap; font-size: 0.88rem; color: var(--text-muted); }
+  .rt-footer-stats strong { color: var(--primary); font-size: 1.05rem; margin-left: 4px; }
+
+  /* Okno potwierdzenia */
+  .rt-modal-box { max-width: 1060px; width: 96%; max-height: 92vh; display: flex; flex-direction: column; position: relative; }
+  .rt-meta { display: flex; gap: 14px; flex-wrap: wrap; align-items: flex-end; background: #F5F5F7; padding: 14px 16px; border-radius: 8px; margin-bottom: 14px; }
+  .rt-meta .form-group { margin-bottom: 0; }
+  .rt-summary-scroll { overflow: auto; flex: 1; min-height: 160px; border: 1px solid var(--border-color); border-radius: 8px; }
+  .rt-summary-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+  .rt-summary-table th {
+    position: sticky; top: 0; background: #F9FAFB; text-align: left; padding: 11px 14px;
+    font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.03em; color: #4B5563; border-bottom: 1px solid var(--border-color);
+  }
+  .rt-summary-table td { padding: 10px 14px; border-bottom: 1px solid #F0F0F0; vertical-align: top; }
+  .rt-summary-table tr.conflict td { background: #FDECEC; }
+  .rt-pill { display: inline-block; padding: 3px 9px; border-radius: 999px; font-size: 0.76rem; font-weight: 600; }
+  .rt-pill.ok { background: rgba(16, 185, 129, 0.12); color: #0b7a57; }
+  .rt-pill.absent { background: rgba(217, 56, 58, 0.1); color: var(--danger); }
+  .rt-conflict-line { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 6px; color: #9b1c1f; font-size: 0.82rem; font-weight: 500; }
+  .rt-conflict-line:last-child { margin-bottom: 0; }
+  .rt-mini-btn {
+    border: none; border-radius: 5px; padding: 5px 10px; font-size: 0.76rem; font-weight: 700; cursor: pointer;
+    font-family: inherit; white-space: nowrap;
+  }
+  .rt-mini-btn.danger { background: var(--danger); color: #fff; }
+  .rt-mini-btn.danger:hover { background: var(--danger-hover); }
+  .rt-mini-btn.armed { background: #7f1d1d; }
+  .rt-mini-btn.neutral { background: #E5E5EA; color: var(--text-dark); }
+  .rt-mini-btn.neutral:hover { background: #D1D1D6; }
+
+  @media (max-width: 900px) {
+    .rt-filters { grid-template-columns: 1fr 1fr !important; }
+  }
+
+  /* ===== Telefon: wiersz pracownika jako zwarta karta ===== */
+  @media (max-width: 768px) {
+    .rt-filters > :first-child { grid-column: 1 / -1; }
+    .rt-table-wrap { max-height: none; min-height: 0; overflow: visible; }
+
+    #main-content .rt-table tbody tr.rt-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; padding: 12px; }
+    #main-content .rt-table tbody tr.rt-row.is-filled { background: #EEFAF5; }
+    #main-content .rt-table tbody tr.rt-row.is-absent { background: #FDF1F1; }
+    #main-content .rt-table tbody tr.rt-row.is-error { background: #FEF6D2; }
+
+    #main-content .rt-table tbody tr.rt-row td { min-height: 0; padding: 0 !important; text-align: left !important; }
+    #main-content .rt-table tbody tr.rt-row td::before { content: none; }
+
+    /* 1. linia: imię, nazwisko, firma po prawej; 2. linia: dział */
+    #main-content .rt-table tr.rt-row td:nth-child(1),
+    #main-content .rt-table tr.rt-row td:nth-child(2) { flex: 0 0 auto; font-size: 1rem; }
+    #main-content .rt-table tr.rt-row td:nth-child(3) { flex: 0 0 auto; margin-left: auto; }
+    #main-content .rt-table tr.rt-row td:nth-child(4) { flex: 0 0 100%; }
+
+    /* 3. linia: Od, Do, Suma z podpisami nad polami */
+    #main-content .rt-table tr.rt-row td:nth-child(5),
+    #main-content .rt-table tr.rt-row td:nth-child(6) { flex: 1 1 34%; }
+    #main-content .rt-table tr.rt-row td:nth-child(7) { flex: 0 0 22%; text-align: center !important; }
+    #main-content .rt-table tr.rt-row td:nth-child(5)::before,
+    #main-content .rt-table tr.rt-row td:nth-child(6)::before,
+    #main-content .rt-table tr.rt-row td:nth-child(7)::before {
+      content: attr(data-label); position: static; display: block; width: auto; margin-bottom: 3px;
+    }
+    #main-content .rt-table tr.rt-row td:nth-child(7)::before { text-align: center; }
+    .rt-time { width: 100%; padding: 10px 8px; font-size: 0.95rem; }
+
+    /* 4. linia: suwak nieobecności i czyszczenie wiersza */
+    #main-content .rt-table tr.rt-row td:nth-child(8) { flex: 1 1 60%; padding-top: 4px !important; }
+    #main-content .rt-table tr.rt-row td:nth-child(9) { flex: 0 0 auto; margin-left: auto; }
+    .rt-clear { padding: 8px 12px; font-size: 1rem; }
+
+    /* Dolny pasek: statystyki nad przyciskami */
+    .rt-footer { padding: 10px 12px; gap: 10px; }
+    .rt-footer-stats { width: 100%; gap: 4px 14px; font-size: 0.8rem; }
+    .rt-footer-stats strong { font-size: 0.95rem; }
+    .rt-footer > div:last-child { width: 100%; }
+    .rt-footer button { flex: 1; padding: 11px 8px !important; font-size: 13px; white-space: nowrap; }
+
+    /* Okno potwierdzenia: przewija się całe, bez wewnętrznego okienka */
+    .rt-modal-box { display: block; width: 100%; max-height: calc(100vh - 20px); max-height: calc(100dvh - 20px); overflow-y: auto; }
+    .rt-summary-scroll { overflow: visible; min-height: 0; border: none; }
+    .rt-meta .form-group { flex: 1 1 130px; }
+    .rt-conflict-line { flex-wrap: wrap; justify-content: flex-end; text-align: right; }
+    #main-content .rt-summary-table tbody tr { margin: 0 0 10px 0; }
+    #main-content .rt-summary-table tbody tr.conflict { background: #FDECEC; }
+  }
+</style>
+
+<!-- Nagłówek -->
+<div class="card" style="margin-bottom: 20px;">
+  <h3 style="margin: 0; font-size: 1.3rem;">Rozliczanie czasu pracy</h3>
+  <p style="color: var(--text-muted); margin: 5px 0 0 0; font-size: 0.9rem;">
+    Wybierz godziny od–do dla pracowników. Suwak oznacza nieobecność w wybranych godzinach. Zmiana jest wykrywana automatycznie z pierwszej wybranej godziny i ogranicza dostępne godziny do tej zmiany. Datę wybierzesz w oknie potwierdzenia.
+  </p>
+</div>
+
+<div id="rt-banner" class="rt-banner" role="status"></div>
+
+<!-- Filtry -->
+<div class="card" style="margin-bottom: 20px; padding: 16px 20px;">
+  <div class="rt-filters" style="display: grid; grid-template-columns: 2fr 1.2fr 1.2fr auto; gap: 14px; align-items: end;">
+    <div class="form-group" style="margin-bottom: 0;">
+      <label for="rt-filter-search" style="font-size: 0.8rem; color: var(--text-muted);">Szukaj pracownika</label>
+      <div style="position: relative;">
+        <input type="text" id="rt-filter-search" class="form-control" placeholder="Imię lub nazwisko..." oninput="rtApplyFilters()" style="padding-left: 36px;" autocomplete="off" />
+        <i class="fa-solid fa-magnifying-glass" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 0.9rem;"></i>
+      </div>
     </div>
-    <div class="form-group" style="max-width: 400px;">
-      <label>Liczba godzin</label>
-      <input type="number" class="form-control" min="1" max="24" value="8" />
+
+    <div class="form-group" style="margin-bottom: 0;">
+      <label for="rt-filter-business" style="font-size: 0.8rem; color: var(--text-muted);">Firma</label>
+      <select id="rt-filter-business" class="form-control" onchange="rtApplyFilters()">
+        <option value="">Wszystkie firmy</option>
+      </select>
     </div>
-    <button type="submit" class="btn-primary" style="max-width: 200px;">Zapisz rozliczenie</button>
-  </form>
+
+    <div class="form-group" style="margin-bottom: 0;">
+      <label for="rt-filter-dept" style="font-size: 0.8rem; color: var(--text-muted);">Dział</label>
+      <select id="rt-filter-dept" class="form-control" onchange="rtApplyFilters()">
+        <option value="">Wszystkie działy</option>
+      </select>
+    </div>
+
+    <div>
+      <button type="button" class="btn-secondary" style="height: 42px; padding: 0 16px; font-size: 0.85rem;" onclick="rtResetFilters()" title="Wyczyść filtry">
+        <i class="fa-solid fa-rotate-left" style="margin-right: 6px;"></i> Reset
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Tabela pracowników -->
+<div class="card" style="padding: 0; overflow: hidden; margin-bottom: 0;">
+  <div class="rt-table-wrap">
+    <table class="users-table rt-table" style="width: 100%; border-collapse: collapse; text-align: left;">
+      <thead>
+        <tr>
+          <th>Imię</th>
+          <th>Nazwisko</th>
+          <th>Firma</th>
+          <th>Dział</th>
+          <th>Od</th>
+          <th>Do</th>
+          <th>Suma</th>
+          <th>Nieobecność</th>
+          <th style="width: 44px;"></th>
+        </tr>
+      </thead>
+      <tbody id="rt-table-body">
+        <tr>
+          <td colspan="9" style="text-align: center; padding: 30px; color: var(--text-muted);">
+            <i class="fa-solid fa-spinner fa-spin"></i> Ładowanie pracowników...
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Pasek zatwierdzania -->
+<div class="rt-footer">
+  <div class="rt-footer-stats">
+    <span>Zmiana:<strong id="rt-stat-shift">—</strong></span>
+    <span>Uzupełnieni:<strong id="rt-stat-count">0</strong></span>
+    <span>w tym nieobecni:<strong id="rt-stat-absent" style="color: var(--danger);">0</strong></span>
+    <span>Suma godzin:<strong id="rt-stat-hours">0.0 h</strong></span>
+  </div>
+  <div style="display: flex; gap: 10px;">
+    <button type="button" class="btn-secondary" style="width: auto; padding: 11px 18px;" onclick="rtClearAll()">Wyczyść wszystko</button>
+    <button type="button" class="btn-primary" style="width: auto; padding: 11px 24px;" onclick="rtOpenConfirm()">
+      <i class="fa-solid fa-clipboard-check"></i> Zatwierdź raport
+    </button>
+  </div>
+</div>
+
+<!-- Modal potwierdzenia raportu -->
+<div id="modal-rt-confirm" class="modal">
+  <div class="modal-box rt-modal-box">
+    <h3 style="color: var(--primary); margin: 0 0 16px 0; font-size: 1.25rem;">Potwierdzenie raportu</h3>
+    <button class="link-btn" onclick="rtCloseConfirm()" style="position: absolute; top: 22px; right: 22px; font-size: 1.2rem;" title="Zamknij">
+      <i class="fa-solid fa-xmark"></i>
+    </button>
+
+    <div class="rt-meta">
+      <div class="form-group">
+        <label for="rt-meta-date">Data raportu</label>
+        <input type="date" id="rt-meta-date" class="form-control" onchange="rtOnMetaChange()" />
+      </div>
+      <div class="form-group">
+        <label for="rt-meta-shift">Zmiana</label>
+        <select id="rt-meta-shift" class="form-control" disabled title="Zmiana wykrywana automatycznie z wybranych godzin">
+          <option value="Zmiana I">Zmiana I</option>
+          <option value="Zmiana II">Zmiana II</option>
+          <option value="Zmiana III">Zmiana III</option>
+        </select>
+      </div>
+      <div id="rt-meta-info" style="font-size: 0.85rem; color: var(--text-muted); padding-bottom: 12px;"></div>
+    </div>
+
+    <div id="rt-summary-msg" style="display: none; font-size: 0.88rem; margin-bottom: 12px;"></div>
+
+    <div class="rt-summary-scroll">
+      <table class="rt-summary-table">
+        <thead>
+          <tr>
+            <th>Pracownik</th>
+            <th>Firma</th>
+            <th>Dział</th>
+            <th>Od</th>
+            <th>Do</th>
+            <th>Suma</th>
+            <th>Status</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="rt-summary-body"></tbody>
+      </table>
+    </div>
+
+    <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 16px;">
+      <button type="button" class="btn-secondary" style="width: auto; padding: 11px 20px;" onclick="rtCloseConfirm()">Wróć do edycji</button>
+      <button type="button" id="rt-btn-save" class="btn-primary" style="width: auto; padding: 11px 24px;" onclick="rtSaveReport()">
+        Zatwierdź i zapisz
+      </button>
+    </div>
+  </div>
 </div>

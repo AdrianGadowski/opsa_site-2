@@ -1,4 +1,282 @@
-<div class="card">
-  <h3>Lista raportów</h3>
-  <p style="color: var(--text-muted);">Archiwum zatwierdzonych i wygenerowanych raportów czasu pracy.</p>
+<style>
+  /* ===== Lista raportów ===== */
+  .rp-banner {
+    display: none;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    font-size: 0.9rem;
+    font-weight: 500;
+  }
+  .rp-banner.visible { display: flex; }
+  .rp-banner.success { background: rgba(16, 185, 129, 0.1); color: #0b7a57; border: 1px solid rgba(16, 185, 129, 0.35); }
+  .rp-banner.warning { background: rgba(252, 212, 68, 0.25); color: #7a5c00; border: 1px solid rgba(224, 188, 60, 0.6); }
+
+  .rp-table-wrap { overflow: auto; }
+  .rp-table td { vertical-align: middle; white-space: nowrap; }
+  .rp-table .rp-c { text-align: center; }
+  .rp-num { font-weight: 700; color: var(--primary); }
+  .rp-num-db { font-weight: 500; color: var(--text-muted); font-size: 0.82rem; }
+  .rp-hours-ok { font-weight: 600; color: #0b7a57; }
+  .rp-hours-absent { font-weight: 600; color: var(--danger); }
+
+  .rp-pill { display: inline-block; padding: 3px 9px; border-radius: 999px; font-size: 0.76rem; font-weight: 600; }
+  .rp-pill.ok { background: rgba(16, 185, 129, 0.12); color: #0b7a57; }
+  .rp-pill.absent { background: rgba(217, 56, 58, 0.1); color: var(--danger); }
+
+  /* Okno raportu */
+  .rp-modal-box { max-width: 1020px; width: 96%; max-height: 92vh; display: flex; flex-direction: column; position: relative; }
+  .rp-meta { display: flex; gap: 26px; flex-wrap: wrap; background: #F5F5F7; padding: 12px 16px; border-radius: 8px; margin-bottom: 14px; font-size: 0.88rem; color: var(--text-muted); }
+  .rp-meta strong { color: var(--text-dark); margin-left: 4px; }
+  .rp-summary { display: flex; gap: 22px; flex-wrap: wrap; font-size: 0.88rem; color: var(--text-muted); }
+  .rp-summary strong { color: var(--text-dark); font-size: 1.05rem; margin-left: 4px; }
+  .rp-summary strong.rp-hours-ok { color: #0b7a57; }
+  .rp-summary strong.rp-hours-absent { color: var(--danger); }
+  .rp-detail-scroll { overflow: auto; flex: 1; min-height: 140px; border: 1px solid var(--border-color); border-radius: 8px; }
+  .rp-detail-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+  .rp-detail-table th {
+    position: sticky; top: 0; background: #F9FAFB; text-align: left; padding: 11px 14px;
+    font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.03em; color: #4B5563; border-bottom: 1px solid var(--border-color);
+  }
+  .rp-detail-table td { padding: 10px 14px; border-bottom: 1px solid #F0F0F0; vertical-align: middle; }
+
+  .rp-mini-btn {
+    border: none; border-radius: 5px; padding: 5px 10px; font-size: 0.76rem; font-weight: 700; cursor: pointer;
+    font-family: inherit; white-space: nowrap; background: var(--danger); color: #fff;
+  }
+  .rp-mini-btn:hover { background: var(--danger-hover); }
+
+  .rp-pick-btn { text-align: left; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .rp-pick-btn.empty { color: var(--text-muted); }
+
+  /* Okno wyboru pracownika */
+  .rp-picker-box { max-width: 620px; width: 94%; max-height: 86vh; display: flex; flex-direction: column; position: relative; }
+  .rp-picker-list { overflow: auto; flex: 1; min-height: 200px; border: 1px solid var(--border-color); border-radius: 8px; margin-top: 12px; }
+  .rp-picker-item {
+    display: flex; justify-content: space-between; align-items: center; gap: 12px; width: 100%;
+    padding: 11px 14px; border: none; border-bottom: 1px solid #F0F0F0; background: #fff;
+    font-family: inherit; font-size: 0.9rem; text-align: left; cursor: pointer; color: var(--text-dark);
+  }
+  .rp-picker-item:hover, .rp-picker-item:focus-visible { background: rgba(8, 88, 75, 0.06); outline: none; }
+  .rp-picker-item .name { font-weight: 600; color: var(--primary); }
+  .rp-picker-item .sub { font-size: 0.8rem; color: var(--text-muted); white-space: nowrap; }
+
+  .rp-add {
+    display: grid; grid-template-columns: 2fr 110px 110px auto auto; gap: 12px; align-items: end;
+    margin-top: 14px; padding: 14px 16px; background: #F5F5F7; border-radius: 8px;
+  }
+  .rp-add .form-group { margin-bottom: 0; }
+  .rp-add label { font-size: 0.8rem; color: var(--text-muted); }
+
+  /* Suwak: nieobecność (jak w rozliczaniu czasu pracy) */
+  .rp-switch { position: relative; display: inline-flex; align-items: center; gap: 10px; height: 42px; cursor: pointer; user-select: none; }
+  .rp-switch input[type="checkbox"] { position: absolute; opacity: 0; width: 0; height: 0; }
+  .rp-switch .track {
+    width: 42px; height: 24px; border-radius: 999px; background: #D1D5DB;
+    position: relative; transition: background 0.2s; flex-shrink: 0;
+  }
+  .rp-switch .track::after {
+    content: ""; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px;
+    border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.25);
+    transition: transform 0.2s;
+  }
+  .rp-switch input:checked + .track { background: var(--danger); }
+  .rp-switch input:checked + .track::after { transform: translateX(18px); }
+  .rp-switch input:focus-visible + .track { outline: 3px solid rgba(8, 88, 75, 0.35); outline-offset: 2px; }
+  .rp-switch .lbl { font-size: 0.8rem; color: var(--text-muted); min-width: 78px; }
+  .rp-switch .lbl-on { display: none; color: var(--danger); font-weight: 600; }
+  .rp-switch input:checked ~ .lbl-off { display: none; }
+  .rp-switch input:checked ~ .lbl-on { display: inline; }
+
+  @media (max-width: 900px) {
+    .rp-filters { grid-template-columns: 1fr 1fr !important; }
+    .rp-add { grid-template-columns: 1fr 1fr; }
+  }
+
+  /* ===== Telefon ===== */
+  @media (max-width: 768px) {
+    .rp-filters > :first-child { grid-column: 1 / -1; }
+    #rp-filter-info { grid-column: 1 / -1; text-align: left !important; padding-bottom: 0 !important; }
+
+    /* Okno raportu przewija się całe, bez wewnętrznego okienka */
+    .rp-modal-box { display: block; width: 100%; max-height: calc(100vh - 20px); max-height: calc(100dvh - 20px); overflow-y: auto; }
+    .rp-detail-scroll { overflow: visible; min-height: 0; border: none; }
+    #main-content .rp-detail-table tbody tr { margin: 0 0 10px 0; }
+    .rp-meta { gap: 6px 18px; }
+    .rp-add > :first-child { grid-column: 1 / -1; }
+    .rp-add #rp-add-btn { justify-content: center; }
+    .rp-summary { gap: 4px 16px; }
+
+    .rp-picker-box { width: 100%; }
+    .rp-picker-item { flex-direction: column; align-items: flex-start; gap: 2px; }
+    .rp-picker-item .sub { white-space: normal; }
+  }
+</style>
+
+<!-- Nagłówek -->
+<div class="card" style="margin-bottom: 20px;">
+  <h3 style="margin: 0; font-size: 1.3rem;">Lista raportów</h3>
+  <p style="color: var(--text-muted); margin: 5px 0 0 0; font-size: 0.9rem;">
+    Archiwum zatwierdzonych raportów czasu pracy. Raport można podejrzeć, edytować (dodać lub usunąć pracownika) albo usunąć w całości.
+  </p>
+</div>
+
+<div id="rp-banner" class="rp-banner" role="status"></div>
+
+<!-- Filtry -->
+<div class="card" style="margin-bottom: 20px; padding: 16px 20px;">
+  <div class="rp-filters" style="display: grid; grid-template-columns: 2fr 140px 200px auto; gap: 14px; align-items: end;">
+    <div class="form-group" style="margin-bottom: 0;">
+      <label for="rp-filter-search" style="font-size: 0.8rem; color: var(--text-muted);">Szukaj raportu</label>
+      <div style="position: relative;">
+        <input type="text" id="rp-filter-search" class="form-control" placeholder="Kto utworzył lub data raportu, np. 10.10.2026..." oninput="rpOnSearch()" style="padding-left: 36px;" autocomplete="off" />
+        <i class="fa-solid fa-magnifying-glass" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 0.9rem;"></i>
+      </div>
+    </div>
+
+    <div class="form-group" style="margin-bottom: 0;">
+      <label for="rp-filter-year" style="font-size: 0.8rem; color: var(--text-muted);">Rok</label>
+      <select id="rp-filter-year" class="form-control" onchange="rpLoad()"></select>
+    </div>
+
+    <div class="form-group" style="margin-bottom: 0;">
+      <label for="rp-filter-month" style="font-size: 0.8rem; color: var(--text-muted);">Miesiąc</label>
+      <select id="rp-filter-month" class="form-control" onchange="rpLoad()"></select>
+    </div>
+
+    <div id="rp-filter-info" style="font-size: 0.85rem; color: var(--text-muted); padding-bottom: 12px; text-align: right; white-space: nowrap;"></div>
+  </div>
+</div>
+
+<!-- Tabela raportów -->
+<div class="card" style="padding: 0; overflow: hidden;">
+  <div class="rp-table-wrap">
+    <table class="users-table rp-table" style="width: 100%; border-collapse: collapse; text-align: left;">
+      <thead>
+        <tr>
+          <th class="rp-c">Nr</th>
+          <th class="rp-c">Data raportu</th>
+          <th class="rp-c">Zmiana</th>
+          <th>Utworzył</th>
+          <th class="rp-c">Pracowników</th>
+          <th class="rp-c">Godz. obecne</th>
+          <th class="rp-c">Godz. nieobecne</th>
+          <th class="rp-c">Data utworzenia</th>
+          <th style="width: 120px;"></th>
+        </tr>
+      </thead>
+      <tbody id="rp-table-body">
+        <tr>
+          <td colspan="9" style="text-align: center; padding: 30px; color: var(--text-muted);">
+            <i class="fa-solid fa-spinner fa-spin"></i> Ładowanie raportów...
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Modal: podgląd / edycja raportu -->
+<div id="modal-rp-detail" class="modal">
+  <div class="modal-box rp-modal-box">
+    <h3 id="rp-detail-title" style="color: var(--primary); margin: 0 0 16px 0; font-size: 1.25rem;"></h3>
+    <button class="link-btn" onclick="rpCloseDetail()" style="position: absolute; top: 22px; right: 22px; font-size: 1.2rem;" title="Zamknij">
+      <i class="fa-solid fa-xmark"></i>
+    </button>
+
+    <div id="rp-detail-meta" class="rp-meta"></div>
+    <div id="rp-detail-msg" style="display: none; font-size: 0.88rem; margin-bottom: 12px;"></div>
+
+    <div class="rp-detail-scroll">
+      <table class="rp-detail-table">
+        <thead>
+          <tr>
+            <th>Pracownik</th>
+            <th>Firma</th>
+            <th>Dział</th>
+            <th>Od</th>
+            <th>Do</th>
+            <th>Suma</th>
+            <th>Status</th>
+            <th id="rp-detail-actions-head"></th>
+          </tr>
+        </thead>
+        <tbody id="rp-detail-body"></tbody>
+      </table>
+    </div>
+
+    <!-- Dodawanie pracownika (tylko w trybie edycji) -->
+    <div id="rp-add" class="rp-add">
+      <div class="form-group">
+        <label for="rp-add-emp">Dodaj pracownika</label>
+        <button type="button" id="rp-add-emp" class="form-control rp-pick-btn empty" onclick="rpOpenPicker()">Wybierz pracownika...</button>
+      </div>
+      <div class="form-group">
+        <label for="rp-add-from">Od</label>
+        <select id="rp-add-from" class="form-control" onchange="rpSyncAddTimes()"></select>
+      </div>
+      <div class="form-group">
+        <label for="rp-add-to">Do</label>
+        <select id="rp-add-to" class="form-control" onchange="rpSyncAddTimes()"></select>
+      </div>
+      <label class="rp-switch">
+        <input type="checkbox" id="rp-add-absent" aria-label="Nieobecność" />
+        <span class="track"></span>
+        <span class="lbl lbl-off">Obecny</span>
+        <span class="lbl lbl-on">Nieobecny</span>
+      </label>
+      <button type="button" id="rp-add-btn" class="btn-primary" style="width: auto; height: 42px; padding: 0 20px;" onclick="rpAddEmployee()">
+        <i class="fa-solid fa-plus"></i> Dodaj
+      </button>
+    </div>
+
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px; margin-top: 16px;">
+      <div id="rp-detail-summary" class="rp-summary"></div>
+      <button type="button" class="btn-secondary" style="width: auto; padding: 11px 20px;" onclick="rpCloseDetail()">Zamknij</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal wyboru pracownika z wyszukiwarką -->
+<div id="modal-rp-picker" class="modal">
+  <div class="modal-box rp-picker-box">
+    <h3 style="color: var(--primary); margin: 0 0 16px 0; font-size: 1.2rem;">Wybierz pracownika</h3>
+    <button class="link-btn" onclick="rpClosePicker()" style="position: absolute; top: 22px; right: 22px; font-size: 1.2rem;" title="Zamknij">
+      <i class="fa-solid fa-xmark"></i>
+    </button>
+
+    <div style="position: relative;">
+      <input type="text" id="rp-picker-search" class="form-control" placeholder="Imię, nazwisko, firma lub dział..." oninput="rpRenderPicker()" style="padding-left: 36px;" autocomplete="off" />
+      <i class="fa-solid fa-magnifying-glass" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 0.9rem;"></i>
+    </div>
+
+    <div id="rp-picker-list" class="rp-picker-list"></div>
+  </div>
+</div>
+
+<!-- Modal potwierdzenia usunięcia (odliczanie 3s) -->
+<div id="modal-rp-delete-confirm" class="modal">
+  <div class="modal-box" style="max-width: 440px; width: 92%; text-align: center; padding: 25px 20px;">
+    <div style="width: 55px; height: 55px; border-radius: 50%; background: rgba(217, 56, 58, 0.1); color: var(--danger); display: flex; align-items: center; justify-content: center; font-size: 1.6rem; margin: 0 auto 15px auto;">
+      <i class="fa-solid fa-triangle-exclamation"></i>
+    </div>
+
+    <h3 id="rp-delete-title" style="margin: 0 0 10px 0; font-size: 1.25rem;"></h3>
+
+    <p style="color: var(--text-muted); font-size: 0.95rem; margin-bottom: 24px; line-height: 1.5;">
+      <span id="rp-delete-question"></span> <br/>
+      <strong id="rp-delete-target" style="color: var(--text-dark); font-size: 1.05rem;"></strong>?
+    </p>
+
+    <div class="modal-btn-row">
+      <button type="button" class="btn-secondary" onclick="rpCloseDelete()">
+        Nie
+      </button>
+      <button type="button" id="rp-btn-confirm-delete" class="btn-danger" disabled onclick="rpConfirmDelete()">
+        Tak (3s)
+      </button>
+    </div>
+  </div>
 </div>

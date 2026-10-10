@@ -1,0 +1,125 @@
+/* =========================================================
+   WERSJA NA TELEFON
+   Ładuj jako OSTATNI arkusz. Wszystkie zmiany układu są w bloku
+   @media (max-width: 768px) - na komputerze nic się nie zmienia.
+   Wymaga js/mobile.js (wysuwane menu, etykiety komórek tabel).
+   ========================================================= */
+
+/* Elementy tylko na telefon - na komputerze ukryte */
+.topbar-menu-btn { display: none; }
+.sidebar-backdrop { display: none; }
+
+@media (max-width: 768px) {
+
+  /* ---------- Układ ---------- */
+  #app-container {
+    height: 100vh;
+    height: 100dvh; /* bez obcinania przez pasek adresu przeglądarki */
+  }
+
+  .content-area { min-width: 0; }
+  .topbar { height: 54px; padding: 0 12px; gap: 8px; }
+  .page-title { flex: 1; min-width: 0; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .main-body { padding: 14px; }
+  .card { padding: 16px; }
+
+  .topbar-menu-btn {
+    display: inline-flex; align-items: center; justify-content: center; flex: none;
+    width: 40px; height: 40px; border: none; border-radius: 10px;
+    background: transparent; color: var(--primary); font-size: 1.15rem; cursor: pointer;
+  }
+  .topbar-menu-btn:active { background: rgba(8, 88, 75, 0.1); }
+  .topbar-menu-btn:focus-visible { outline: 3px solid rgba(8, 88, 75, 0.35); }
+
+  /* ---------- Menu boczne jako wysuwany panel ---------- */
+  .sidebar {
+    position: fixed;
+    top: 0; bottom: 0; left: 0;
+    z-index: 1001;
+    width: min(300px, 86vw) !important;
+    height: auto;
+    transform: translateX(-105%);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 8px 0 30px rgba(0, 0, 0, 0.3);
+  }
+  .sidebar.mobile-open { transform: none; }
+
+  .sidebar-backdrop {
+    display: block; position: fixed; inset: 0; z-index: 1000;
+    background: rgba(0, 0, 0, 0.45);
+    opacity: 0; pointer-events: none; transition: opacity 0.3s ease;
+  }
+  .sidebar-backdrop.visible { opacity: 1; pointer-events: auto; }
+
+  /* Na telefonie panel jest zawsze pełny - stan "zwinięty" z komputera nie obowiązuje */
+  .sidebar-toggle { display: none; }
+  .sidebar.collapsed .menu-label { max-width: 170px; opacity: 1; }
+  .sidebar.collapsed .sidebar-header .menu-label { margin-left: 12px; }
+  .sidebar.collapsed .menu-btn i { margin-right: 12px; }
+  .sidebar.collapsed .user-footer { flex-direction: row; justify-content: space-between; padding: 12px 16px; }
+  .sidebar.collapsed .user-info-wrapper { display: block; }
+  .sidebar .menu-btn { padding: 14px 15px; }
+
+  /* ---------- Okna dialogowe ---------- */
+  .modal { padding: 10px; }
+  .modal-box {
+    padding: 18px;
+    max-height: calc(100vh - 20px);
+    max-height: calc(100dvh - 20px);
+    overflow-y: auto;
+  }
+  /* Formularze dwukolumnowe (style wpisane w znaczniku) - jedna kolumna */
+  .modal-box div[style*="grid-template-columns: 1fr 1fr"] { grid-template-columns: 1fr !important; }
+
+  /* Filtry: wyszukiwarka na całą szerokość, pozostałe pola po dwa */
+  #main-content div[style*="grid-template-columns: 2fr 1.2fr 1.2fr auto"] { grid-template-columns: 1fr 1fr !important; }
+  #main-content div[style*="grid-template-columns: 2fr 1.2fr 1.2fr auto"] > :first-child { grid-column: 1 / -1; }
+
+  /* ---------- Tabele jako karty ----------
+     Każdy wiersz to karta, a nazwa kolumny (data-label z js/mobile.js)
+     stoi po lewej stronie wartości. */
+  #main-content table,
+  #main-content tbody { display: block; width: 100% !important; }
+  #main-content thead { display: none; }
+
+  #main-content tbody tr {
+    display: block;
+    margin: 10px;
+    padding: 8px 12px;
+    border: 1px solid var(--border-color) !important;
+    border-radius: 10px;
+    background: #FFFFFF;
+  }
+
+  #main-content tbody td {
+    display: block;
+    position: relative;
+    min-height: 30px;
+    width: auto !important;
+    max-width: none !important;
+    padding: 6px 0 6px 42% !important;
+    border: none !important;
+    text-align: right !important;
+    white-space: normal !important;
+    overflow-wrap: anywhere;
+  }
+  #main-content tbody td::before {
+    content: attr(data-label);
+    position: absolute; left: 0; top: 8px; width: 40%;
+    text-align: left;
+    font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em;
+    color: var(--text-muted);
+  }
+
+  /* Komórki bez nagłówka (akcje) i wiersze informacyjne na całą szerokość */
+  #main-content tbody td[data-label=""],
+  #main-content tbody td:not([data-label]) { padding-left: 0 !important; }
+  #main-content tbody td[data-label=""]::before,
+  #main-content tbody td:not([data-label])::before { content: none; }
+  #main-content tbody td[colspan] { text-align: center !important; }
+  #main-content tbody td:empty { display: none; }
+}
+
+@media (max-width: 768px) and (prefers-reduced-motion: reduce) {
+  .sidebar, .sidebar-backdrop { transition: none; }
+}
