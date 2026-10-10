@@ -1,16 +1,161 @@
-<div class="card">
-  <h3>Pulpit główny</h3>
-  <p style="color: var(--text-muted); margin-bottom: 20px;">
-    Bieżące statystyki obecności, godziny przepracowane oraz podsumowanie dzisiejszej zmiany.
-  </p>
-  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
-    <div style="background: #F8F9FA; padding: 15px; border-radius: 6px; border-left: 4px solid var(--primary);">
-      <div style="font-size: 12px; color: var(--text-muted);">Pracownicy obecni</div>
-      <div style="font-size: 24px; font-weight: bold; margin-top: 5px;">43</div>
+<style>
+  /* ===== Dashboard ===== */
+  .db-root {
+    --db-present: #08584B;      /* godziny obecne */
+    --db-absent: #E5484D;       /* godziny nieobecne */
+    --db-track: #EEF0F3;
+    --db-grid: #E9EBEF;
+    --db-ink: #1F2328;
+    --db-ink-2: #5B616B;
+    --db-ink-3: #8B919A;
+  }
+
+  .db-head { display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 16px; margin-bottom: 20px; }
+  .db-head h3 { margin: 0; font-size: 1.5rem; font-weight: 700; letter-spacing: -0.02em; color: var(--db-ink); }
+  .db-head p { margin: 4px 0 0 0; font-size: 0.9rem; color: var(--db-ink-2); }
+  .db-filters { display: flex; gap: 10px; }
+  .db-filters select { width: auto; min-width: 110px; border-radius: 10px; font-weight: 600; cursor: pointer; }
+
+  .db-panel { background: #fff; border-radius: 14px; border: 1px solid var(--border-color); box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04); padding: 20px; }
+  .db-panel h4 { margin: 0; font-size: 0.98rem; font-weight: 700; color: var(--db-ink); }
+  .db-panel .sub { margin: 3px 0 0 0; font-size: 0.8rem; color: var(--db-ink-3); }
+  .db-panel-head { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; }
+
+  /* --- Kafelki --- */
+  .db-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px; margin-bottom: 16px; }
+  .db-kpi { background: #fff; border-radius: 14px; border: 1px solid var(--border-color); box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04); padding: 16px 18px; }
+  .db-kpi .lbl { display: flex; align-items: center; gap: 8px; font-size: 0.8rem; font-weight: 600; color: var(--db-ink-2); }
+  .db-kpi .ico { width: 28px; height: 28px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; font-size: 0.8rem; background: #F1F3F5; color: var(--db-ink-2); }
+  .db-kpi .val { margin-top: 10px; font-size: 1.75rem; font-weight: 700; letter-spacing: -0.02em; color: var(--db-ink); line-height: 1.1; }
+  .db-kpi .val small { font-size: 0.95rem; font-weight: 600; color: var(--db-ink-2); margin-left: 3px; }
+  .db-kpi .note { margin-top: 6px; font-size: 0.78rem; color: var(--db-ink-3); }
+  .db-kpi.lead { background: linear-gradient(135deg, #0B6B5B 0%, #08584B 50%, #053D34 100%); border-color: transparent; box-shadow: 0 8px 22px rgba(8, 88, 75, 0.25); }
+  .db-kpi.lead .lbl, .db-kpi.lead .note { color: rgba(255, 255, 255, 0.78); }
+  .db-kpi.lead .ico { background: rgba(255, 255, 255, 0.14); color: var(--accent); }
+  .db-kpi.lead .val, .db-kpi.lead .val small { color: #fff; }
+  .db-meter { height: 6px; border-radius: 999px; background: var(--db-track); overflow: hidden; margin-top: 10px; }
+  .db-meter span { display: block; height: 100%; border-radius: 999px; background: var(--db-absent); }
+
+  /* --- Legenda --- */
+  .db-legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 0.8rem; color: var(--db-ink-2); }
+  .db-legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .db-legend i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+  .db-legend .p { background: var(--db-present); }
+  .db-legend .a { background: var(--db-absent); }
+
+  /* --- Wykres kolumnowy: godziny w czasie --- */
+  .db-chart { display: grid; grid-template-columns: 44px 1fr; height: 270px; }
+  .db-yaxis { position: relative; margin-bottom: 22px; }
+  .db-yaxis span { position: absolute; right: 8px; transform: translateY(50%); font-size: 0.72rem; color: var(--db-ink-3); white-space: nowrap; }
+  .db-plot { position: relative; min-width: 0; }
+  .db-gridlines { position: absolute; left: 0; right: 0; top: 0; bottom: 22px; pointer-events: none; }
+  .db-gridlines i { position: absolute; left: 0; right: 0; height: 1px; background: var(--db-grid); }
+  .db-gridlines i.base { background: #C9CED4; }
+  .db-cols { position: relative; display: flex; align-items: stretch; height: 100%; gap: 2px; }
+  .db-col { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; cursor: default; border-radius: 6px; outline: none; }
+  .db-col .area { flex: 1; display: flex; align-items: flex-end; justify-content: center; padding: 0 1px; }
+  .db-col .stack { width: 100%; max-width: 26px; display: flex; flex-direction: column; gap: 2px; }
+  .db-col .seg { display: block; min-height: 2px; }
+  .db-col .seg.a { background: var(--db-absent); }
+  .db-col .seg.p { background: var(--db-present); }
+  .db-col .seg:first-child { border-radius: 4px 4px 0 0; }
+  .db-col .xl { height: 22px; line-height: 22px; text-align: center; font-size: 0.7rem; color: var(--db-ink-3); overflow: hidden; }
+  .db-col:hover, .db-col:focus-visible { background: rgba(8, 88, 75, 0.06); }
+  .db-col:hover .xl, .db-col:focus-visible .xl { color: var(--db-ink); font-weight: 700; }
+
+  /* --- Listy słupków poziomych --- */
+  .db-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; margin-top: 16px; }
+  .db-bars { display: flex; flex-direction: column; gap: 12px; }
+  .db-bar { outline: none; border-radius: 8px; }
+  .db-bar .top { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 5px; }
+  .db-bar .name { font-size: 0.86rem; font-weight: 600; color: var(--db-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .db-bar .num { font-size: 0.8rem; color: var(--db-ink-2); white-space: nowrap; }
+  .db-bar .num b { color: var(--db-ink); font-weight: 700; }
+  .db-bar .track { display: flex; gap: 2px; height: 10px; border-radius: 4px; background: var(--db-track); overflow: hidden; }
+  .db-bar .track span { display: block; height: 100%; }
+  .db-bar .track .p { background: var(--db-present); }
+  .db-bar .track .a { background: var(--db-absent); }
+  .db-bar:hover .track, .db-bar:focus-visible .track { box-shadow: 0 0 0 3px rgba(8, 88, 75, 0.1); }
+
+  .db-empty { padding: 26px 10px; text-align: center; font-size: 0.88rem; color: var(--db-ink-3); }
+  .db-empty i { display: block; font-size: 1.5rem; color: #C9CED4; margin-bottom: 10px; }
+
+  /* --- Dymek --- */
+  .db-tip {
+    position: fixed; z-index: 1003; pointer-events: none; display: none;
+    background: #1F2328; color: #fff; border-radius: 8px; padding: 8px 11px;
+    font-size: 0.78rem; line-height: 1.5; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25); max-width: 240px;
+  }
+  .db-tip strong { display: block; font-size: 0.82rem; margin-bottom: 2px; }
+  .db-tip .row { display: flex; align-items: center; gap: 7px; white-space: nowrap; }
+  .db-tip .row i { width: 8px; height: 8px; border-radius: 2px; flex: none; }
+
+  @media (max-width: 768px) {
+    .db-head h3 { font-size: 1.25rem; }
+    .db-filters { width: 100%; }
+    .db-filters select { flex: 1; }
+    .db-panel { padding: 16px; }
+    .db-kpis { grid-template-columns: 1fr 1fr; gap: 10px; }
+    .db-kpi.lead { grid-column: 1 / -1; }
+    .db-kpi .val { font-size: 1.4rem; }
+    .db-chart { grid-template-columns: 34px 1fr; height: 230px; }
+    .db-cols { gap: 1px; }
+    .db-col .xl.minor { visibility: hidden; }
+    .db-grid { grid-template-columns: 1fr; }
+  }
+</style>
+
+<div class="db-root" id="db-root">
+  <div class="page-hero">
+    <div>
+      <div class="eyebrow">Podsumowanie</div>
+      <h3>Pulpit główny</h3>
+      <p id="db-period-label">Podsumowanie czasu pracy z raportów.</p>
     </div>
-    <div style="background: #F8F9FA; padding: 15px; border-radius: 6px; border-left: 4px solid var(--accent);">
-      <div style="font-size: 12px; color: var(--text-muted);">Zgłoszone godziny (dziś)</div>
-      <div style="font-size: 24px; font-weight: bold; margin-top: 5px;">336 h</div>
+    <div class="page-hero-actions">
+      <select id="db-filter-year" class="form-control" aria-label="Rok" onchange="dbLoad()"></select>
+      <select id="db-filter-month" class="form-control" aria-label="Miesiąc" onchange="dbLoad()"></select>
     </div>
   </div>
+
+  <div class="db-kpis" id="db-kpis"></div>
+
+  <div class="db-panel">
+    <div class="db-panel-head">
+      <div>
+        <h4 id="db-time-title">Godziny w czasie</h4>
+        <p class="sub" id="db-time-sub"></p>
+      </div>
+      <div class="db-legend">
+        <span><i class="p"></i> Obecne</span>
+        <span><i class="a"></i> Nieobecne</span>
+      </div>
+    </div>
+    <div id="db-time"></div>
+  </div>
+
+  <div class="db-grid">
+    <div class="db-panel">
+      <div class="db-panel-head"><div><h4>Zmiany</h4><p class="sub">Godziny obecne i nieobecne na każdej zmianie</p></div></div>
+      <div id="db-shifts"></div>
+    </div>
+    <div class="db-panel">
+      <div class="db-panel-head"><div><h4>Działy</h4><p class="sub">Od największej liczby godzin</p></div></div>
+      <div id="db-depts"></div>
+    </div>
+    <div class="db-panel">
+      <div class="db-panel-head"><div><h4>Firmy</h4><p class="sub">Od największej liczby godzin</p></div></div>
+      <div id="db-biz"></div>
+    </div>
+    <div class="db-panel">
+      <div class="db-panel-head"><div><h4>Najwięcej godzin pracy</h4><p class="sub">Pracownicy z największą liczbą godzin obecnych</p></div></div>
+      <div id="db-top-present"></div>
+    </div>
+    <div class="db-panel">
+      <div class="db-panel-head"><div><h4>Najwięcej nieobecności</h4><p class="sub">Pracownicy z największą liczbą godzin nieobecnych</p></div></div>
+      <div id="db-top-absent"></div>
+    </div>
+  </div>
+
+  <div class="db-tip" id="db-tip" role="tooltip"></div>
 </div>
