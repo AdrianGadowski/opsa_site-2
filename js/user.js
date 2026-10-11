@@ -9,6 +9,7 @@ const US_MODULES = [
   { column: "allow_dashboard", label: "Dashboard", icon: "fa-chart-pie" },
   { column: "allow_employees", label: "Baza pracowników", icon: "fa-users" },
   { column: "allow_time_reporting", label: "Rozliczanie czasu", icon: "fa-clock" },
+  { column: "allow_schedule", label: "Harmonogram", icon: "fa-calendar-week" },
   { column: "allow_reports", label: "Lista raportów", icon: "fa-file-lines" },
   { column: "allow_users", label: "Użytkownicy", icon: "fa-user-gear" },
   { column: "allow_updates", label: "Aktualizacje", icon: "fa-rotate" },

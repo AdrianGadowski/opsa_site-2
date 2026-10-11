@@ -48,7 +48,7 @@ const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
 
 // Numer wydania doklejany do adresów plików, żeby przeglądarka nie używała starych kopii.
 // Zmieniaj przy każdej publikacji - tutaj i w index.html (?v=...).
-const APP_BUILD = "20261044";
+const APP_BUILD = "20261056";
 
 let currentUser = null;
 let cachedUsers = [];
@@ -59,6 +59,7 @@ const viewTitles = {
   dashboard: "Dashboard",
   employee_list: "Baza pracowników",
   report_time: "Rozliczanie czasu pracy",
+  schedule: "Harmonogram pracy",
   reports: "Lista raportów",
   users: "Zarządzanie użytkownikami",
   updates: "Aktualizacje systemu",
@@ -75,6 +76,7 @@ const permissionMap = {
   dashboard: { elementId: "nav-dashboard", column: "allow_dashboard" },
   employee_list: { elementId: "nav-employee_list", column: "allow_employees" },
   report_time: { elementId: "nav-report_time", column: "allow_time_reporting" },
+  schedule: { elementId: "nav-schedule", column: "allow_schedule" },
   reports: { elementId: "nav-reports", column: "allow_reports" },
   users: { elementId: "nav-users", column: "allow_users" },
   updates: { elementId: "nav-updates", column: "allow_updates" },
@@ -171,6 +173,7 @@ const USER_SELECT = `
   allow_dashboard,
   allow_employees,
   allow_time_reporting,
+  allow_schedule,
   allow_reports,
   allow_users,
   allow_updates,
@@ -656,6 +659,9 @@ async function onViewLoaded(viewName) {
       await loadRoleAndDepartmentDropdowns();
       await loadUsersList();
       break;
+    case 'schedule':
+      await initScheduleView();
+      break;
     case 'report_time':
       await initReportTimeView();
       break;
@@ -797,6 +803,7 @@ async function openEditUserModal(login) {
   document.getElementById("perm-dashboard").checked = !!(user.allow_dashboard);
   document.getElementById("perm-employees").checked = !!(user.allow_employees);
   document.getElementById("perm-time-reporting").checked = !!(user.allow_time_reporting);
+  document.getElementById("perm-schedule").checked = !!(user.allow_schedule);
   document.getElementById("perm-reports").checked = !!(user.allow_reports);
   document.getElementById("perm-users").checked = !!(user.allow_users);
   document.getElementById("perm-updates").checked = !!(user.allow_updates);
@@ -920,6 +927,7 @@ async function loadUsersList() {
         allow_dashboard,
         allow_employees,
         allow_time_reporting,
+        allow_schedule,
         allow_reports,
         allow_users,
         allow_updates,
@@ -957,6 +965,7 @@ async function loadUsersList() {
         { label: "Dashboard", active: u.allow_dashboard },
         { label: "Pracownicy", active: u.allow_employees },
         { label: "Rozliczanie", active: u.allow_time_reporting },
+        { label: "Harmonogram", active: u.allow_schedule },
         { label: "Raporty", active: u.allow_reports },
         { label: "Użytkownicy", active: u.allow_users },
         { label: "Aktualizacje", active: u.allow_updates },
@@ -1033,6 +1042,7 @@ async function handleSaveUser(e) {
     allow_dashboard: document.getElementById("perm-dashboard") ? document.getElementById("perm-dashboard").checked : false,
     allow_employees: document.getElementById("perm-employees") ? document.getElementById("perm-employees").checked : false,
     allow_time_reporting: document.getElementById("perm-time-reporting") ? document.getElementById("perm-time-reporting").checked : false,
+    allow_schedule: document.getElementById("perm-schedule") ? document.getElementById("perm-schedule").checked : false,
     allow_reports: document.getElementById("perm-reports") ? document.getElementById("perm-reports").checked : false,
     allow_users: document.getElementById("perm-users") ? document.getElementById("perm-users").checked : false,
     allow_updates: document.getElementById("perm-updates") ? document.getElementById("perm-updates").checked : false,

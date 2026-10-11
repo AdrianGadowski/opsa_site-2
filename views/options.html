@@ -50,6 +50,17 @@
   .op-lock-row.locked .st { color: #9b1c1f; font-weight: 600; }
   .op-lock-empty { padding: 26px 14px; text-align: center; font-size: 0.88rem; color: var(--danger); }
 
+  /* --- Okno słownika (działy / firmy) --- */
+  .op-dict-add { display: grid; grid-template-columns: 1fr auto; gap: 10px; background: #F5F5F7; padding: 14px; border-radius: 10px; margin-bottom: 14px; }
+  .op-dict-add button { width: auto; height: 42px; padding: 0 18px; white-space: nowrap; }
+  .op-dict-row { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-bottom: 1px solid #F0F0F0; }
+  .op-dict-row:last-child { border-bottom: none; }
+  .op-dict-row .ico { width: 34px; height: 34px; flex: none; border-radius: 9px; display: grid; place-items: center; font-size: 0.85rem; background: #E6F4EA; color: var(--primary); }
+  .op-dict-row .name { flex: 1; min-width: 0; font-size: 0.92rem; font-weight: 600; color: var(--text-dark); overflow-wrap: anywhere; }
+  .op-dict-del { width: 34px; height: 34px; flex: none; border: none; border-radius: 8px; background: transparent; color: var(--danger); cursor: pointer; font-size: 0.9rem; }
+  .op-dict-del:hover { background: #FEE2E2; }
+  .op-dict-del:focus-visible { outline: 3px solid rgba(217, 56, 58, 0.35); }
+
   .op-switch { position: relative; display: inline-flex; cursor: pointer; flex: none; }
   .op-switch input { position: absolute; opacity: 0; width: 0; height: 0; }
   .op-switch .track { width: 42px; height: 24px; border-radius: 999px; background: #D1D5DB; position: relative; transition: background 0.2s; }
@@ -62,6 +73,8 @@
     .op-lock-box { display: block; width: 100%; max-height: calc(100vh - 20px); max-height: calc(100dvh - 20px); overflow-y: auto; }
     .op-lock-pick { grid-template-columns: 1fr 1fr; }
     .op-lock-pick button { grid-column: 1 / -1; width: 100%; }
+    .op-dict-add { grid-template-columns: 1fr; }
+    .op-dict-add button { width: 100%; }
     .op-lock-list { overflow: visible; min-height: 0; }
   }
 
@@ -90,6 +103,28 @@
     </div>
     <h4>Blokada miesiąca</h4>
     <p>Zablokuj wybrany miesiąc, żeby nie można było tworzyć, edytować ani usuwać w nim raportów czasu pracy.</p>
+    <span class="go">Otwórz <i class="fa-solid fa-arrow-right"></i></span>
+  </button>
+
+  <!-- Działy -->
+  <button type="button" class="op-tile" onclick="opOpenDict('department')">
+    <div class="top">
+      <span class="ico"><i class="fa-solid fa-sitemap"></i></span>
+      <span class="chip">Słownik</span>
+    </div>
+    <h4>Działy</h4>
+    <p>Zobacz listę działów i dodaj nowy. Dział wybiera się potem przy pracowniku i użytkowniku.</p>
+    <span class="go">Otwórz <i class="fa-solid fa-arrow-right"></i></span>
+  </button>
+
+  <!-- Firmy -->
+  <button type="button" class="op-tile" onclick="opOpenDict('business')">
+    <div class="top">
+      <span class="ico"><i class="fa-solid fa-building"></i></span>
+      <span class="chip">Słownik</span>
+    </div>
+    <h4>Firmy</h4>
+    <p>Zobacz listę firm i dodaj nową. Firmę wybiera się potem przy pracowniku.</p>
     <span class="go">Otwórz <i class="fa-solid fa-arrow-right"></i></span>
   </button>
 </div>
@@ -123,6 +158,54 @@
 
     <div style="display: flex; justify-content: flex-end; margin-top: 16px;">
       <button type="button" class="btn-secondary" style="width: auto; padding: 11px 20px;" onclick="opCloseLocks()">Zamknij</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: słownik (działy / firmy) -->
+<div id="modal-op-dict" class="modal">
+  <div class="modal-box op-lock-box">
+    <h3 id="op-dict-title" style="color: var(--primary); margin: 0 0 16px 0; font-size: 1.25rem;"></h3>
+    <button class="link-btn" onclick="opCloseDict()" style="position: absolute; top: 22px; right: 22px; font-size: 1.2rem;" title="Zamknij">
+      <i class="fa-solid fa-xmark"></i>
+    </button>
+
+    <form class="op-dict-add" onsubmit="event.preventDefault(); opAddDictItem();">
+      <input type="text" id="op-dict-name" class="form-control" aria-label="Nazwa" autocomplete="off" maxlength="80" />
+      <button type="submit" id="op-dict-add" class="btn-primary">Dodaj</button>
+    </form>
+
+    <div id="op-dict-msg" role="status" style="display: none; font-size: 0.88rem; margin-bottom: 12px;"></div>
+
+    <div id="op-dict-list" class="op-lock-list"></div>
+
+    <div style="display: flex; justify-content: flex-end; margin-top: 16px;">
+      <button type="button" class="btn-secondary" style="width: auto; padding: 11px 20px;" onclick="opCloseDict()">Zamknij</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal potwierdzenia usunięcia działu / firmy (odliczanie 3s) -->
+<div id="modal-op-delete-confirm" class="modal">
+  <div class="modal-box" style="max-width: 440px; width: 92%; text-align: center; padding: 25px 20px;">
+    <div style="width: 55px; height: 55px; border-radius: 50%; background: rgba(217, 56, 58, 0.1); color: var(--danger); display: flex; align-items: center; justify-content: center; font-size: 1.6rem; margin: 0 auto 15px auto;">
+      <i class="fa-solid fa-triangle-exclamation"></i>
+    </div>
+
+    <h3 id="op-delete-title" style="margin: 0 0 10px 0; font-size: 1.25rem;"></h3>
+
+    <p style="color: var(--text-muted); font-size: 0.95rem; margin-bottom: 24px; line-height: 1.5;">
+      <span id="op-delete-question"></span> <br/>
+      <strong id="op-delete-target" style="color: var(--text-dark); font-size: 1.05rem;"></strong>?
+    </p>
+
+    <div class="modal-btn-row">
+      <button type="button" class="btn-secondary" onclick="opCloseDictDelete()">
+        Nie
+      </button>
+      <button type="button" id="op-btn-confirm-delete" class="btn-danger" disabled onclick="opConfirmDictDelete()">
+        Tak (3s)
+      </button>
     </div>
   </div>
 </div>

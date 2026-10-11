@@ -53,6 +53,25 @@
 
 .ep-main { max-width: 980px; margin: 0 auto; padding: 24px; }
 
+/* Godziny pracy z harmonogramu: ten i przyszły tydzień */
+.ep-schedule { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
+.ep-schedule:empty { display: none; }
+.ep-shift {
+  display: flex; align-items: center; gap: 14px; padding: 16px 18px; border-radius: 14px;
+  background: #FFFFFF; border: 1px solid var(--border-color); box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+.ep-shift .ico { width: 46px; height: 46px; flex: none; border-radius: 12px; display: grid; place-items: center; font-size: 1.1rem; background: #E6F4EA; color: var(--primary); }
+.ep-shift .lbl { font-size: 0.78rem; font-weight: 600; color: var(--text-muted); }
+.ep-shift .val { margin-top: 3px; font-size: 1.45rem; font-weight: 700; letter-spacing: -0.01em; color: var(--text-dark); }
+/* bieżący tydzień wyróżniony jak zielony nagłówek */
+.ep-shift.now { background: linear-gradient(135deg, #0B6B5B 0%, #08584B 50%, #053D34 100%); border-color: transparent; box-shadow: 0 8px 22px rgba(8, 88, 75, 0.25); }
+.ep-shift.now .ico { background: rgba(255, 255, 255, 0.14); color: var(--accent); }
+.ep-shift.now .lbl { color: rgba(255, 255, 255, 0.78); }
+.ep-shift.now .val { color: #FFFFFF; }
+.ep-shift.next .ico { background: rgba(252, 212, 68, 0.3); color: #92590A; }
+.ep-shift.empty .val { font-size: 1.05rem; font-weight: 600; color: var(--text-muted); }
+.ep-shift.now.empty .val { color: rgba(255, 255, 255, 0.85); }
+
 /* Stan miesiąca: zamknięty / otwarty */
 .ep-lock {
   display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-radius: 12px; margin-bottom: 16px;
@@ -107,6 +126,8 @@
   .ep-top { height: 54px; padding: 0 14px; }
   .ep-logout span { display: none; }
   .ep-main { padding: 14px; }
+  .ep-schedule { grid-template-columns: 1fr; gap: 10px; }
+  .ep-shift .val { font-size: 1.25rem; }
   .ep-root .eh-tiles { grid-template-columns: 1fr 1fr; gap: 10px; }
   .ep-root .eh-tile .val { font-size: 1.2rem; }
 

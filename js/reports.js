@@ -19,6 +19,7 @@ let rpBannerTimer = null;
 let rpBusy = false;
 let rpAddEmpId = null;       // pracownik wybrany do dodania w oknie edycji
 let rpRowEdits = {};         // { [id wiersza]: { from, to, absent } } — niezapisane zmiany w oknie edycji
+let rpDateEdit = null;       // nowa data raportu (rrrr-mm-dd) czekająca na "Zapisz zmiany"; null = bez zmiany
 let rpPendingDelete = null;  // { type: "report", number, label, date } | { type: "row", id, date }
 let rpLockedKeys = new Set(); // zablokowane miesiące "RRRR-MM" (Opcje -> Blokada miesiąca)
 let rpDeleteTimer = null;
@@ -292,7 +293,7 @@ function rpRenderTable() {
         <td class="rp-c rp-num">${r.seq} <span class="rp-num-db">(${rtEsc(r.number)})</span></td>
         <td class="rp-c" style="font-weight: 600;">${rtEsc(r.date)}</td>
         <td class="rp-c">${rtEsc(r.shift || "-")}</td>
-        <td>${rtEsc(rpUserName(r.creatorId))}</td>
+        <td class="rp-c">${rtEsc(rpUserName(r.creatorId))}</td>
         <td class="rp-c">${r.empIds.size}</td>
         <td class="rp-c rp-hours-ok">${rtFmtHours(r.present)}</td>
         <td class="rp-c rp-hours-absent">${rtFmtHours(r.absent)}</td>
@@ -455,6 +456,7 @@ function rpOpenDetail(number, edit) {
   if (!rep) return;
   rpCurrent = { number, edit: edit && canModifyReport(rep.creatorId) && !rpLockedKeys.has(opPeriodKeyFromPl(rep.date)) };
   rpRowEdits = {};
+  rpDateEdit = null;
   rpHideDetailMsg();
   rpRenderDetail(true);
   toggleModal("modal-rp-detail", true);
@@ -463,6 +465,7 @@ function rpOpenDetail(number, edit) {
 function rpCloseDetail() {
   rpCurrent = null;
   rpRowEdits = {};
+  rpDateEdit = null;
   rpClosePicker();
   toggleModal("modal-rp-detail", false);
 }
@@ -478,8 +481,17 @@ function rpRenderDetail(resetForm) {
   document.getElementById("rp-detail-title").textContent =
     `${edit ? "Edycja raportu" : "Raport"} nr ${rpLabel(rep)}`;
 
+  // w edycji datę raportu można zmienić; zapisuje ją dopiero "Zapisz zmiany"
+  const dateField = edit
+    ? `<span class="rp-date-edit">
+         <label for="rp-edit-date">Data raportu:</label>
+         <input type="date" id="rp-edit-date" class="form-control ${rpDateEdit ? "rp-dirty-field" : ""}"
+                value="${rtEsc(rpDateEdit || rpIsoDate(rep.date))}" onchange="rpOnDateChange()" />
+       </span>`
+    : `<span>Data raportu:<strong>${rtEsc(rep.date)}</strong></span>`;
+
   document.getElementById("rp-detail-meta").innerHTML = `
-    <span>Data raportu:<strong>${rtEsc(rep.date)}</strong></span>
+    ${dateField}
     <span>Zmiana:<strong>${rtEsc(rep.shift || "-")}</strong></span>
     <span>Utworzył:<strong>${rtEsc(rpUserName(rep.creatorId))}</strong></span>
     <span>Data utworzenia:<strong>${rtEsc(rep.created || "-")}</strong></span>`;
@@ -547,6 +559,71 @@ function rpRenderDetail(resetForm) {
     document.getElementById("rp-add-absent").checked = false;
   }
   rpSyncAddTimes();
+}
+
+// ---------- Zmiana daty raportu ----------
+// Nowa data jest tylko zapamiętywana; do bazy trafia razem z resztą zmian
+// po kliknięciu "Zapisz zmiany" (rpSaveAll).
+function rpIsoDate(plDate) {
+  const [dd, mm, yyyy] = String(plDate || "").split(".");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+function rpOnDateChange() {
+  const rep = rpCurrent && rpFindReport(rpCurrent.number);
+  const input = document.getElementById("rp-edit-date");
+  if (!rep || !input) return;
+
+  rpDateEdit = input.value && input.value !== rpIsoDate(rep.date) ? input.value : null;
+  input.classList.toggle("rp-dirty-field", !!rpDateEdit);
+  rpHideDetailMsg();
+  rpSyncSaveAll();
+}
+
+// Sprawdza, czy raport można przenieść na nowy dzień. Zwraca nową datę (dd.mm.rrrr)
+// albo null, gdy przeniesienie jest niedozwolone (komunikat jest już pokazany):
+//  - nowy miesiąc jest zablokowany,
+//  - autor ma już inny raport na nowy dzień i tę samą zmianę (jeden raport na autora, dzień i zmianę),
+//  - któryś pracownik ma w nowym dniu i tej zmianie nakładające się godziny w innym raporcie.
+async function rpValidateDateChange(rep, iso) {
+  const newDate = rtIsoToPl(iso);
+
+  const newKey = iso.slice(0, 7);
+  if (await opIsLocked(newKey)) {
+    rpShowDetailMsg(`Miesiąc ${opMonthLabel(newKey)} jest zablokowany. Nie można przenieść do niego raportu.`);
+    return null;
+  }
+
+  // Wpisy innych raportów na nowy dzień i tę samą zmianę
+  const { data: existing, error } = await supabaseClient
+    .from("work_reports")
+    .select("number_report, add_first_name_id, first_name_id, start_time, end_time")
+    .eq("report_date", newDate)
+    .eq("shift", rep.shift)
+    .neq("number_report", rep.number);
+  if (error) throw error;
+
+  const sameAuthor = (existing || []).find(o => Number(o.add_first_name_id) === Number(rep.creatorId));
+  if (sameAuthor) {
+    rpShowDetailMsg(`${rpUserName(rep.creatorId)} ma już raport nr ${sameAuthor.number_report} na ${newDate} (${rep.shift}). Na jeden dzień i zmianę może być tylko jeden raport tej osoby. Nic nie zostało zapisane.`);
+    return null;
+  }
+
+  for (const row of rep.rows) {
+    // godziny po uwzględnieniu niezapisanych zmian w tym wierszu
+    const v = rpRowValues(row);
+    if (!v.from || !v.to) continue;
+    const mine = rtRange(v.from, v.to);
+    const clash = (existing || []).find(o =>
+      Number(o.first_name_id) === Number(row.first_name_id) &&
+      o.start_time && o.end_time && rtOverlap(mine, rtRange(o.start_time, o.end_time)));
+    if (clash) {
+      rpShowDetailMsg(`${rpEmpName(row.first_name_id)} ma już w dniu ${newDate} wpis w raporcie nr ${clash.number_report} w godzinach ${clash.start_time}–${clash.end_time}. Nic nie zostało zapisane.`);
+      return null;
+    }
+  }
+
+  return newDate;
 }
 
 // Opcje godzin ograniczone do zmiany raportu; "do" musi być późniejsze niż "od".
@@ -623,7 +700,8 @@ function rpSyncSaveAll() {
   const btn = document.getElementById("rp-save-all");
   const rep = rpCurrent && rpFindReport(rpCurrent.number);
   if (!btn) return;
-  const count = rep && rpCurrent.edit ? rpPendingEdits(rep).length : 0;
+  // zmienione wiersze + ewentualna zmiana daty raportu
+  const count = rep && rpCurrent.edit ? rpPendingEdits(rep).length + (rpDateEdit ? 1 : 0) : 0;
 
   btn.style.display = rpCurrent && rpCurrent.edit ? "" : "none";
   btn.disabled = count === 0 || rpBusy;
@@ -662,7 +740,8 @@ async function rpSaveAll() {
   if (!rep || rpBusy || !canModifyReport(rep.creatorId)) return;
 
   const edits = rpPendingEdits(rep);
-  if (edits.length === 0) return;
+  const dateIso = rpDateEdit;
+  if (edits.length === 0 && !dateIso) return;
 
   if (edits.some(e => rtDuration(e.from, e.to) === null)) {
     rpShowDetailMsg("W każdym zmienionym wierszu wybierz godziny od i do.");
@@ -676,15 +755,28 @@ async function rpSaveAll() {
   try {
     if (await rpBlockedByLock(rep.date, rpShowDetailMsg)) return;
 
-    // Nowe godziny nie mogą nakładać się na inne wpisy tej samej osoby w tym dniu i zmianie
-    const empIds = [...new Set(edits.map(e => e.row.first_name_id))];
-    const { data: existing, error: checkErr } = await supabaseClient
-      .from("work_reports")
-      .select("id, number_report, first_name_id, start_time, end_time")
-      .eq("report_date", rep.date)
-      .eq("shift", rep.shift)
-      .in("first_name_id", empIds);
-    if (checkErr) throw checkErr;
+    // Najpierw wszystkie kontrole, dopiero potem zapisy - żeby nie zapisać połowy zmian.
+    // 1. Zmiana daty: blokada nowego miesiąca, inny raport autora, kolizje godzin w nowym dniu
+    let newDate = null;
+    if (dateIso) {
+      newDate = await rpValidateDateChange(rep, dateIso);
+      if (!newDate) return;
+    }
+    const effectiveDate = newDate || rep.date;
+
+    // 2. Nowe godziny nie mogą nakładać się na inne wpisy tej samej osoby w tym dniu i zmianie
+    let existing = [];
+    if (edits.length) {
+      const empIds = [...new Set(edits.map(e => e.row.first_name_id))];
+      const { data: found, error: checkErr } = await supabaseClient
+        .from("work_reports")
+        .select("id, number_report, first_name_id, start_time, end_time")
+        .eq("report_date", effectiveDate)
+        .eq("shift", rep.shift)
+        .in("first_name_id", empIds);
+      if (checkErr) throw checkErr;
+      existing = found || [];
+    }
 
     for (const e of edits) {
       const mine = rtRange(e.from, e.to);
@@ -701,6 +793,32 @@ async function rpSaveAll() {
       }
     }
 
+    // 3. Zapis daty (cały raport naraz)
+    if (newDate) {
+      const { data: moved, error: moveErr } = await supabaseClient
+        .from("work_reports")
+        .update({ report_date: newDate })
+        .eq("number_report", rep.number)
+        .select("id");
+      if (moveErr) throw moveErr;
+      if (!moved || moved.length === 0) {
+        rpShowDetailMsg("Data nie została zmieniona (brak uprawnień w bazie). Nic nie zostało zapisane.");
+        return;
+      }
+      rpDateEdit = null;
+
+      // Lista pokazuje wybrany rok i miesiąc - przełącz ją na okres nowej daty, żeby raport nie zniknął
+      const [newYear, newMonth] = dateIso.split("-");
+      const yearSel = document.getElementById("rp-filter-year");
+      const monthSel = document.getElementById("rp-filter-month");
+      if (yearSel && ![...yearSel.options].some(o => o.value === newYear)) {
+        yearSel.insertAdjacentHTML("beforeend", `<option value="${rtEsc(newYear)}">${rtEsc(newYear)}</option>`);
+      }
+      if (yearSel) yearSel.value = newYear;
+      if (monthSel && monthSel.value) monthSel.value = newMonth;
+    }
+
+    // 4. Zapis godzin i statusów
     const failed = [];
     for (const e of edits) {
       const hours = rtDuration(e.from, e.to);
@@ -725,7 +843,9 @@ async function rpSaveAll() {
       rpShowDetailMsg(`Nie zapisano zmian dla: ${failed.join(", ")} (brak uprawnień w bazie lub wpis został usunięty).`);
     } else {
       rpCloseDetail();
-      rpShowBanner("success", `Zapisano zmiany w raporcie nr ${rpLabel(rep)}.`);
+      rpShowBanner("success", newDate
+        ? `Zapisano zmiany w raporcie nr ${rep.number}. Raport został przeniesiony z ${rep.date} na ${newDate}.`
+        : `Zapisano zmiany w raporcie nr ${rpLabel(rep)}.`);
     }
   } catch (err) {
     console.error("Błąd zapisu zmian w raporcie:", err);

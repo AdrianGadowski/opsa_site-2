@@ -26,6 +26,11 @@ let rtBannerTimer = null;
 let rtRefreshToken = 0;
 let rtSaving = false;
 let rtLocked = false;        // miesiąc wybranej daty raportu jest zablokowany (Opcje -> Blokada miesiąca)
+let rtTargets = [];          // raporty na wybrany dzień i zmianę, do których można dopisać osoby
+let rtTarget = "new";        // "new" | numer raportu | null (administrator musi wskazać raport)
+let rtTargetManual = false;  // administrator sam wybrał pozycję z listy
+let rtTargetKey = "";        // "data|zmiana", dla których ustalono rtTarget
+let rtUsersById = null;      // nazwiska autorów raportów (ładowane tylko dla administratora)
 
 // ---------- Pomocnicze ----------
 function rtEsc(value) {
@@ -478,7 +483,7 @@ function rtUpdateSaveButton() {
   const btn = document.getElementById("rt-btn-save");
   if (!btn) return;
   const noEntries = rtFilledEntries().length === 0;
-  btn.disabled = rtSaving || noEntries || !rtMeta.date || rtLocked || rtHasConflicts();
+  btn.disabled = rtSaving || noEntries || !rtMeta.date || rtLocked || rtTarget === null || rtHasConflicts();
 }
 
 // Szuka wpisów tych pracowników w wybranym dniu i zmianie, które nakładają się godzinowo
@@ -505,6 +510,125 @@ async function rtFetchConflicts(entries) {
   return { error: null, map };
 }
 
+// ---------- Jeden raport na użytkownika, dzień i zmianę ----------
+// Jeśli autor ma już raport na wybrany dzień i zmianę, nowe osoby są do niego dopisywane
+// (ten sam numer). Administrator wpisujący godziny za kogoś dopisuje do raportu mistrza:
+// wybiera go z listy raportów istniejących na ten dzień i zmianę.
+function rtIsAdmin() {
+  return String(currentUser?.role?.role || "").toLowerCase() === "administrator";
+}
+
+function rtUserName(id) {
+  const u = rtUsersById && rtUsersById[id];
+  return u ? `${u.name || ""} ${u.last_name || ""}`.trim() : `Użytkownik #${id}`;
+}
+
+// Raporty na wybrany dzień i zmianę, do których zalogowana osoba może dopisać:
+// zwykły użytkownik - tylko własne, administrator - wszystkie.
+async function rtFetchTargets() {
+  const { data, error } = await supabaseClient
+    .from("work_reports")
+    .select("number_report, add_first_name_id, add_data, first_name_id")
+    .eq("report_date", rtIsoToPl(rtMeta.date))
+    .eq("shift", rtMeta.shift);
+  if (error) return { error, list: [] };
+
+  const map = new Map();
+  (data || []).forEach(r => {
+    let t = map.get(r.number_report);
+    if (!t) {
+      t = { number: Number(r.number_report), creatorId: r.add_first_name_id, created: r.add_data, people: new Set() };
+      map.set(r.number_report, t);
+    }
+    t.people.add(r.first_name_id);
+  });
+
+  const admin = rtIsAdmin();
+  const list = [...map.values()]
+    .filter(t => admin || Number(t.creatorId) === Number(currentUser.id))
+    .sort((a, b) => a.number - b.number);
+
+  // nazwiska autorów są potrzebne tylko administratorowi (lista wyboru)
+  if (admin && list.length && !rtUsersById) {
+    const { data: users, error: usersErr } = await supabaseClient.from("users").select("id, name, last_name");
+    if (!usersErr) {
+      rtUsersById = {};
+      (users || []).forEach(u => { rtUsersById[u.id] = u; });
+    }
+  }
+  return { error: null, list };
+}
+
+// Ustala, dokąd trafią nowe osoby, i rysuje informację / listę wyboru
+function rtApplyTargets(list) {
+  rtTargets = list;
+  const key = `${rtMeta.date}|${rtMeta.shift}`;
+  const own = list.filter(t => Number(t.creatorId) === Number(currentUser.id));
+  const stillValid = rtTarget === "new" || list.some(t => t.number === rtTarget);
+
+  if (!rtIsAdmin()) {
+    // zwykły użytkownik nie wybiera: dopisuje do swojego raportu, jeśli go ma
+    rtTarget = own.length ? own[0].number : "new";
+  } else if (!(rtTargetManual && key === rtTargetKey && stillValid)) {
+    rtTargetManual = false;
+    if (own.length) rtTarget = own[0].number;
+    else if (list.length === 1) rtTarget = list[0].number;
+    else if (list.length > 1) rtTarget = null;   // kilka raportów różnych osób - trzeba wskazać
+    else rtTarget = "new";
+  }
+  rtTargetKey = key;
+  rtRenderTarget();
+}
+
+function rtClearTargets() {
+  rtTargets = [];
+  rtTarget = "new";
+  rtTargetManual = false;
+  rtRenderTarget();
+}
+
+function rtRenderTarget() {
+  const el = document.getElementById("rt-target");
+  if (!el) return;
+
+  if (rtTargets.length === 0) {
+    el.style.display = "none";
+    el.innerHTML = "";
+    return;
+  }
+  el.style.display = "";
+
+  const describe = t => `nr ${t.number} — ${rtUserName(t.creatorId)} (osób: ${t.people.size})`;
+
+  if (!rtIsAdmin()) {
+    const t = rtTargets.find(x => x.number === rtTarget) || rtTargets[0];
+    el.className = "rt-target info";
+    el.innerHTML = `<i class="fa-solid fa-circle-info"></i>
+      <span>Masz już raport <strong>nr ${t.number}</strong> na ten dzień i tę zmianę (osób: ${t.people.size}).
+      Nowe osoby zostaną do niego dopisane.</span>`;
+    return;
+  }
+
+  el.className = `rt-target ${rtTarget === null ? "choose" : "info"}`;
+  el.innerHTML = `
+    <i class="fa-solid ${rtTarget === null ? "fa-triangle-exclamation" : "fa-circle-info"}"></i>
+    <div class="rt-target-body">
+      <label for="rt-target-select">Na ten dzień i tę zmianę są już raporty. Dopisz osoby do raportu:</label>
+      <select id="rt-target-select" class="form-control" onchange="rtOnTargetChange(this.value)">
+        ${rtTarget === null ? `<option value="" selected>Wybierz raport...</option>` : ""}
+        ${rtTargets.map(t => `<option value="${t.number}"${t.number === rtTarget ? " selected" : ""}>${rtEsc(describe(t))}</option>`).join("")}
+        <option value="new"${rtTarget === "new" ? " selected" : ""}>Nowy, osobny raport na moje nazwisko</option>
+      </select>
+    </div>`;
+}
+
+function rtOnTargetChange(value) {
+  rtTarget = value === "new" ? "new" : value === "" ? null : Number(value);
+  rtTargetManual = true;
+  rtRenderTarget();
+  rtUpdateSaveButton();
+}
+
 async function rtRefreshSummary() {
   const body = document.getElementById("rt-summary-body");
   const info = document.getElementById("rt-summary-totals");
@@ -524,6 +648,7 @@ async function rtRefreshSummary() {
 
   if (entries.length === 0) {
     rtConflicts = {};
+    rtClearTargets();
     body.innerHTML = `<tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:30px;">Brak pozycji w raporcie.</td></tr>`;
     rtUpdateSaveButton();
     return;
@@ -531,6 +656,7 @@ async function rtRefreshSummary() {
 
   if (!rtMeta.date) {
     rtConflicts = {};
+    rtClearTargets();
     rtShowSummaryMsg("Wybierz datę raportu.");
     rtRenderSummaryRows(entries);
     rtUpdateSaveButton();
@@ -555,6 +681,7 @@ async function rtRefreshSummary() {
 
   if (rtLocked) {
     rtConflicts = {};
+    rtClearTargets();
     rtRenderSummaryRows(entries);
     rtShowSummaryMsg(lockError
       ? "Nie udało się sprawdzić blokady miesiąca: " + (lockError.message || lockError)
@@ -563,18 +690,22 @@ async function rtRefreshSummary() {
     return;
   }
 
-  const res = await rtFetchConflicts(entries);
+  // Duplikaty godzin oraz istniejące raporty na ten dzień i zmianę (do dopisania)
+  const [res, targets] = await Promise.all([rtFetchConflicts(entries), rtFetchTargets()]);
   if (token !== rtRefreshToken) return; // ktoś zmienił datę/zmianę w trakcie
 
-  if (res.error) {
-    console.error("Błąd sprawdzania duplikatów:", res.error);
+  const fetchError = res.error || targets.error;
+  if (fetchError) {
+    console.error("Błąd sprawdzania raportów:", fetchError);
     rtConflicts = {};
-    rtShowSummaryMsg("Nie udało się sprawdzić duplikatów: " + (res.error.message || res.error));
+    rtClearTargets();
+    rtShowSummaryMsg("Nie udało się sprawdzić istniejących raportów: " + (fetchError.message || fetchError));
     rtRenderSummaryRows(entries);
     if (btn) btn.disabled = true;
     return;
   }
 
+  rtApplyTargets(targets.list);
   rtConflicts = res.map;
   rtRenderSummaryRows(entries);
   rtUpdateSaveButton();
@@ -708,19 +839,43 @@ async function rtSaveReport() {
       return;
     }
 
-    // 2. Kolejny numer raportu
-    const { data: maxRows, error: maxErr } = await supabaseClient
-      .from("work_reports")
-      .select("number_report")
-      .order("number_report", { ascending: false })
-      .limit(1);
-    if (maxErr) throw maxErr;
+    // 2. Dopisanie do istniejącego raportu albo nowy numer.
+    //    Lista raportów jest pobierana jeszcze raz - mogła się zmienić od otwarcia okna.
+    const fresh = await rtFetchTargets();
+    if (fresh.error) throw fresh.error;
 
-    const reportNumber = maxRows && maxRows.length ? (Number(maxRows[0].number_report) || 0) + 1 : 1;
+    let target = null;
+    if (!rtIsAdmin()) {
+      // jeden raport na użytkownika, dzień i zmianę
+      target = fresh.list[0] || null;
+    } else if (rtTarget !== "new") {
+      target = fresh.list.find(t => t.number === rtTarget) || null;
+      if (!target) {
+        rtApplyTargets(fresh.list);
+        rtUpdateSaveButton();
+        rtShowSummaryMsg("Wybrany raport już nie istnieje. Sprawdź, dokąd mają trafić osoby, i zapisz ponownie.", "#9b1c1f");
+        return;
+      }
+    }
 
-    // 3. Zapis
+    let reportNumber;
+    if (target) {
+      reportNumber = target.number;
+    } else {
+      const { data: maxRows, error: maxErr } = await supabaseClient
+        .from("work_reports")
+        .select("number_report")
+        .order("number_report", { ascending: false })
+        .limit(1);
+      if (maxErr) throw maxErr;
+      reportNumber = maxRows && maxRows.length ? (Number(maxRows[0].number_report) || 0) + 1 : 1;
+    }
+
+    // 3. Zapis. Dopisane osoby dostają autora i datę utworzenia istniejącego raportu,
+    //    żeby raport nadal miał jednego autora.
     const reportDate = rtIsoToPl(rtMeta.date);
-    const addedOn = rtIsoToPl(rtTodayIso());
+    const addedOn = target ? target.created : rtIsoToPl(rtTodayIso());
+    const authorId = target ? target.creatorId : currentUser.id;
 
     const records = entries.map(e => ({
       report_date: reportDate,
@@ -728,8 +883,8 @@ async function rtSaveReport() {
       department_id: e.emp.department_id,
       first_name_id: e.emp.id,
       last_name_id: e.emp.id,
-      add_first_name_id: currentUser.id,
-      add_last_name_id: currentUser.id,
+      add_first_name_id: authorId,
+      add_last_name_id: authorId,
       number_report: reportNumber,
       add_data: addedOn,
       start_time: e.from,
@@ -748,7 +903,10 @@ async function rtSaveReport() {
     rtCloseConfirm();
     rtRenderTable();
     rtUpdateStats();
-    rtShowBanner("success", `Raport nr ${reportNumber} (${reportDate}, ${rtMeta.shift}) został zapisany. Liczba osób: ${records.length}.`);
+    rtClearTargets();
+    rtShowBanner("success", target
+      ? `Dopisano ${records.length} os. do raportu nr ${reportNumber} (${reportDate}, ${rtMeta.shift}).`
+      : `Raport nr ${reportNumber} (${reportDate}, ${rtMeta.shift}) został zapisany. Liczba osób: ${records.length}.`);
   } catch (err) {
     console.error("Błąd zapisu raportu:", err);
     rtShowSummaryMsg("Wystąpił błąd podczas zapisu: " + (err.message || err));

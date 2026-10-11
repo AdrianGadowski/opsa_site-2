@@ -176,7 +176,47 @@ function epOpen() {
   const overlay = document.getElementById("auth-overlay");
   if (overlay) overlay.style.display = "none";
 
+  epLoadSchedule();
   epLoad();
+}
+
+// Kafelki z godzinami pracy z harmonogramu: bieżący i przyszły tydzień
+async function epLoadSchedule() {
+  const el = document.getElementById("ep-schedule");
+  if (!el || !epEmployee) return;
+  const empId = epEmployee.id;
+
+  const current = shCurrentWeek();
+  const next = shShiftWeek(current.year, current.week, 1);
+  const weeks = [
+    { ...current, title: "Ten tydzień", cls: "now" },
+    { ...next, title: "Przyszły tydzień", cls: "next" }
+  ];
+
+  const render = (values, failed) => {
+    el.innerHTML = weeks.map(w => {
+      const text = shDisplay(values[shWeekColumn(w.week)]);
+      const value = failed ? "Nie udało się pobrać" : (text || "Nie ustalono");
+      return `
+        <div class="ep-shift ${w.cls} ${text && !failed ? "" : "empty"}">
+          <span class="ico"><i class="fa-solid ${w.cls === "now" ? "fa-business-time" : "fa-calendar-plus"}"></i></span>
+          <div>
+            <div class="lbl">${w.title} • tydzień ${w.week} (${shWeekLabel(w.year, w.week)})</div>
+            <div class="val">${rtEsc(value)}</div>
+          </div>
+        </div>`;
+    }).join("");
+  };
+
+  const { data, error } = await supabaseClient
+    .from("employees")
+    .select(weeks.map(w => shWeekColumn(w.week)).join(", "))
+    .eq("id", empId)
+    .maybeSingle();
+  if (!epEmployee || epEmployee.id !== empId) return; // w międzyczasie wylogowano
+
+  if (error) console.error("Błąd pobierania harmonogramu pracownika:", error);
+  render(data || {}, !!error);
 }
 
 function epLogout() {

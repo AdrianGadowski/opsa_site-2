@@ -6,7 +6,7 @@
     --db-sat: #FFF4C7;          /* tło kolumny: sobota */
     --db-sun: #FDE3E3;          /* tło kolumny: niedziela */
     --db-track: #EEF0F3;
-    --db-grid: #E9EBEF;
+    --db-grid: rgba(31, 35, 40, 0.1);   /* półprzezroczysta: widoczna także na żółtym i czerwonym tle */
     --db-ink: #1F2328;
     --db-ink-2: #5B616B;
     --db-ink-3: #8B919A;
@@ -64,13 +64,14 @@
   .db-yaxis { position: relative; margin-bottom: 22px; }
   .db-yaxis span { position: absolute; right: 8px; transform: translateY(50%); font-size: 0.72rem; color: var(--db-ink-3); white-space: nowrap; }
   .db-plot { position: relative; min-width: 0; }
-  .db-gridlines { position: absolute; left: 0; right: 0; top: 0; bottom: 22px; pointer-events: none; }
+  /* Warstwy wykresu: tło kolumny (weekend) -> linie siatki -> słupki */
+  .db-gridlines { position: absolute; left: 0; right: 0; top: 0; bottom: 22px; pointer-events: none; z-index: 1; }
   .db-gridlines i { position: absolute; left: 0; right: 0; height: 1px; background: var(--db-grid); }
   .db-gridlines i.base { background: #C9CED4; }
   .db-cols { position: relative; display: flex; align-items: stretch; height: 100%; gap: 2px; }
   .db-col { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; cursor: default; border-radius: 6px; outline: none; }
   .db-col .area { flex: 1; display: flex; align-items: flex-end; justify-content: center; padding: 0 1px; }
-  .db-col .stack { width: 100%; max-width: 26px; display: flex; flex-direction: column; gap: 2px; }
+  .db-col .stack { position: relative; z-index: 2; width: 100%; max-width: 26px; display: flex; flex-direction: column; gap: 2px; }
   .db-col .seg { display: block; min-height: 2px; }
   .db-col .seg.a { background: var(--db-absent); }
   .db-col .seg.p { background: var(--db-present); }
@@ -86,6 +87,29 @@
   .db-legend .sat { background: var(--db-sat); border: 1px solid #E8D48A; }
   .db-legend .sun { background: var(--db-sun); border: 1px solid #F0BDBD; }
   .db-col:hover .xl, .db-col:focus-visible .xl { color: var(--db-ink); font-weight: 700; }
+
+  /* --- Wykres roczny: 12 miesięcy, w każdym kolumny tygodni --- */
+  .db-chart.months { height: 300px; }                   /* wyższy o miejsce na dwie linie sum pod miesiącem */
+  .db-chart.months .db-yaxis { margin-bottom: 72px; }   /* 16 px numer tygodnia + 56 px podpis miesiąca */
+  .db-chart.months .db-gridlines { bottom: 72px; }
+  .db-col .wk { height: 16px; line-height: 16px; text-align: center; font-size: 0.6rem; color: var(--db-ink-3); overflow: hidden; }
+  .db-col:hover .wk, .db-col:focus-visible .wk { color: var(--db-ink); font-weight: 700; }
+  .db-chart.months .db-cols { gap: 8px; }
+  .db-mgroup { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; border-radius: 8px; }
+  .db-mgroup .weeks { flex: 1; min-height: 0; display: flex; align-items: stretch; gap: 2px; padding: 0 2px; }
+  .db-mgroup .mxl {
+    height: 56px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
+    border-top: 1px solid transparent; border-radius: 0 0 8px 8px; outline: none; cursor: default; overflow: hidden;
+  }
+  .db-mgroup .mn { font-size: 0.74rem; font-weight: 600; color: var(--db-ink-2); }
+  .db-mgroup .tot { font-size: 0.7rem; font-weight: 700; line-height: 1.25; white-space: nowrap; }
+  .db-mgroup .tot.ok { color: #0b7a57; }           /* godziny obecne w miesiącu */
+  .db-mgroup .tot.absent { color: var(--danger); }  /* godziny nieobecne w miesiącu */
+  .db-mgroup .mxl:hover .mn, .db-mgroup .mxl:focus-visible .mn { color: var(--db-ink); font-weight: 700; }
+  /* Miesiąc wybrany w filtrze u góry */
+  .db-mgroup.selected { background: rgba(8, 88, 75, 0.06); }
+  .db-mgroup.selected .mn { color: var(--primary); font-weight: 700; }
+
 
   /* --- Listy słupków poziomych --- */
   .db-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; margin-top: 16px; }
@@ -123,8 +147,18 @@
     .db-kpi.lead { grid-column: 1 / -1; }
     .db-kpi .val { font-size: 1.4rem; }
     .db-chart { grid-template-columns: 34px 1fr; height: 230px; }
+    /* na telefonie sumy pod miesiącami są ukryte, więc podpis jest niższy */
+    .db-chart.months { height: 230px; }
+    .db-chart.months .db-yaxis { margin-bottom: 44px; }
+    .db-chart.months .db-gridlines { bottom: 44px; }
+    .db-mgroup .mxl { height: 28px; }
     .db-cols { gap: 1px; }
     .db-col .xl.minor { visibility: hidden; }
+    .db-chart.months .db-cols { gap: 3px; }
+    .db-mgroup .weeks { gap: 1px; padding: 0; }
+    .db-mgroup .tot { display: none; }   /* sumy miesiąca są w dymku po dotknięciu nazwy */
+    .db-col .wk { visibility: hidden; }  /* numery tygodni się nie mieszczą - są w dymku */
+    .db-mgroup .mn { font-size: 0.62rem; }
     .db-grid { grid-template-columns: 1fr; }
   }
 </style>
@@ -183,6 +217,21 @@
       <div class="db-panel-head"><div><h4>Najwięcej nieobecności</h4><p class="sub">Pracownicy z największą liczbą godzin nieobecnych</p></div></div>
       <div id="db-top-absent"></div>
     </div>
+  </div>
+
+  <!-- Cały rok: miesiące podzielone na tygodnie -->
+  <div class="db-panel" style="margin-top: 16px;">
+    <div class="db-panel-head">
+      <div>
+        <h4 id="db-year-title">Godziny w miesiącach</h4>
+        <p class="sub">Kolumny to tygodnie numerowane kolejno przez cały rok (od poniedziałku do niedzieli). Pod nazwą miesiąca są jego godziny: obecne na zielono, nieobecne na czerwono.</p>
+      </div>
+      <div class="db-legend">
+        <span><i class="p"></i> Obecne</span>
+        <span><i class="a"></i> Nieobecne</span>
+      </div>
+    </div>
+    <div id="db-year"></div>
   </div>
 
   <div class="db-tip" id="db-tip" role="tooltip"></div>

@@ -95,19 +95,31 @@ async function dbLoad() {
   const token = ++dbLoadToken;
 
   try {
-    const rows = await rpFetchAll(() => supabaseClient
-      .from("work_reports")
-      .select("report_date, shift, department_id, first_name_id, number_report, total_hours, at_work")
-      .like("report_date", pattern));
+    // Wykres roczny na dole zawsze pokazuje cały rok, niezależnie od wybranego miesiąca.
+    // Przy "Cały rok" wystarcza jedno pobranie.
+    const [rows, yearOnly] = await Promise.all([
+      rpFetchAll(() => supabaseClient
+        .from("work_reports")
+        .select("report_date, shift, department_id, first_name_id, number_report, total_hours, at_work")
+        .like("report_date", pattern)),
+      month
+        ? rpFetchAll(() => supabaseClient
+            .from("work_reports")
+            .select("report_date, total_hours, at_work")
+            .like("report_date", `%.${year}`))
+        : null
+    ]);
     if (token !== dbLoadToken) return; // w międzyczasie zmieniono okres
 
     dbRender(rows, year, month);
+    dbRenderYear(yearOnly || rows, year, month);
   } catch (err) {
     if (token !== dbLoadToken) return;
     console.error("Błąd pobierania danych dashboardu:", err);
     document.getElementById("db-kpis").innerHTML = "";
     document.getElementById("db-time").innerHTML =
       dbEmptyHtml("Nie udało się pobrać danych: " + (err.message || err));
+    document.getElementById("db-year").innerHTML = "";
   }
 }
 
@@ -280,6 +292,111 @@ function dbRenderTime(byTime, year, month) {
       <div class="db-plot">
         <div class="db-gridlines">${grid}</div>
         <div class="db-cols">${cols}</div>
+      </div>
+    </div>`;
+}
+
+
+// ---------- Wykres: cały rok, miesiące podzielone na tygodnie ----------
+// Tygodnie są numerowane kolejno przez cały rok (od poniedziałku do niedzieli; tydzień 1
+// zaczyna się 1 stycznia). Tydzień na przełomie miesięcy ma po jednej kolumnie w każdym
+// z nich, z tym samym numerem - dzięki temu sumy miesięcy się zgadzają.
+function dbWeekOfYear(year, month, day) {
+  const jan1 = new Date(year, 0, 1);
+  const offset = (jan1.getDay() + 6) % 7; // poniedziałek = 0
+  const dayOfYear = Math.round((new Date(year, month - 1, day) - jan1) / 86400000);
+  return Math.floor((dayOfYear + offset) / 7) + 1;
+}
+
+function dbRenderYear(rows, year, selectedMonth) {
+  const el = document.getElementById("db-year");
+  const title = document.getElementById("db-year-title");
+  if (!el) return;
+  if (title) title.textContent = `Godziny w miesiącach — ${year}`;
+
+  const y = Number(year);
+
+  // months[m] = lista tygodni tego miesiąca: { week, from, to, present, absent }
+  const months = Array.from({ length: 12 }, (_, mi) => {
+    const weeks = [];
+    const daysInMonth = new Date(y, mi + 1, 0).getDate();
+    for (let d = 1; d <= daysInMonth; d++) {
+      const week = dbWeekOfYear(y, mi + 1, d);
+      const last = weeks[weeks.length - 1];
+      if (last && last.week === week) last.to = d;
+      else weeks.push({ week, from: d, to: d, present: 0, absent: 0 });
+    }
+    return weeks;
+  });
+
+  rows.forEach(r => {
+    const [d, m] = String(r.report_date || "").split(".").map(Number);
+    if (!(m >= 1 && m <= 12) || !(d >= 1 && d <= 31)) return;
+    const cell = months[m - 1].find(w => d >= w.from && d <= w.to);
+    if (!cell) return;
+    const hours = parseFloat(r.total_hours) || 0;
+    if (r.at_work === false) cell.absent += hours;
+    else cell.present += hours;
+  });
+
+  const maxWeek = Math.max(...months.flat().map(c => c.present + c.absent));
+  if (maxWeek <= 0) {
+    el.innerHTML = dbEmptyHtml(`Brak raportów w roku ${year}.`);
+    return;
+  }
+
+  const max = dbNiceMax(maxWeek);
+  const ticks = [0, 1, 2, 3, 4].map(i => (max / 4) * i);
+  const yAxis = ticks.map(t => `<span style="bottom: ${(t / max) * 100}%;">${dbNum(t)}</span>`).join("");
+  const grid = ticks.map(t =>
+    `<i class="${t === 0 ? "base" : ""}" style="bottom: ${(t / max) * 100}%;"></i>`).join("");
+  const p2 = n => String(n).padStart(2, "0");
+
+  const groups = months.map((weeks, mi) => {
+    const monthName = RP_MONTHS[mi];
+    const mm = p2(mi + 1);
+    const total = weeks.reduce((acc, c) => ({ present: acc.present + c.present, absent: acc.absent + c.absent }),
+      { present: 0, absent: 0 });
+
+    const cols = weeks.map(c => {
+      const sum = c.present + c.absent;
+      const range = c.from === c.to ? `${p2(c.from)}.${mm}.${year}` : `${p2(c.from)}.${mm}–${p2(c.to)}.${mm}.${year}`;
+      const name = `Tydzień ${c.week} (${range})`;
+      const stack = sum > 0 ? `
+        <div class="stack" style="height: ${(sum / max) * 100}%;">
+          ${c.absent > 0 ? `<span class="seg a" style="flex: ${c.absent} 0 0;"></span>` : ""}
+          ${c.present > 0 ? `<span class="seg p" style="flex: ${c.present} 0 0;"></span>` : ""}
+        </div>` : "";
+
+      return `
+        <div class="db-col" tabindex="0" role="img"
+             aria-label="${rtEsc(`${name}: obecne ${dbHours(c.present)}, nieobecne ${dbHours(c.absent)}`)}"
+             data-tip="${dbTipAttr(name, dbHoursLines(c.present, c.absent))}">
+          <div class="area">${stack}</div>
+          <div class="wk">${c.week}</div>
+        </div>`;
+    }).join("");
+
+    const isSelected = selectedMonth && Number(selectedMonth) === mi + 1;
+    const monthTip = dbTipAttr(`${monthName} ${year} — razem`, dbHoursLines(total.present, total.absent));
+
+    return `
+      <div class="db-mgroup ${isSelected ? "selected" : ""}">
+        <div class="weeks">${cols}</div>
+        <div class="mxl" tabindex="0" data-tip="${monthTip}">
+          <span class="mn">${rtEsc(monthName.slice(0, 3))}</span>
+          <span class="tot ok" title="Godziny obecne">${dbHours(total.present)}</span>
+          <span class="tot absent" title="Godziny nieobecne">${dbHours(total.absent)}</span>
+        </div>
+      </div>`;
+  }).join("");
+
+  el.innerHTML = `
+    <div class="db-chart months">
+      <div class="db-yaxis" aria-hidden="true">${yAxis}</div>
+      <div class="db-plot">
+        <div class="db-gridlines">${grid}</div>
+        <div class="db-cols">${groups}</div>
       </div>
     </div>`;
 }

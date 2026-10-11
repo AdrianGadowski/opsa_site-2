@@ -85,6 +85,15 @@
   .rt-meta .form-group label { text-align: center; }
   .rt-meta #rt-meta-date { text-align: center; }
   /* Zmiana wykrywana automatycznie: sam napis, bez listy */
+  /* Informacja o dopisaniu do istniejącego raportu (dla administratora: lista wyboru) */
+  .rt-target { display: flex; align-items: flex-start; gap: 10px; padding: 12px 14px; border-radius: 8px; margin-bottom: 14px; font-size: 0.88rem; line-height: 1.45; }
+  .rt-target.info { background: rgba(8, 88, 75, 0.06); border: 1px solid rgba(8, 88, 75, 0.2); color: #08584B; }
+  .rt-target.choose { background: rgba(252, 212, 68, 0.25); border: 1px solid rgba(224, 188, 60, 0.6); color: #7a5c00; }
+  .rt-target > i { margin-top: 3px; }
+  .rt-target-body { flex: 1; min-width: 0; }
+  .rt-target-body label { display: block; font-weight: 600; margin-bottom: 6px; }
+  .rt-target-body select { max-width: 460px; }
+
   /* Podsumowanie na dole okna potwierdzenia */
   .rt-totals { display: flex; gap: 22px; flex-wrap: wrap; font-size: 0.88rem; color: var(--text-muted); }
   .rt-totals strong { color: var(--text-dark); font-size: 1.05rem; margin-left: 4px; }
@@ -275,6 +284,9 @@
         <div id="rt-meta-shift" class="rt-shift-text" aria-labelledby="rt-meta-shift-label" title="Zmiana wykrywana automatycznie z wybranych godzin">—</div>
       </div>
     </div>
+
+    <!-- Dopisanie do istniejącego raportu na ten dzień i zmianę -->
+    <div id="rt-target" class="rt-target" style="display: none;"></div>
 
     <div id="rt-summary-msg" style="display: none; font-size: 0.88rem; margin-bottom: 12px;"></div>
 
