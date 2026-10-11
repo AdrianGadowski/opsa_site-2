@@ -80,7 +80,7 @@
           <th style="padding: 14px 18px;">Telefon</th>
           <th style="padding: 14px 18px;">Firma</th>
           <th style="padding: 14px 18px;">Dział</th>
-          <th style="padding: 14px 18px; text-align: center; width: 110px;">Akcje</th>
+          <th style="padding: 14px 18px; text-align: center; width: 150px;">Akcje</th>
         </tr>
       </thead>
       <tbody id="employees-table-body">
@@ -111,11 +111,11 @@
       <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
         <div class="form-group">
           <label for="form-emp-first-name">Imię *</label>
-          <input type="text" id="form-emp-first-name" class="form-control" placeholder="np. Jan" required />
+          <input type="text" id="form-emp-first-name" class="form-control" placeholder="np. Jan" required oninput="syncEmployeeLogin()" />
         </div>
         <div class="form-group">
           <label for="form-emp-last-name">Nazwisko *</label>
-          <input type="text" id="form-emp-last-name" class="form-control" placeholder="np. Kowalski" required />
+          <input type="text" id="form-emp-last-name" class="form-control" placeholder="np. Kowalski" required oninput="syncEmployeeLogin()" />
         </div>
       </div>
 
@@ -145,6 +145,18 @@
           <select id="form-emp-dept-id" class="form-control" required>
             <option value="">Wybierz dział...</option>
           </select>
+        </div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+        <div class="form-group">
+          <label for="form-emp-login">Login</label>
+          <input type="text" id="form-emp-login" class="form-control" placeholder="np. jko" autocomplete="off" oninput="employeeLoginEdited()" />
+          <small id="form-emp-login-hint" style="display: block; margin-top: 4px; color: var(--text-muted); font-size: 0.75rem;"></small>
+        </div>
+        <div class="form-group">
+          <label for="form-emp-password">Hasło</label>
+          <input type="text" id="form-emp-password" class="form-control" autocomplete="off" />
         </div>
       </div>
 
@@ -183,6 +195,100 @@
       <button type="button" id="btn-confirm-delete-employee" class="btn-danger" disabled onclick="confirmDeleteEmployee()">
         Tak (3s)
       </button>
+    </div>
+  </div>
+</div>
+<!-- Modal: podgląd godzin pracownika w wybranym miesiącu -->
+<style>
+  .eh-modal-box { max-width: 880px; width: 96%; max-height: 92vh; display: flex; flex-direction: column; position: relative; }
+  .eh-head { display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 14px; margin-bottom: 14px; padding-right: 34px; }
+  .eh-head h3 { margin: 0; font-size: 1.25rem; color: var(--primary); }
+  .eh-head p { margin: 4px 0 0 0; font-size: 0.86rem; color: var(--text-muted); }
+  .eh-filters { display: flex; gap: 10px; }
+  .eh-filters select { width: auto; min-width: 110px; font-weight: 600; cursor: pointer; }
+
+  .eh-tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 14px; }
+  .eh-tile { border-radius: 12px; padding: 12px 14px; background: #F5F5F7; }
+  .eh-tile .lbl { font-size: 0.74rem; font-weight: 600; color: var(--text-muted); }
+  .eh-tile .val { margin-top: 4px; font-size: 1.3rem; font-weight: 700; color: var(--text-dark); letter-spacing: -0.01em; }
+  .eh-tile.ok { background: #E8F6EF; }
+  .eh-tile.ok .lbl, .eh-tile.ok .val { color: #0b7a57; }
+  .eh-tile.absent { background: #FDE8E8; }
+  .eh-tile.absent .lbl, .eh-tile.absent .val { color: #9b1c1f; }
+
+  .eh-scroll { overflow: auto; flex: 1; min-height: 160px; border: 1px solid var(--border-color); border-radius: 8px; }
+  .eh-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+  .eh-table th {
+    position: sticky; top: 0; z-index: 1; background: #F9FAFB; padding: 10px 14px; text-align: center;
+    font-size: 0.76rem; text-transform: uppercase; letter-spacing: 0.03em; color: #4B5563; border-bottom: 1px solid var(--border-color);
+  }
+  .eh-table td { padding: 8px 14px; border-bottom: 1px solid #F0F0F0; text-align: center; vertical-align: middle; }
+  .eh-table th:first-child, .eh-table td:first-child { text-align: left; white-space: nowrap; }
+  .eh-table .day { font-weight: 700; color: var(--text-dark); }
+  .eh-table .wd { margin-left: 6px; font-size: 0.78rem; color: var(--text-muted); }
+  .eh-table tr.sat td { background: #FFF8DB; }
+  .eh-table tr.sun td { background: #FDEDED; }
+  .eh-table tr.none td { color: #B0B5BC; }
+  .eh-table tr.none .day { color: #8B919A; font-weight: 600; }
+  .eh-table .hrs { font-weight: 700; color: var(--primary); white-space: nowrap; }
+  .eh-table .hrs.absent { color: var(--danger); }
+  .eh-pill { display: inline-block; padding: 3px 9px; border-radius: 999px; font-size: 0.76rem; font-weight: 600; }
+  .eh-pill.ok { background: rgba(16, 185, 129, 0.12); color: #0b7a57; }
+  .eh-pill.absent { background: rgba(217, 56, 58, 0.1); color: var(--danger); }
+
+  @media (max-width: 768px) {
+    .eh-modal-box { display: block; width: 100%; max-height: calc(100vh - 20px); max-height: calc(100dvh - 20px); overflow-y: auto; }
+    .eh-filters { width: 100%; }
+    .eh-filters select { flex: 1; }
+    .eh-tiles { grid-template-columns: 1fr 1fr; }
+    .eh-scroll { overflow: visible; min-height: 0; border: none; }
+    /* na telefonie tylko dni z wpisami - dni bez wpisu nie zajmują miejsca */
+    #main-content .eh-table tbody tr.none { display: none; }
+    #main-content .eh-table tbody tr { margin: 0 0 10px 0; }
+    #main-content .eh-table tbody tr.sat { background: #FFF8DB; }
+    #main-content .eh-table tbody tr.sun { background: #FDEDED; }
+    #main-content .eh-table tbody tr td { background: transparent; }
+  }
+</style>
+
+<div id="modal-eh" class="modal">
+  <div class="modal-box eh-modal-box">
+    <button class="link-btn" onclick="ehClose()" style="position: absolute; top: 22px; right: 22px; font-size: 1.2rem;" title="Zamknij">
+      <i class="fa-solid fa-xmark"></i>
+    </button>
+
+    <div class="eh-head">
+      <div>
+        <h3 id="eh-name">Godziny pracownika</h3>
+        <p id="eh-sub"></p>
+      </div>
+      <div class="eh-filters">
+        <select id="eh-year" class="form-control" aria-label="Rok" onchange="ehLoad()"></select>
+        <select id="eh-month" class="form-control" aria-label="Miesiąc" onchange="ehLoad()"></select>
+      </div>
+    </div>
+
+    <div class="eh-tiles" id="eh-tiles"></div>
+
+    <div class="eh-scroll">
+      <table class="eh-table">
+        <thead>
+          <tr>
+            <th>Dzień</th>
+            <th>Zmiana</th>
+            <th>Od</th>
+            <th>Do</th>
+            <th>Godziny</th>
+            <th>Status</th>
+            <th>Nr raportu</th>
+          </tr>
+        </thead>
+        <tbody id="eh-body"></tbody>
+      </table>
+    </div>
+
+    <div style="display: flex; justify-content: flex-end; margin-top: 16px;">
+      <button type="button" class="btn-secondary" style="width: auto; padding: 11px 20px;" onclick="ehClose()">Zamknij</button>
     </div>
   </div>
 </div>

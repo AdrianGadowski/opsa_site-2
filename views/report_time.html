@@ -81,6 +81,16 @@
   .rt-modal-box { max-width: 1060px; width: 96%; max-height: 92vh; display: flex; flex-direction: column; position: relative; }
   .rt-meta { display: flex; gap: 14px; flex-wrap: wrap; align-items: flex-end; background: #F5F5F7; padding: 14px 16px; border-radius: 8px; margin-bottom: 14px; }
   .rt-meta .form-group { margin-bottom: 0; }
+  /* Nagłówki wyśrodkowane dokładnie nad swoimi polami */
+  .rt-meta .form-group label { text-align: center; }
+  .rt-meta #rt-meta-date { text-align: center; }
+  /* Zmiana wykrywana automatycznie: sam napis, bez listy */
+  /* Podsumowanie na dole okna potwierdzenia */
+  .rt-totals { display: flex; gap: 22px; flex-wrap: wrap; font-size: 0.88rem; color: var(--text-muted); }
+  .rt-totals strong { color: var(--text-dark); font-size: 1.05rem; margin-left: 4px; }
+  .rt-totals strong.ok { color: #0b7a57; }
+  .rt-totals strong.absent { color: var(--danger); }
+  .rt-shift-text { min-width: 120px; height: 42px; display: flex; align-items: center; justify-content: center; padding: 0 14px; font-size: 0.95rem; font-weight: 700; color: var(--primary); white-space: nowrap; }
   .rt-summary-scroll { overflow: auto; flex: 1; min-height: 160px; border: 1px solid var(--border-color); border-radius: 8px; }
   .rt-summary-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
   .rt-summary-table th {
@@ -261,14 +271,9 @@
         <input type="date" id="rt-meta-date" class="form-control" onchange="rtOnMetaChange()" />
       </div>
       <div class="form-group">
-        <label for="rt-meta-shift">Zmiana</label>
-        <select id="rt-meta-shift" class="form-control" disabled title="Zmiana wykrywana automatycznie z wybranych godzin">
-          <option value="Zmiana I">Zmiana I</option>
-          <option value="Zmiana II">Zmiana II</option>
-          <option value="Zmiana III">Zmiana III</option>
-        </select>
+        <label id="rt-meta-shift-label">Zmiana</label>
+        <div id="rt-meta-shift" class="rt-shift-text" aria-labelledby="rt-meta-shift-label" title="Zmiana wykrywana automatycznie z wybranych godzin">—</div>
       </div>
-      <div id="rt-meta-info" style="font-size: 0.85rem; color: var(--text-muted); padding-bottom: 12px;"></div>
     </div>
 
     <div id="rt-summary-msg" style="display: none; font-size: 0.88rem; margin-bottom: 12px;"></div>
@@ -291,11 +296,14 @@
       </table>
     </div>
 
-    <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 16px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px; margin-top: 16px;">
+      <div id="rt-summary-totals" class="rt-totals"></div>
+      <div style="display: flex; gap: 12px; flex-wrap: wrap;">
       <button type="button" class="btn-secondary" style="width: auto; padding: 11px 20px;" onclick="rtCloseConfirm()">Wróć do edycji</button>
       <button type="button" id="rt-btn-save" class="btn-primary" style="width: auto; padding: 11px 24px;" onclick="rtSaveReport()">
         Zatwierdź i zapisz
       </button>
+      </div>
     </div>
   </div>
 </div>

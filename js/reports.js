@@ -18,7 +18,9 @@ let rpLoadToken = 0;
 let rpBannerTimer = null;
 let rpBusy = false;
 let rpAddEmpId = null;       // pracownik wybrany do dodania w oknie edycji
-let rpPendingDelete = null;  // { type: "report", number } | { type: "row", id }
+let rpRowEdits = {};         // { [id wiersza]: { from, to, absent } } — niezapisane zmiany w oknie edycji
+let rpPendingDelete = null;  // { type: "report", number, label, date } | { type: "row", id, date }
+let rpLockedKeys = new Set(); // zablokowane miesiące "RRRR-MM" (Opcje -> Blokada miesiąca)
 let rpDeleteTimer = null;
 
 // ---------- Pomocnicze ----------
@@ -190,7 +192,16 @@ async function rpLoad() {
       .from("work_reports")
       .select("id, report_date, shift, department_id, first_name_id, add_first_name_id, number_report, add_data, start_time, end_time, total_hours, at_work")
       .like("report_date", pattern));
+    // Zablokowane miesiące: przy nich nie ma edycji ani usuwania
+    let lockedKeys = new Set();
+    try {
+      lockedKeys = await opFetchLockedKeys();
+    } catch (lockErr) {
+      // przyciski zostają, ale każda akcja i tak sprawdza blokadę w bazie
+      console.error("Błąd pobierania blokad miesięcy:", lockErr);
+    }
     if (token !== rpLoadToken) return; // w międzyczasie zmieniono filtr
+    rpLockedKeys = lockedKeys;
 
     rpReports = rpGroup(rows);
     rpRenderTable();
@@ -274,7 +285,8 @@ function rpRenderTable() {
 
   tbody.innerHTML = list.map(r => {
     const n = Number(r.number);
-    const canModify = canModifyReport(r.creatorId);
+    const locked = rpLockedKeys.has(opPeriodKeyFromPl(r.date));
+    const canModify = canModifyReport(r.creatorId) && !locked;
     return `
       <tr>
         <td class="rp-c rp-num">${r.seq} <span class="rp-num-db">(${rtEsc(r.number)})</span></td>
@@ -294,10 +306,25 @@ function rpRenderTable() {
           </button>
           <button class="link-btn" title="Usuń raport" style="font-size: 1rem; padding: 4px 8px; cursor: pointer; color: var(--danger, #ef4444); margin-left: 6px;" onclick="rpDeleteReport(${n})">
             <i class="fa-solid fa-trash"></i>
-          </button>` : ""}
+          </button>` : ""}${locked ? `
+          <span class="rp-lock" title="Miesiąc zablokowany — raportu nie można edytować ani usuwać"><i class="fa-solid fa-lock"></i></span>` : ""}
         </td>
       </tr>`;
   }).join("");
+}
+
+// Sprawdza w bazie blokadę miesiąca raportu tuż przed zmianą. Zwraca true (i pokazuje
+// komunikat przez show), gdy miesiąc jest zablokowany albo nie dało się tego sprawdzić.
+async function rpBlockedByLock(plDate, show) {
+  const key = opPeriodKeyFromPl(plDate);
+  try {
+    if (!(await opIsLocked(key))) return false;
+    show(`Miesiąc ${opMonthLabel(key)} jest zablokowany. Raportu nie można edytować ani usuwać.`);
+  } catch (err) {
+    console.error("Błąd sprawdzania blokady miesiąca:", err);
+    show("Nie udało się sprawdzić blokady miesiąca: " + (err.message || err));
+  }
+  return true;
 }
 
 function rpFindReport(number) {
@@ -352,7 +379,7 @@ function rpDeleteReport(number) {
   const rep = rpFindReport(number);
   if (!rep || !canModifyReport(rep.creatorId)) return;
   rpOpenDelete(
-    { type: "report", number: rep.number, label: rpLabel(rep) },
+    { type: "report", number: rep.number, label: rpLabel(rep), date: rep.date },
     "Usuwanie raportu",
     "Czy na pewno chcesz usunąć raport",
     `nr ${rpLabel(rep)} z dnia ${rep.date} (${rep.shift || "-"}, pracowników: ${rep.empIds.size})`
@@ -365,7 +392,7 @@ function rpDeleteRow(recordId) {
   const row = rep && rep.rows.find(r => Number(r.id) === Number(recordId));
   if (!row || !canModifyReport(rep.creatorId)) return;
   rpOpenDelete(
-    { type: "row", id: row.id },
+    { type: "row", id: row.id, date: rep.date },
     "Usuwanie pracownika z raportu",
     `Czy na pewno chcesz usunąć z raportu nr ${rpLabel(rep)} pracownika`,
     `${rpEmpName(row.first_name_id)} (${row.start_time || "?"}–${row.end_time || "?"})`
@@ -383,6 +410,17 @@ async function rpConfirmDelete() {
   }
 
   rpBusy = true;
+  const blocked = await rpBlockedByLock(p.date, msg => {
+    if (p.type === "row") rpShowDetailMsg(msg);
+    else rpShowBanner("warning", msg);
+  });
+  if (blocked) {
+    rpBusy = false;
+    rpCloseDelete();
+    await rpReloadAfterEdit();
+    return;
+  }
+
   let failure = null;
   try {
     let query = supabaseClient.from("work_reports").delete();
@@ -415,7 +453,8 @@ async function rpConfirmDelete() {
 function rpOpenDetail(number, edit) {
   const rep = rpFindReport(number);
   if (!rep) return;
-  rpCurrent = { number, edit: edit && canModifyReport(rep.creatorId) };
+  rpCurrent = { number, edit: edit && canModifyReport(rep.creatorId) && !rpLockedKeys.has(opPeriodKeyFromPl(rep.date)) };
+  rpRowEdits = {};
   rpHideDetailMsg();
   rpRenderDetail(true);
   toggleModal("modal-rp-detail", true);
@@ -423,6 +462,7 @@ function rpOpenDetail(number, edit) {
 
 function rpCloseDetail() {
   rpCurrent = null;
+  rpRowEdits = {};
   rpClosePicker();
   toggleModal("modal-rp-detail", false);
 }
@@ -458,22 +498,41 @@ function rpRenderDetail(resetForm) {
 
   document.getElementById("rp-detail-body").innerHTML = rows.map(r => {
     const emp = rpEmpById[r.first_name_id];
+    const id = Number(r.id);
+    // w edycji pokazuj niezapisane zmiany, jeśli są
+    const v = edit ? rpRowValues(r) : null;
+    const dirty = edit && !!rpRowEdits[r.id];
+    const hours = dirty ? rtDuration(v.from, v.to) : rpHours(r);
+
     return `
-      <tr>
+      <tr class="${dirty ? "rp-dirty" : ""}">
         <td style="font-weight: 600;">${rtEsc(rpEmpName(r.first_name_id))}</td>
         <td>${rtEsc(emp?.business?.business || "-")}</td>
         <td>${rtEsc(emp?.department?.department || "-")}</td>
-        <td>${rtEsc(r.start_time || "-")}</td>
-        <td>${rtEsc(r.end_time || "-")}</td>
-        <td style="font-weight: 700; color: var(--primary); white-space: nowrap;">${rtFmtHours(rpHours(r))}</td>
-        <td>${r.at_work === false
-          ? `<span class="rp-pill absent">Nieobecność</span>`
-          : `<span class="rp-pill ok">Obecność</span>`}</td>
-        <td style="text-align: right;">${edit
-          ? `<button type="button" class="rp-mini-btn" onclick="rpDeleteRow(${Number(r.id)})">Usuń</button>`
+        <td>${edit
+          ? `<select class="rp-row-time" id="rp-row-from-${id}" aria-label="Od" onchange="rpOnRowTime(${id})">${rpShiftTimeOptions(rep.shift, "from", v.from, v.to, false)}</select>`
+          : rtEsc(r.start_time || "-")}</td>
+        <td>${edit
+          ? `<select class="rp-row-time" id="rp-row-to-${id}" aria-label="Do" onchange="rpOnRowTime(${id})">${rpShiftTimeOptions(rep.shift, "to", v.from, v.to, false)}</select>`
+          : rtEsc(r.end_time || "-")}</td>
+        <td id="rp-row-sum-${id}" style="font-weight: 700; color: var(--primary); white-space: nowrap;">${hours === null ? "—" : rtFmtHours(hours)}</td>
+        <td>${edit
+          ? `<label class="rp-switch row">
+               <input type="checkbox" id="rp-row-absent-${id}" aria-label="Nieobecność" ${v.absent ? "checked" : ""} onchange="rpOnRowTime(${id})" />
+               <span class="track"></span>
+               <span class="lbl lbl-off">Obecny</span>
+               <span class="lbl lbl-on">Nieobecny</span>
+             </label>`
+          : (r.at_work === false
+            ? `<span class="rp-pill absent">Nieobecność</span>`
+            : `<span class="rp-pill ok">Obecność</span>`)}</td>
+        <td style="text-align: right; white-space: nowrap;">${edit
+          ? `<button type="button" class="rp-mini-btn" onclick="rpDeleteRow(${id})">Usuń</button>`
           : ""}</td>
       </tr>`;
   }).join("");
+
+  rpSyncSaveAll();
 
   const add = document.getElementById("rp-add");
   add.style.display = edit ? "" : "none";
@@ -490,7 +549,44 @@ function rpRenderDetail(resetForm) {
   rpSyncAddTimes();
 }
 
-// Listy godzin ograniczone do zmiany raportu; "do" musi być późniejsze niż "od"
+// Opcje godzin ograniczone do zmiany raportu; "do" musi być późniejsze niż "od".
+// which: "from" | "to"; withEmpty: czy dodać pozycję "--:--".
+function rpShiftTimeOptions(shift, which, from, to, withEmpty) {
+  const selected = which === "from" ? from : to;
+  const opt = t => `<option value="${t}"${t === selected ? " selected" : ""}>${t}</option>`;
+  const empty = withEmpty ? `<option value="">--:--</option>` : "";
+
+  const idx = RT_SHIFT_NAMES.indexOf(shift);
+  if (idx < 0) {
+    // raport z nieznaną zmianą — bez ograniczeń
+    return empty + RT_ALL_TIMES.map(opt).join("");
+  }
+
+  const start = RT_SHIFT_BASE + idx * RT_SHIFT_LEN;
+  const slots = RT_SHIFT_LEN / 30;
+  const slot = t => ((rtToMin(t) - start + 1440) % 1440) / 30;
+  const inShift = (t, isTo) => {
+    if (!RT_ALL_TIMES.includes(t)) return false;
+    const k = slot(t);
+    return isTo ? k >= 1 && k <= slots : k <= slots - 1;
+  };
+
+  // Godzina drugiego pola zawęża listę tylko wtedy, gdy sama mieści się w zmianie
+  const min = which === "to" ? (inShift(from, false) ? slot(from) + 1 : 1) : 0;
+  const max = which === "from" ? (inShift(to, true) ? slot(to) - 1 : slots - 1) : slots;
+
+  let html = empty;
+  let found = false;
+  for (let k = min; k <= max; k++) {
+    const t = RT_ALL_TIMES[((start + k * 30) % 1440) / 30];
+    if (t === selected) found = true;
+    html += opt(t);
+  }
+  // Zapisana wcześniej godzina spoza zmiany zostaje widoczna, dopóki nie zostanie zmieniona
+  if (selected && !found) html = opt(selected) + html;
+  return html;
+}
+
 function rpSyncAddTimes() {
   const rep = rpCurrent && rpFindReport(rpCurrent.number);
   const fromSel = document.getElementById("rp-add-from");
@@ -499,29 +595,145 @@ function rpSyncAddTimes() {
 
   const from = fromSel.value;
   const to = toSel.value;
-  const opt = (t, sel) => `<option value="${t}"${t === sel ? " selected" : ""}>${t}</option>`;
-  const empty = `<option value="">--:--</option>`;
+  fromSel.innerHTML = rpShiftTimeOptions(rep.shift, "from", from, to, true);
+  toSel.innerHTML = rpShiftTimeOptions(rep.shift, "to", from, to, true);
+}
 
-  const idx = RT_SHIFT_NAMES.indexOf(rep.shift);
-  if (idx < 0) {
-    // raport z nieznaną zmianą — bez ograniczeń
-    fromSel.innerHTML = empty + RT_ALL_TIMES.map(t => opt(t, from)).join("");
-    toSel.innerHTML = empty + RT_ALL_TIMES.map(t => opt(t, to)).join("");
+// ---------- Zmiana godzin i statusu pracowników w raporcie ----------
+function rpFindRow(recordId) {
+  const rep = rpCurrent && rpFindReport(rpCurrent.number);
+  const row = rep && rep.rows.find(r => Number(r.id) === Number(recordId));
+  return row ? { rep, row } : null;
+}
+
+// Wartości wiersza w oknie edycji: niezapisana zmiana albo stan z bazy
+function rpRowValues(row) {
+  return rpRowEdits[row.id] ||
+    { from: row.start_time || "", to: row.end_time || "", absent: row.at_work === false };
+}
+
+// Niezapisane zmiany, które nadal dotyczą wierszy tego raportu
+function rpPendingEdits(rep) {
+  return rep.rows
+    .filter(r => rpRowEdits[r.id])
+    .map(r => ({ row: r, ...rpRowEdits[r.id] }));
+}
+
+function rpSyncSaveAll() {
+  const btn = document.getElementById("rp-save-all");
+  const rep = rpCurrent && rpFindReport(rpCurrent.number);
+  if (!btn) return;
+  const count = rep && rpCurrent.edit ? rpPendingEdits(rep).length : 0;
+
+  btn.style.display = rpCurrent && rpCurrent.edit ? "" : "none";
+  btn.disabled = count === 0 || rpBusy;
+  btn.innerHTML = `<i class="fa-solid fa-floppy-disk"></i> ${count ? `Zapisz zmiany (${count})` : "Zapisz zmiany"}`;
+}
+
+// Po zmianie godziny lub suwaka: przelicz listy i sumę, zapamiętaj zmianę do zapisu
+function rpOnRowTime(recordId) {
+  const found = rpFindRow(recordId);
+  const fromSel = document.getElementById(`rp-row-from-${recordId}`);
+  const toSel = document.getElementById(`rp-row-to-${recordId}`);
+  if (!found || !fromSel || !toSel) return;
+
+  const from = fromSel.value;
+  const to = toSel.value;
+  const absent = !!document.getElementById(`rp-row-absent-${recordId}`)?.checked;
+  fromSel.innerHTML = rpShiftTimeOptions(found.rep.shift, "from", from, to, false);
+  toSel.innerHTML = rpShiftTimeOptions(found.rep.shift, "to", from, to, false);
+
+  const hours = rtDuration(from, to);
+  const sum = document.getElementById(`rp-row-sum-${recordId}`);
+  if (sum) sum.textContent = hours === null ? "—" : rtFmtHours(hours);
+
+  const changed = from !== (found.row.start_time || "") || to !== (found.row.end_time || "") ||
+    absent !== (found.row.at_work === false);
+  if (changed) rpRowEdits[found.row.id] = { from, to, absent };
+  else delete rpRowEdits[found.row.id];
+
+  fromSel.closest("tr")?.classList.toggle("rp-dirty", changed);
+  rpSyncSaveAll();
+}
+
+// Zapis wszystkich zmienionych wierszy raportu jednym przyciskiem
+async function rpSaveAll() {
+  const rep = rpCurrent && rpFindReport(rpCurrent.number);
+  if (!rep || rpBusy || !canModifyReport(rep.creatorId)) return;
+
+  const edits = rpPendingEdits(rep);
+  if (edits.length === 0) return;
+
+  if (edits.some(e => rtDuration(e.from, e.to) === null)) {
+    rpShowDetailMsg("W każdym zmienionym wierszu wybierz godziny od i do.");
     return;
   }
 
-  const start = RT_SHIFT_BASE + idx * RT_SHIFT_LEN;
-  const slots = RT_SHIFT_LEN / 30;
-  const slot = t => ((rtToMin(t) - start + 1440) % 1440) / 30;
-  const time = k => RT_ALL_TIMES[((start + k * 30) % 1440) / 30];
+  rpBusy = true;
+  rpSyncSaveAll();
+  rpHideDetailMsg();
 
-  let fromHtml = empty;
-  for (let k = 0; k <= (to ? slot(to) - 1 : slots - 1); k++) fromHtml += opt(time(k), from);
-  let toHtml = empty;
-  for (let k = (from ? slot(from) + 1 : 1); k <= slots; k++) toHtml += opt(time(k), to);
+  try {
+    if (await rpBlockedByLock(rep.date, rpShowDetailMsg)) return;
 
-  fromSel.innerHTML = fromHtml;
-  toSel.innerHTML = toHtml;
+    // Nowe godziny nie mogą nakładać się na inne wpisy tej samej osoby w tym dniu i zmianie
+    const empIds = [...new Set(edits.map(e => e.row.first_name_id))];
+    const { data: existing, error: checkErr } = await supabaseClient
+      .from("work_reports")
+      .select("id, number_report, first_name_id, start_time, end_time")
+      .eq("report_date", rep.date)
+      .eq("shift", rep.shift)
+      .in("first_name_id", empIds);
+    if (checkErr) throw checkErr;
+
+    for (const e of edits) {
+      const mine = rtRange(e.from, e.to);
+      const clash = (existing || []).find(o => {
+        if (Number(o.id) === Number(e.row.id) || Number(o.first_name_id) !== Number(e.row.first_name_id)) return false;
+        // inny wpis tej osoby też może być właśnie zmieniany — porównuj z jego nowymi godzinami
+        const other = rpRowEdits[o.id] ? { start: rpRowEdits[o.id].from, end: rpRowEdits[o.id].to }
+          : { start: o.start_time, end: o.end_time };
+        return other.start && other.end && rtOverlap(mine, rtRange(other.start, other.end));
+      });
+      if (clash) {
+        rpShowDetailMsg(`${rpEmpName(e.row.first_name_id)}: godziny ${e.from}–${e.to} nakładają się na wpis w raporcie nr ${clash.number_report}. Nic nie zostało zapisane.`);
+        return;
+      }
+    }
+
+    const failed = [];
+    for (const e of edits) {
+      const hours = rtDuration(e.from, e.to);
+      const { data, error } = await supabaseClient
+        .from("work_reports")
+        .update({ start_time: e.from, end_time: e.to, total_hours: hours.toFixed(1), at_work: !e.absent })
+        .eq("id", e.row.id)
+        .select("id");
+
+      if (error || !data || data.length === 0) {
+        if (error) console.error("Błąd zapisu wiersza raportu:", error);
+        failed.push(rpEmpName(e.row.first_name_id));
+      } else {
+        delete rpRowEdits[e.row.id];
+      }
+    }
+
+    rpBusy = false;
+    await rpReloadAfterEdit();
+
+    if (failed.length) {
+      rpShowDetailMsg(`Nie zapisano zmian dla: ${failed.join(", ")} (brak uprawnień w bazie lub wpis został usunięty).`);
+    } else {
+      rpCloseDetail();
+      rpShowBanner("success", `Zapisano zmiany w raporcie nr ${rpLabel(rep)}.`);
+    }
+  } catch (err) {
+    console.error("Błąd zapisu zmian w raporcie:", err);
+    rpShowDetailMsg("Nie udało się zapisać zmian: " + (err.message || err));
+  } finally {
+    rpBusy = false;
+    rpSyncSaveAll();
+  }
 }
 
 // Po zmianie w bazie: odśwież listę i otwarte okno (zamknij je, jeśli raport zniknął)
@@ -618,6 +830,8 @@ async function rpAddEmployee() {
   rpHideDetailMsg();
 
   try {
+    if (await rpBlockedByLock(rep.date, rpShowDetailMsg)) return;
+
     // Ten sam pracownik nie może mieć nakładających się godzin w tym dniu i zmianie
     const { data: existing, error: checkErr } = await supabaseClient
       .from("work_reports")

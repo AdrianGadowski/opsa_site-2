@@ -26,6 +26,7 @@
   .rp-table thead th.rp-col-ok, .rp-table thead th.rp-col-absent { width: 160px; min-width: 160px; white-space: nowrap; }
   .rp-table thead th.rp-col-ok { background: #D9F0E4; color: #0b7a57; }
   .rp-table thead th.rp-col-absent { background: #FAD9D9; color: #9b1c1f; }
+  .rp-lock { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 28px; margin-left: 6px; color: var(--danger); font-size: 0.9rem; cursor: help; }
   .rp-num { font-weight: 700; color: var(--primary); }
   .rp-num-db { font-weight: 500; color: var(--text-muted); font-size: 0.82rem; }
   .rp-hours-ok { font-weight: 600; color: #0b7a57; }
@@ -56,6 +57,17 @@
     font-family: inherit; white-space: nowrap; background: var(--danger); color: #fff;
   }
   .rp-mini-btn:hover { background: var(--danger-hover); }
+  /* Wiersz z niezapisaną zmianą */
+  .rp-detail-table tr.rp-dirty td { background: #FFF8DB; }
+  .rp-detail-table tr.rp-dirty td:first-child { box-shadow: inset 4px 0 0 var(--accent-hover); }
+  .rp-mini-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+  /* Listy godzin w wierszu edytowanego raportu */
+  .rp-row-time {
+    width: 86px; padding: 6px 8px; border-radius: 6px; border: 1.5px solid #D9D9D9; background: #fff;
+    font-family: inherit; font-size: 0.86rem; text-align: center; color: var(--text-dark); cursor: pointer;
+  }
+  .rp-row-time:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(8, 88, 75, 0.1); }
 
   .rp-pick-btn { text-align: left; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .rp-pick-btn.empty { color: var(--text-muted); }
@@ -94,6 +106,7 @@
   .rp-switch input:checked + .track { background: var(--danger); }
   .rp-switch input:checked + .track::after { transform: translateX(18px); }
   .rp-switch input:focus-visible + .track { outline: 3px solid rgba(8, 88, 75, 0.35); outline-offset: 2px; }
+  .rp-switch.row { height: auto; }
   .rp-switch .lbl { font-size: 0.8rem; color: var(--text-muted); min-width: 78px; }
   .rp-switch .lbl-on { display: none; color: var(--danger); font-weight: 600; }
   .rp-switch input:checked ~ .lbl-off { display: none; }
@@ -249,7 +262,12 @@
 
     <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px; margin-top: 16px;">
       <div id="rp-detail-summary" class="rp-summary"></div>
-      <button type="button" class="btn-secondary" style="width: auto; padding: 11px 20px;" onclick="rpCloseDetail()">Zamknij</button>
+      <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+        <button type="button" class="btn-secondary" style="width: auto; padding: 11px 20px;" onclick="rpCloseDetail()">Zamknij</button>
+        <button type="button" id="rp-save-all" class="btn-primary" style="width: auto; padding: 11px 22px; display: none;" disabled onclick="rpSaveAll()">
+          <i class="fa-solid fa-floppy-disk"></i> Zapisz zmiany
+        </button>
+      </div>
     </div>
   </div>
 </div>

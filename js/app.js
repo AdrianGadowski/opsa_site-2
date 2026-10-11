@@ -8,7 +8,7 @@ const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // Numer wydania doklejany do adresów plików, żeby przeglądarka nie używała starych kopii.
 // Zmieniaj przy każdej publikacji - tutaj i w index.html (?v=...).
-const APP_BUILD = "20261024";
+const APP_BUILD = "20261041";
 
 let currentUser = null;
 let cachedUsers = [];
@@ -22,7 +22,8 @@ const viewTitles = {
   reports: "Lista raportów",
   users: "Zarządzanie użytkownikami",
   updates: "Aktualizacje systemu",
-  user: "Moje konto"
+  user: "Moje konto",
+  options: "Opcje systemu"
 };
 
 // Kliknięcie w awatar lub dane użytkownika w stopce menu otwiera "Moje konto"
@@ -36,7 +37,8 @@ const permissionMap = {
   report_time: { elementId: "nav-report_time", column: "allow_time_reporting" },
   reports: { elementId: "nav-reports", column: "allow_reports" },
   users: { elementId: "nav-users", column: "allow_users" },
-  updates: { elementId: "nav-updates", column: "allow_updates" }
+  updates: { elementId: "nav-updates", column: "allow_updates" },
+  options: { elementId: "nav-options", column: "allow_options" }
 };
 
 function hasPermission(columnName) {
@@ -48,6 +50,8 @@ function hasPermission(columnName) {
 function setTopbarVersion(version) {
   const el = document.getElementById("topbar-version");
   if (el) el.innerText = `Wersja: ${version || "—"}`;
+  const loginEl = document.getElementById("auth-version");
+  if (loginEl) loginEl.innerText = version ? ` • v${version}` : "";
 }
 
 async function loadTopbarVersion() {
@@ -75,13 +79,14 @@ function canModifyReport(creatorId) {
 // ==========================================
 // OBSŁUGA BŁĘDÓW LOGOWANIA (BEZ ROZPYCHANIA KARTY)
 // ==========================================
-function showLoginError(message = "zły login lub hasło") {
+// markFields = false: komunikat bez czerwonych ramek pól (np. brak sieci, wygasła sesja)
+function showLoginError(message = "zły login lub hasło", markFields = true) {
   const loginInput = document.getElementById("login-input");
   const passwordInput = document.getElementById("password-input");
   const errorMsg = document.getElementById("login-error-msg");
 
-  if (loginInput) loginInput.classList.add("input-error");
-  if (passwordInput) passwordInput.classList.add("input-error");
+  if (loginInput && markFields) loginInput.classList.add("input-error");
+  if (passwordInput && markFields) passwordInput.classList.add("input-error");
 
   if (errorMsg) {
     errorMsg.innerText = message;
@@ -110,10 +115,184 @@ document.addEventListener("DOMContentLoaded", () => {
   if (passwordInput) passwordInput.addEventListener("input", clearLoginError);
 });
 
+// Kolumny użytkownika pobierane przy logowaniu i przy przywracaniu sesji
+const USER_SELECT = `
+  id,
+  login,
+  password,
+  name,
+  last_name,
+  role_id,
+  role:role_id ( role ),
+  department_id,
+  department:department_id ( department ),
+  allow_dashboard,
+  allow_employees,
+  allow_time_reporting,
+  allow_reports,
+  allow_users,
+  allow_updates,
+  allow_options
+`;
+
+// ---------- Sesja: logowanie przetrwa odświeżenie strony ----------
+// W przeglądarce zapisywane jest tylko ID użytkownika, ostatni widok i czas ostatniej
+// aktywności (bez hasła). "Zapamiętaj mnie" = localStorage (przetrwa zamknięcie
+// przeglądarki), bez zaznaczenia = sessionStorage (do zamknięcia karty).
+const SESSION_KEY = "opsaSession";
+const SESSION_IDLE_LIMIT = 8 * 60 * 60 * 1000; // wylogowanie po 8 h bez aktywności
+let sessionStore = null;      // magazyn bieżącej sesji (localStorage / sessionStorage)
+let sessionTouchedAt = 0;
+
+function readStoredSession() {
+  for (const store of [window.sessionStorage, window.localStorage]) {
+    try {
+      const data = JSON.parse(store.getItem(SESSION_KEY) || "null");
+      if (data && data.id != null) return { store, data };
+    } catch (e) { /* brak dostępu do magazynu albo uszkodzony wpis - ignoruj */ }
+  }
+  return null;
+}
+
+function writeSession(view) {
+  if (!sessionStore || !currentUser) return;
+  sessionTouchedAt = Date.now();
+  try {
+    const prev = JSON.parse(sessionStore.getItem(SESSION_KEY) || "null") || {};
+    sessionStore.setItem(SESSION_KEY, JSON.stringify({
+      id: currentUser.id,
+      view: view || prev.view || null,
+      ts: sessionTouchedAt
+    }));
+  } catch (e) { /* brak dostępu - sesja po prostu nie zostanie zapamiętana */ }
+}
+
+function startSession(remember) {
+  clearSession();
+  try {
+    sessionStore = remember ? window.localStorage : window.sessionStorage;
+  } catch (e) {
+    sessionStore = null;
+  }
+  writeSession(null);
+}
+
+function clearSession() {
+  sessionStore = null;
+  for (const name of ["sessionStorage", "localStorage"]) {
+    try { window[name].removeItem(SESSION_KEY); } catch (e) { /* ignoruj */ }
+  }
+}
+
+// Po odświeżeniu strony: wczytaj użytkownika z bazy i pomiń ekran logowania
+async function restoreSession() {
+  const stored = readStoredSession();
+  const overlay = document.getElementById("auth-overlay");
+  if (!stored) return;
+
+  if (Date.now() - (stored.data.ts || 0) > SESSION_IDLE_LIMIT) {
+    clearSession();
+    overlay?.classList.remove("session-check");
+    return;
+  }
+
+  try {
+    const { data: user, error } = await supabaseClient
+      .from("users")
+      .select(USER_SELECT)
+      .eq("id", stored.data.id)
+      .maybeSingle();
+    if (error) throw error;
+    if (!user) {
+      clearSession(); // konto usunięte
+      return;
+    }
+    if (await passwordChangeRequired("users", user.id)) {
+      clearSession(); // hasło zresetowane przez administratora: trzeba zalogować się nim i ustawić własne
+      return;
+    }
+
+    currentUser = user;
+    sessionStore = stored.store;
+    writeSession(stored.data.view);
+    loadTopbarVersion();
+
+    if (overlay) overlay.style.display = "none";
+    initDashboardApp(stored.data.view);
+  } catch (err) {
+    // np. brak internetu: zostaje ekran logowania, zapisana sesja nie jest kasowana
+    console.error("Nie udało się przywrócić sesji:", err);
+  } finally {
+    overlay?.classList.remove("session-check");
+  }
+}
+
+// Zanim przyjdzie odpowiedź z bazy, nie pokazuj formularza logowania
+if (readStoredSession()) document.getElementById("auth-overlay")?.classList.add("session-check");
+
+document.addEventListener("DOMContentLoaded", () => {
+  loadTopbarVersion();
+  restoreSession();
+});
+
+// Aktywność odświeża czas sesji (najwyżej raz na minutę); bez aktywności - wylogowanie
+document.addEventListener("click", () => {
+  if (currentUser && Date.now() - sessionTouchedAt > 60 * 1000) writeSession();
+});
+setInterval(() => {
+  if (currentUser && sessionStore && Date.now() - sessionTouchedAt > SESSION_IDLE_LIMIT) {
+    handleLogout();
+    showLoginError("Sesja wygasła z powodu braku aktywności. Zaloguj się ponownie.", false);
+  }
+}, 60 * 1000);
+
+// ---------- Blokada po kilku błędnych próbach ----------
+const LOGIN_MAX_ATTEMPTS = 5;
+const LOGIN_LOCK_SECONDS = 30;
+let loginFailedAttempts = 0;
+let loginLockTimer = null;
+
+function registerFailedLogin() {
+  loginFailedAttempts++;
+  if (loginFailedAttempts < LOGIN_MAX_ATTEMPTS) {
+    showLoginError("zły login lub hasło");
+    return;
+  }
+
+  loginFailedAttempts = 0;
+  const btn = document.getElementById("btn-login");
+  let left = LOGIN_LOCK_SECONDS;
+  showLoginError("Zbyt wiele nieudanych prób. Odczekaj chwilę.");
+
+  const tick = () => {
+    if (left <= 0) {
+      clearInterval(loginLockTimer);
+      loginLockTimer = null;
+      if (btn) {
+        btn.disabled = false;
+        btn.innerText = "Zaloguj się";
+      }
+      clearLoginError();
+      return;
+    }
+    if (btn) {
+      btn.disabled = true;
+      btn.innerText = `Spróbuj za ${left} s`;
+    }
+    left--;
+  };
+  tick();
+  loginLockTimer = setInterval(tick, 1000);
+}
+
 // ==========================================
 // 2. LOGOWANIE I PŁYNNA TRANSFORMACJA IKON
 // ==========================================
+let loginMode = "user";       // zakładka na ekranie logowania: "user" | "employee" (portal pracownika)
+
 async function handleLogin() {
+  if (loginMode === "employee") return epLogin();
+  if (loginLockTimer) return; // trwa blokada po błędnych próbach
   clearLoginError();
 
   const loginInput = document.getElementById("login-input").value.trim();
@@ -121,7 +300,7 @@ async function handleLogin() {
   const loginBtn = document.getElementById("btn-login");
 
   if (!loginInput || !passwordInput) {
-    showLoginError("zły login lub hasło");
+    showLoginError("Wpisz login i hasło.");
     return;
   }
 
@@ -133,119 +312,129 @@ async function handleLogin() {
 
     const { data: user, error } = await supabaseClient
       .from("users")
-      .select(`
-        id,
-        login,
-        password,
-        name, 
-        last_name, 
-        role_id,
-        role:role_id ( role ),
-        department_id,
-        department:department_id ( department ),
-        allow_dashboard,
-        allow_employees,
-        allow_time_reporting,
-        allow_reports,
-        allow_users,
-        allow_updates
-      `)
+      .select(USER_SELECT)
       .eq("login", loginInput)
       .maybeSingle();
 
     if (error) {
       console.error("Błąd zapytania Supabase:", error);
-      showLoginError("Błąd połączenia z bazą danych.");
+      // brak sieci to nie jest błąd loginu ani hasła - nie podświetlaj pól
+      const offline = !navigator.onLine || /fetch|network/i.test(error.message || "");
+      showLoginError(offline
+        ? "Brak połączenia z serwerem. Sprawdź internet."
+        : "Błąd bazy danych. Spróbuj ponownie.", false);
       return;
     }
 
     if (!user || user.password !== passwordInput) {
-      showLoginError("zły login lub hasło");
+      registerFailedLogin();
       return;
     }
 
-    currentUser = user;
-    loadTopbarVersion();
-
-    const iconBox = document.getElementById("auth-icon-box");
-    const stepLogin = document.getElementById("step-login");
-    const stepSuccess = document.getElementById("step-success");
-    const stepWelcome = document.getElementById("step-welcome");
-
-    const welcomeTextEl = document.getElementById("welcome-text");
-    const welcomeMetaEl = document.getElementById("welcome-user-meta");
-    const welcomeRoleEl = document.getElementById("welcome-role");
-    const welcomeDeptEl = document.getElementById("welcome-dept");
-    const progressBar = document.getElementById("welcome-progress-bar");
-    const statusText = document.getElementById("welcome-status-text");
-    const loaderBox = document.querySelector(".loader-box");
-    const authOverlay = document.getElementById("auth-overlay");
-
-    // FAZA 1: Cross-fade z formularza do zielonego ptaszka
-    stepLogin.classList.remove("active");
-    stepSuccess.classList.add("active");
-    
-    iconBox.className = "morph-icon-box state-success";
-
-    // FAZA 2: Po wyświetleniu ptaszka (1.2s), morph w żółty kwadrat
-    setTimeout(() => {
-      welcomeTextEl.textContent = "";
-      const roleName = currentUser.role?.role || "Użytkownik";
-      if (welcomeRoleEl) welcomeRoleEl.innerText = roleName;
-      if (welcomeDeptEl) {
-        welcomeDeptEl.innerText = currentUser.department?.department || "Brak działu";
-      }
-      if (welcomeMetaEl) welcomeMetaEl.classList.remove("visible");
-
-      if (progressBar) progressBar.style.width = "0%";
-      if (loaderBox) loaderBox.classList.remove("visible");
-
-      stepSuccess.classList.remove("active");
-      stepWelcome.classList.add("active");
-
-      iconBox.className = "morph-icon-box state-welcome";
-
-      const firstName = (currentUser.name || "").trim();
-      const lastName = (currentUser.last_name || "").trim();
-      const userFullName = (firstName && lastName) ? `${firstName} ${lastName}` : (firstName || lastName || currentUser.login);
-
-      const fullText = `Witaj, ${userFullName}!`;
-      let charIdx = 0;
-
-      const typingInterval = setInterval(() => {
-        welcomeTextEl.textContent = fullText.slice(0, charIdx + 1);
-        charIdx++;
-
-        if (charIdx >= fullText.length) {
-          clearInterval(typingInterval);
-
-          if (welcomeMetaEl) welcomeMetaEl.classList.add("visible");
-          if (loaderBox) loaderBox.classList.add("visible");
-
-          runLoadingSequence(progressBar, statusText, () => {
-            setTimeout(() => {
-              authOverlay.style.opacity = "0";
-              initDashboardApp();
-
-              setTimeout(() => {
-                authOverlay.style.display = "none";
-              }, 600);
-            }, 600);
-          });
+    loginFailedAttempts = 0;
+    // Pierwsze logowanie albo hasło ustawione przez administratora: najpierw własne hasło
+    if (await passwordChangeRequired("users", user.id)) {
+      openForcePassword({
+        table: "users",
+        id: user.id,
+        current: passwordInput,
+        onDone: (newPassword) => {
+          user.password = newPassword;
+          completeUserLogin(user);
         }
-      }, 35);
+      });
+      return;
+    }
 
-    }, 1200);
+    completeUserLogin(user);
 
   } catch (err) {
     console.error("Niespodziewany błąd:", err);
-    showLoginError("Wystąpił błąd logowania.");
+    showLoginError("Brak połączenia z serwerem. Sprawdź internet.", false);
   } finally {
-    if (loginBtn) {
+    // podczas blokady przycisk zostaje nieaktywny z odliczaniem
+    if (loginBtn && !loginLockTimer) {
       loginBtn.disabled = false;
       loginBtn.innerText = "Zaloguj się";
     }
   }
+}
+
+// Wejście do systemu po poprawnym logowaniu: sesja i animacja powitania
+function completeUserLogin(user) {
+  currentUser = user;
+  startSession(!!document.getElementById("login-remember")?.checked);
+  loadTopbarVersion();
+
+  const iconBox = document.getElementById("auth-icon-box");
+  const stepLogin = document.getElementById("step-login");
+  const stepSuccess = document.getElementById("step-success");
+  const stepWelcome = document.getElementById("step-welcome");
+
+  const welcomeTextEl = document.getElementById("welcome-text");
+  const welcomeMetaEl = document.getElementById("welcome-user-meta");
+  const welcomeRoleEl = document.getElementById("welcome-role");
+  const welcomeDeptEl = document.getElementById("welcome-dept");
+  const progressBar = document.getElementById("welcome-progress-bar");
+  const statusText = document.getElementById("welcome-status-text");
+  const loaderBox = document.querySelector(".loader-box");
+  const authOverlay = document.getElementById("auth-overlay");
+
+  // FAZA 1: Cross-fade z formularza do zielonego ptaszka
+  stepLogin.classList.remove("active");
+  stepSuccess.classList.add("active");
+  
+  iconBox.className = "morph-icon-box state-success";
+
+  // FAZA 2: Po wyświetleniu ptaszka (1.2s), morph w żółty kwadrat
+  setTimeout(() => {
+    welcomeTextEl.textContent = "";
+    const roleName = currentUser.role?.role || "Użytkownik";
+    if (welcomeRoleEl) welcomeRoleEl.innerText = roleName;
+    if (welcomeDeptEl) {
+      welcomeDeptEl.innerText = currentUser.department?.department || "Brak działu";
+    }
+    if (welcomeMetaEl) welcomeMetaEl.classList.remove("visible");
+
+    if (progressBar) progressBar.style.width = "0%";
+    if (loaderBox) loaderBox.classList.remove("visible");
+
+    stepSuccess.classList.remove("active");
+    stepWelcome.classList.add("active");
+
+    iconBox.className = "morph-icon-box state-welcome";
+
+    const firstName = (currentUser.name || "").trim();
+    const lastName = (currentUser.last_name || "").trim();
+    const userFullName = (firstName && lastName) ? `${firstName} ${lastName}` : (firstName || lastName || currentUser.login);
+
+    const fullText = `Witaj, ${userFullName}!`;
+    let charIdx = 0;
+
+    const typingInterval = setInterval(() => {
+      welcomeTextEl.textContent = fullText.slice(0, charIdx + 1);
+      charIdx++;
+
+      if (charIdx >= fullText.length) {
+        clearInterval(typingInterval);
+
+        if (welcomeMetaEl) welcomeMetaEl.classList.add("visible");
+        if (loaderBox) loaderBox.classList.add("visible");
+
+        runLoadingSequence(progressBar, statusText, () => {
+          setTimeout(() => {
+            authOverlay.style.opacity = "0";
+            initDashboardApp();
+
+            setTimeout(() => {
+              authOverlay.style.display = "none";
+            }, 600);
+          }, 600);
+        });
+      }
+    }, 35);
+
+  }, 1200);
 }
 
 function runLoadingSequence(progressBar, statusText, onComplete) {
@@ -276,7 +465,7 @@ function runLoadingSequence(progressBar, statusText, onComplete) {
 // ==========================================
 // 3. OBSŁUGA UPRAWNIEŃ I INTERFEJSU
 // ==========================================
-function initDashboardApp() {
+function initDashboardApp(startView) {
   document.getElementById("app-container").style.display = "flex";
   
   const firstName = (currentUser.name || "").trim();
@@ -309,7 +498,11 @@ function initDashboardApp() {
     }
   });
 
-  if (hasPermission("allow_dashboard")) {
+  // Po odświeżeniu strony wróć do ostatnio otwartego widoku, jeśli nadal jest dozwolony
+  const startInfo = startView ? permissionMap[startView] : null;
+  if (startView && viewTitles[startView] && (!startInfo || hasPermission(startInfo.column))) {
+    navigateTo(startView);
+  } else if (hasPermission("allow_dashboard")) {
     navigateTo("dashboard");
   } else if (firstAvailableView) {
     navigateTo(firstAvailableView);
@@ -341,6 +534,7 @@ async function navigateTo(viewName) {
   if (activeNav) activeNav.classList.add("active");
 
   topbarTitle.innerText = viewTitles[viewName] || "Moduł";
+  writeSession(viewName);
 
   contentEl.innerHTML = `
     <div class="view-loader">
@@ -400,23 +594,12 @@ function toggleModal(modalId, show) {
   if (modal) modal.classList.toggle("active", show);
 }
 
-function handleForgotPassword() {
-  const email = document.getElementById("forgot-email").value.trim();
-  const login = document.getElementById("forgot-login").value.trim();
-
-  if (!login || !email) {
-    alert("Wprowadź login i adres e-mail.");
-    return;
-  }
-  alert("Jeśli dane są poprawne, hasło zostanie wysłane na podany adres e-mail.");
-  toggleModal("modal-forgot-password", false);
-}
-
 // ==========================================
 // 5. WYLOGOWANIE
 // ==========================================
 function handleLogout() {
   currentUser = null;
+  clearSession();
   clearLoginError();
   document.getElementById("app-container").style.display = "none";
 
@@ -534,6 +717,7 @@ async function openEditUserModal(login) {
   document.getElementById("perm-reports").checked = !!(user.allow_reports);
   document.getElementById("perm-users").checked = !!(user.allow_users);
   document.getElementById("perm-updates").checked = !!(user.allow_updates);
+  document.getElementById("perm-options").checked = !!(user.allow_options);
 
   const msgBox = document.getElementById("user-form-msg");
   if (msgBox) msgBox.style.display = "none";
@@ -655,7 +839,8 @@ async function loadUsersList() {
         allow_time_reporting,
         allow_reports,
         allow_users,
-        allow_updates
+        allow_updates,
+        allow_options
       `)
       .order("name", { ascending: true });
 
@@ -691,7 +876,8 @@ async function loadUsersList() {
         { label: "Rozliczanie", active: u.allow_time_reporting },
         { label: "Raporty", active: u.allow_reports },
         { label: "Użytkownicy", active: u.allow_users },
-        { label: "Aktualizacje", active: u.allow_updates }
+        { label: "Aktualizacje", active: u.allow_updates },
+        { label: "Opcje", active: u.allow_options }
       ];
 
       const activeBadges = permissions
@@ -766,7 +952,8 @@ async function handleSaveUser(e) {
     allow_time_reporting: document.getElementById("perm-time-reporting") ? document.getElementById("perm-time-reporting").checked : false,
     allow_reports: document.getElementById("perm-reports") ? document.getElementById("perm-reports").checked : false,
     allow_users: document.getElementById("perm-users") ? document.getElementById("perm-users").checked : false,
-    allow_updates: document.getElementById("perm-updates") ? document.getElementById("perm-updates").checked : false
+    allow_updates: document.getElementById("perm-updates") ? document.getElementById("perm-updates").checked : false,
+    allow_options: document.getElementById("perm-options") ? document.getElementById("perm-options").checked : false
   };
 
   try {
@@ -798,8 +985,12 @@ async function handleSaveUser(e) {
 
       if (insertError) throw insertError;
 
+      // nowe konto: przy pierwszym logowaniu użytkownik ustawia własne hasło
+      await setPasswordChangeRequired("users", login, true, "login");
+
     } else if (mode === "edit") {
-      if (password && password.trim() !== "") {
+      const passwordChanged = !!(password && password.trim() !== "");
+      if (passwordChanged) {
         userPayload.password = password;
       }
 
@@ -809,6 +1000,13 @@ async function handleSaveUser(e) {
         .eq("login", originalLogin);
 
       if (updateError) throw updateError;
+
+      // hasło nadane komuś przez administratora jest tymczasowe; własnego nie trzeba zmieniać ponownie
+      if (passwordChanged) {
+        const own = !!currentUser && originalLogin === currentUser.login;
+        await setPasswordChangeRequired("users", originalLogin, !own, "login");
+        if (own) currentUser.password = password;
+      }
     }
 
     toggleModal("modal-user-form", false);
@@ -901,6 +1099,8 @@ async function loadEmployeesList() {
         first_name,
         last_name,
         phone_number,
+        login,
+        password,
         business_id,
         department_id,
         active,
@@ -981,6 +1181,9 @@ function renderEmployeesTable(list) {
           ${deptName}
         </td>
         <td style="padding: 14px 18px; text-align: center; white-space: nowrap;">
+          <button class="link-btn" title="Podgląd godzin" style="font-size: 1rem; padding: 4px 8px; cursor: pointer; margin-right: 6px;" onclick="ehOpen(${emp.id})">
+            <i class="fa-solid fa-clock"></i>
+          </button>
           <button class="link-btn" title="Edytuj pracownika" style="font-size: 1rem; padding: 4px 8px; cursor: pointer;" onclick="openEditEmployeeModal(${emp.id})">
             <i class="fa-solid fa-pen-to-square"></i>
           </button>
@@ -1148,6 +1351,13 @@ async function openCreateEmployeeModal() {
   document.getElementById("employee-form-id").value = "";
   document.getElementById("modal-employee-title").innerText = "Nowy pracownik";
 
+  // Login uzupełnia się sam z imienia i nazwiska, hasło startowe jest wpisane z góry
+  if (form) form.dataset.loginAuto = "1";
+  document.getElementById("form-emp-login").value = "";
+  document.getElementById("form-emp-password").value = EMPLOYEE_DEFAULT_PASSWORD;
+  document.getElementById("form-emp-login-hint").textContent =
+    "Uzupełnia się z imienia i nazwiska. Zajęty login dostanie kolejny numer.";
+
   const msgBox = document.getElementById("employee-form-msg");
   if (msgBox) msgBox.style.display = "none";
 
@@ -1173,6 +1383,12 @@ async function openEditEmployeeModal(empId) {
   document.getElementById("form-emp-last-name").value = emp.last_name || "";
   document.getElementById("form-emp-phone").value = emp.phone_number || "";
 
+  // Przy edycji login i hasło zmienia się tylko ręcznie
+  if (form) form.dataset.loginAuto = "0";
+  document.getElementById("form-emp-login").value = emp.login || "";
+  document.getElementById("form-emp-password").value = emp.password || "";
+  document.getElementById("form-emp-login-hint").textContent = "";
+
   await populateEmployeeModalDropdowns(emp.business_id, emp.department_id);
 
   const msgBox = document.getElementById("employee-form-msg");
@@ -1181,11 +1397,71 @@ async function openEditEmployeeModal(empId) {
   toggleModal("modal-employee-form", true);
 }
 
+const EMPLOYEE_DEFAULT_PASSWORD = "123456";
+
+// Podstawa loginu: pierwsza litera imienia + dwie pierwsze litery nazwiska, małymi literami
+// i bez polskich znaków (np. Łukasz Żak -> "lza")
+function employeeLoginBase(firstName, lastName) {
+  const plain = s => String(s || "")
+    .toLowerCase()
+    .replace(/ł/g, "l")
+    .normalize("NFD")
+    .replace(/[^a-z0-9]/g, "");
+  return plain(firstName).slice(0, 1) + plain(lastName).slice(0, 2);
+}
+
+// Loginy zaczynające się od podanego tekstu, zajęte przez innych pracowników
+async function fetchTakenEmployeeLogins(prefix, excludeId) {
+  let query = supabaseClient.from("employees").select("id, login").ilike("login", `${prefix}%`);
+  if (excludeId) query = query.neq("id", excludeId);
+  const { data, error } = await query;
+  if (error) throw error;
+  return new Set((data || []).map(r => String(r.login || "").toLowerCase()));
+}
+
+// Zajęty login dostaje kolejny numer: "lza2", "lza3"...
+async function generateEmployeeLogin(firstName, lastName) {
+  const base = employeeLoginBase(firstName, lastName);
+  if (!base) throw new Error("Nie można utworzyć loginu z podanego imienia i nazwiska.");
+
+  const taken = await fetchTakenEmployeeLogins(base, null);
+  if (!taken.has(base)) return base;
+  let n = 2;
+  while (taken.has(`${base}${n}`)) n++;
+  return `${base}${n}`;
+}
+
+// Nowy pracownik: login podąża za wpisywanym imieniem i nazwiskiem,
+// dopóki ktoś nie zmieni go ręcznie
+function syncEmployeeLogin() {
+  const form = document.getElementById("employee-form");
+  const loginEl = document.getElementById("form-emp-login");
+  if (!form || !loginEl || form.dataset.loginAuto !== "1") return;
+  loginEl.value = employeeLoginBase(
+    document.getElementById("form-emp-first-name").value,
+    document.getElementById("form-emp-last-name").value
+  );
+}
+
+function employeeLoginEdited() {
+  const form = document.getElementById("employee-form");
+  if (form) form.dataset.loginAuto = "0";
+  const hint = document.getElementById("form-emp-login-hint");
+  if (hint) hint.textContent = "";
+}
+
 async function handleSaveEmployee(e) {
   e.preventDefault();
 
+  const form = document.getElementById("employee-form");
   const msgBox = document.getElementById("employee-form-msg");
   const saveBtn = document.getElementById("btn-save-employee");
+  const showError = (text) => {
+    if (!msgBox) return;
+    msgBox.innerText = text;
+    msgBox.style.color = "var(--danger, #D9383A)";
+    msgBox.style.display = "block";
+  };
 
   const mode = document.getElementById("employee-form-mode").value;
   const empId = document.getElementById("employee-form-id").value;
@@ -1195,6 +1471,8 @@ async function handleSaveEmployee(e) {
   const phone_number = document.getElementById("form-emp-phone").value.trim() || null;
   const business_id = parseInt(document.getElementById("form-emp-business-id").value, 10);
   const department_id = parseInt(document.getElementById("form-emp-dept-id").value, 10);
+  let login = document.getElementById("form-emp-login").value.trim().toLowerCase();
+  const password = document.getElementById("form-emp-password").value;
 
   const payload = {
     first_name,
@@ -1205,23 +1483,51 @@ async function handleSaveEmployee(e) {
     active: true
   };
 
+  if (msgBox) msgBox.style.display = "none";
+
   try {
     saveBtn.disabled = true;
     saveBtn.innerText = "Zapisywanie...";
 
     if (mode === "create") {
-      const { error } = await supabaseClient
+      if (!password) {
+        showError("Podaj hasło pracownika.");
+        return;
+      }
+      if (!login || form?.dataset.loginAuto === "1") {
+        // login wygenerowany automatycznie: przy zajętym dostaje kolejny numer
+        login = await generateEmployeeLogin(first_name, last_name);
+      } else if ((await fetchTakenEmployeeLogins(login, null)).has(login)) {
+        showError(`Login „${login}” jest już zajęty. Wpisz inny.`);
+        return;
+      }
+
+      const { data: inserted, error } = await supabaseClient
         .from("employees")
-        .insert([payload]);
+        .insert([{ ...payload, login, password }])
+        .select("id");
 
       if (error) throw error;
+      // hasło startowe: pracownik zmienia je przy pierwszym logowaniu
+      if (inserted && inserted[0]) await setPasswordChangeRequired("employees", inserted[0].id, true);
     } else {
+      if (login && (await fetchTakenEmployeeLogins(login, empId)).has(login)) {
+        showError(`Login „${login}” jest już zajęty przez innego pracownika.`);
+        return;
+      }
+
       const { error } = await supabaseClient
         .from("employees")
-        .update(payload)
+        .update({ ...payload, login: login || null, password: password || null })
         .eq("id", empId);
 
       if (error) throw error;
+
+      // hasło zmienione w kartotece jest tymczasowe: pracownik ustawi własne przy logowaniu
+      const before = cachedEmployees.find(emp => String(emp.id) === String(empId));
+      if (password && before && (before.password || "") !== password) {
+        await setPasswordChangeRequired("employees", empId, true);
+      }
     }
 
     toggleModal("modal-employee-form", false);
@@ -1230,11 +1536,7 @@ async function handleSaveEmployee(e) {
 
   } catch (err) {
     console.error("Błąd zapisu pracownika:", err);
-    if (msgBox) {
-      msgBox.innerText = "Wystąpił błąd podczas zapisu: " + (err.message || err);
-      msgBox.style.color = "var(--danger, #D9383A)";
-      msgBox.style.display = "block";
-    }
+    showError("Wystąpił błąd podczas zapisu: " + (err.message || err));
   } finally {
     saveBtn.disabled = false;
     saveBtn.innerText = "Zapisz";

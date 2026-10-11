@@ -532,3 +532,48 @@
   .unified-auth-card,
   #step-login > * { animation-duration: 0.01s !important; animation-delay: 0s !important; }
 }
+/* =========================================================
+   DODATKI FORMULARZA: podgląd hasła, "Zapamiętaj mnie", Caps Lock
+   ========================================================= */
+.login-pass { position: relative; width: 100%; }
+/* równe odstępy z obu stron, żeby wyśrodkowany tekst nie wchodził pod przycisk oka */
+#step-login .login-pass .form-control { padding-left: 44px; padding-right: 44px; }
+.login-pass button {
+  position: absolute; right: 4px; top: 50%; transform: translateY(-50%);
+  width: 36px; height: 36px; border: none; border-radius: 8px;
+  background: transparent; color: var(--text-muted); cursor: pointer;
+}
+.login-pass button:hover { background: rgba(0, 0, 0, 0.06); color: var(--text-dark); }
+.login-pass button:focus-visible { outline: 3px solid rgba(8, 88, 75, 0.35); }
+
+.login-remember {
+  display: flex; align-items: center; gap: 8px; width: 100%; margin-top: 8px;
+  font-size: 0.82rem; color: var(--text-muted); cursor: pointer; user-select: none;
+}
+.login-remember input { width: 16px; height: 16px; cursor: pointer; }
+
+/* dłuższe komunikaty (brak sieci, blokada, wygasła sesja) mogą zająć dwie linie */
+.error-slot { position: relative; height: auto; min-height: 22px; }
+#login-caps-hint {
+  position: absolute; left: 0; top: 50%; transform: translateY(-50%);
+  display: none; align-items: center; gap: 6px;
+  font-size: 0.8rem; font-weight: 600; color: #B45309; white-space: nowrap;
+}
+#login-caps-hint.visible { display: inline-flex; }
+/* komunikat błędu ma pierwszeństwo przed podpowiedzią o Caps Locku */
+#login-error-msg.visible ~ #login-caps-hint { display: none; }
+
+/* Trwa przywracanie zapisanej sesji: nie pokazuj formularza logowania */
+#auth-overlay.session-check .unified-auth-card { visibility: hidden; }
+
+/* Karta rośnie razem z formularzem (zakładki, "Zapamiętaj mnie"); kroki animacji leżą
+   w jednej komórce siatki, więc wysokość karty nie skacze między nimi */
+.unified-auth-card { height: auto; min-height: 520px; }
+@media (max-width: 480px) {
+  .unified-auth-card { height: auto; min-height: 510px; }
+}
+/* Niskie ekrany (np. telefon poziomo): ciaśniejsze odstępy, a w razie potrzeby przewijanie */
+@media (max-height: 700px) {
+  #auth-overlay { overflow-y: auto; align-items: flex-start; padding: 16px 0; }
+  .unified-auth-card { margin: auto; min-height: 0; padding-top: 24px; padding-bottom: 22px; }
+}

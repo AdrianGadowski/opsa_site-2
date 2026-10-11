@@ -11,7 +11,8 @@ const US_MODULES = [
   { column: "allow_time_reporting", label: "Rozliczanie czasu", icon: "fa-clock" },
   { column: "allow_reports", label: "Lista raportów", icon: "fa-file-lines" },
   { column: "allow_users", label: "Użytkownicy", icon: "fa-user-gear" },
-  { column: "allow_updates", label: "Aktualizacje", icon: "fa-rotate" }
+  { column: "allow_updates", label: "Aktualizacje", icon: "fa-rotate" },
+  { column: "allow_options", label: "Opcje", icon: "fa-sliders" }
 ];
 
 let usSaving = false;
@@ -129,6 +130,8 @@ async function usChangePassword() {
       usShowMsg("error", "Hasło nie zostało zmienione (brak uprawnień w bazie).");
       return;
     }
+    // własne hasło: zmiana przy logowaniu nie jest już wymagana
+    await setPasswordChangeRequired("users", currentUser.id, false);
 
     currentUser.password = next;
     currentEl.value = "";

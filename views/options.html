@@ -1,0 +1,128 @@
+<style>
+  /* ===== Opcje systemu ===== */
+  .op-banner {
+    display: none; align-items: center; gap: 10px; padding: 12px 16px; border-radius: 10px; margin-bottom: 20px;
+    font-size: 0.9rem; font-weight: 500;
+    background: rgba(252, 212, 68, 0.25); color: #7a5c00; border: 1px solid rgba(224, 188, 60, 0.6);
+  }
+  .op-banner.visible { display: flex; }
+
+  .op-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+
+  /* Kafelek opcji: cały jest przyciskiem */
+  .op-tile {
+    display: flex; flex-direction: column; align-items: flex-start; gap: 12px; text-align: left;
+    padding: 22px; border-radius: 14px; border: 1px solid var(--border-color); background: #fff;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04); cursor: pointer; font-family: inherit; color: var(--text-dark);
+    transition: transform 0.15s, box-shadow 0.2s, border-color 0.2s;
+  }
+  .op-tile:hover { transform: translateY(-2px); box-shadow: 0 10px 24px rgba(0, 0, 0, 0.08); border-color: rgba(8, 88, 75, 0.35); }
+  .op-tile:focus-visible { outline: 3px solid rgba(8, 88, 75, 0.35); outline-offset: 2px; }
+  .op-tile:active { transform: none; }
+
+  .op-tile .top { display: flex; justify-content: space-between; align-items: flex-start; width: 100%; gap: 10px; }
+  .op-tile .ico {
+    width: 48px; height: 48px; border-radius: 13px; display: grid; place-items: center; font-size: 1.2rem;
+    background: #E6F4EA; color: var(--primary);
+  }
+  .op-tile .chip { font-size: 0.7rem; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: #EEF0F3; color: #5B5B66; white-space: nowrap; }
+  .op-tile h4 { margin: 0; font-size: 1.05rem; font-weight: 700; }
+  .op-tile p { margin: 0; font-size: 0.86rem; line-height: 1.5; color: var(--text-muted); }
+  .op-tile .go { margin-top: auto; padding-top: 4px; font-size: 0.84rem; font-weight: 700; color: var(--primary); display: inline-flex; align-items: center; gap: 7px; }
+  .op-tile:hover .go i { transform: translateX(3px); }
+  .op-tile .go i { font-size: 0.75rem; transition: transform 0.2s; }
+
+  /* --- Okno blokady miesiąca --- */
+  .op-lock-box { max-width: 560px; width: 94%; max-height: 92vh; display: flex; flex-direction: column; position: relative; }
+  .op-lock-pick { display: grid; grid-template-columns: 110px 1fr auto; gap: 10px; align-items: end; background: #F5F5F7; padding: 14px; border-radius: 10px; margin-bottom: 14px; }
+  .op-lock-pick .form-group { margin-bottom: 0; }
+  .op-lock-pick button { width: auto; height: 42px; padding: 0 16px; white-space: nowrap; }
+  .op-lock-list { overflow: auto; flex: 1; min-height: 160px; border: 1px solid var(--border-color); border-radius: 10px; }
+  .op-lock-row { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-bottom: 1px solid #F0F0F0; }
+  .op-lock-row:last-child { border-bottom: none; }
+  .op-lock-row.selected { box-shadow: inset 4px 0 0 var(--primary); }
+  .op-lock-row.locked { background: #FDF1F1; }
+  .op-lock-row .ico { width: 34px; height: 34px; flex: none; border-radius: 9px; display: grid; place-items: center; font-size: 0.85rem; background: #E6F4EA; color: var(--primary); }
+  .op-lock-row.locked .ico { background: rgba(217, 56, 58, 0.12); color: var(--danger); }
+  .op-lock-row .info { flex: 1; min-width: 0; }
+  .op-lock-row .name { font-size: 0.92rem; font-weight: 600; color: var(--text-dark); }
+  .op-lock-row .st { font-size: 0.76rem; color: var(--text-muted); }
+  .op-lock-row.locked .st { color: #9b1c1f; font-weight: 600; }
+  .op-lock-empty { padding: 26px 14px; text-align: center; font-size: 0.88rem; color: var(--danger); }
+
+  .op-switch { position: relative; display: inline-flex; cursor: pointer; flex: none; }
+  .op-switch input { position: absolute; opacity: 0; width: 0; height: 0; }
+  .op-switch .track { width: 42px; height: 24px; border-radius: 999px; background: #D1D5DB; position: relative; transition: background 0.2s; }
+  .op-switch .track::after { content: ""; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.25); transition: transform 0.2s; }
+  .op-switch input:checked + .track { background: var(--danger); }
+  .op-switch input:checked + .track::after { transform: translateX(18px); }
+  .op-switch input:focus-visible + .track { outline: 3px solid rgba(8, 88, 75, 0.35); outline-offset: 2px; }
+
+  @media (max-width: 768px) {
+    .op-lock-box { display: block; width: 100%; max-height: calc(100vh - 20px); max-height: calc(100dvh - 20px); overflow-y: auto; }
+    .op-lock-pick { grid-template-columns: 1fr 1fr; }
+    .op-lock-pick button { grid-column: 1 / -1; width: 100%; }
+    .op-lock-list { overflow: visible; min-height: 0; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .op-tile, .op-tile .go i { transition: none; }
+    .op-tile:hover { transform: none; }
+  }
+</style>
+
+<div class="page-hero">
+  <div>
+    <div class="eyebrow">Konfiguracja</div>
+    <h3>Opcje systemu</h3>
+    <p>Ustawienia wpływające na działanie całego systemu, np. blokowanie miesiąca do wpisywania raportów.</p>
+  </div>
+</div>
+
+<div id="op-banner" class="op-banner" role="status"></div>
+
+<div class="op-grid">
+  <!-- Blokada miesiąca -->
+  <button type="button" class="op-tile" onclick="opOpenLocks()">
+    <div class="top">
+      <span class="ico"><i class="fa-solid fa-lock"></i></span>
+      <span class="chip">Raporty</span>
+    </div>
+    <h4>Blokada miesiąca</h4>
+    <p>Zablokuj wybrany miesiąc, żeby nie można było tworzyć, edytować ani usuwać w nim raportów czasu pracy.</p>
+    <span class="go">Otwórz <i class="fa-solid fa-arrow-right"></i></span>
+  </button>
+</div>
+
+<!-- Modal: blokada miesiąca -->
+<div id="modal-op-locks" class="modal">
+  <div class="modal-box op-lock-box">
+    <h3 style="color: var(--primary); margin: 0 0 4px 0; font-size: 1.25rem;">Blokada miesiąca</h3>
+    <p style="color: var(--text-muted); font-size: 0.86rem; margin: 0 0 16px 0; padding-right: 30px;">
+      W zablokowanym miesiącu nie można tworzyć, edytować ani usuwać raportów.
+    </p>
+    <button class="link-btn" onclick="opCloseLocks()" style="position: absolute; top: 22px; right: 22px; font-size: 1.2rem;" title="Zamknij">
+      <i class="fa-solid fa-xmark"></i>
+    </button>
+
+    <div class="op-lock-pick">
+      <div class="form-group">
+        <label for="op-lock-year">Rok</label>
+        <select id="op-lock-year" class="form-control" onchange="opOnLockYearChange()"></select>
+      </div>
+      <div class="form-group">
+        <label for="op-lock-month">Miesiąc</label>
+        <select id="op-lock-month" class="form-control" onchange="opOnLockMonthChange()"></select>
+      </div>
+      <button type="button" id="op-lock-btn" class="btn-danger" onclick="opToggleSelectedLock()">Zablokuj miesiąc</button>
+    </div>
+
+    <div id="op-lock-msg" style="display: none; font-size: 0.88rem; margin-bottom: 12px; color: var(--danger);"></div>
+
+    <div id="op-lock-list" class="op-lock-list"></div>
+
+    <div style="display: flex; justify-content: flex-end; margin-top: 16px;">
+      <button type="button" class="btn-secondary" style="width: auto; padding: 11px 20px;" onclick="opCloseLocks()">Zamknij</button>
+    </div>
+  </div>
+</div>

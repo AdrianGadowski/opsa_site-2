@@ -10,10 +10,11 @@
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
 
-  <link rel="stylesheet" href="css/style.css?v=20261024" />
-  <link rel="stylesheet" href="css/login.css?v=20261024" />
-  <link rel="stylesheet" href="css/menu.css?v=20261024" />
-  <link rel="stylesheet" href="css/mobile.css?v=20261024" />
+  <link rel="stylesheet" href="css/style.css?v=20261041" />
+  <link rel="stylesheet" href="css/login.css?v=20261041" />
+  <link rel="stylesheet" href="css/menu.css?v=20261041" />
+  <link rel="stylesheet" href="css/mobile.css?v=20261041" />
+  <link rel="stylesheet" href="css/portal.css?v=20261041" />
 </head>
 <body>
 
@@ -78,6 +79,11 @@
           <h2>Odlewnie Polskie S.A.</h2>
           <div class="subtitle">System Ewidencji Czasu Pracy</div>
 
+          <div class="login-tabs" role="tablist" aria-label="Rodzaj konta">
+            <button type="button" id="login-tab-user" class="on" role="tab" aria-selected="true" onclick="setLoginMode('user')"><i class="fa-solid fa-user-gear"></i> Użytkownik</button>
+            <button type="button" id="login-tab-employee" role="tab" aria-selected="false" onclick="setLoginMode('employee')"><i class="fa-solid fa-helmet-safety"></i> Pracownik</button>
+          </div>
+
           <div class="form-group" style="width: 100%; margin-bottom: 12px;">
             <label for="login-input">Login</label>
             <input type="text" id="login-input" class="form-control" placeholder="Wprowadź login" autocomplete="username" />
@@ -85,11 +91,19 @@
 
           <div class="form-group" style="width: 100%; margin-bottom: 4px;">
             <label for="password-input">Hasło</label>
-            <input type="password" id="password-input" class="form-control" placeholder="Wprowadź hasło" autocomplete="current-password" />
+            <div class="login-pass">
+              <input type="password" id="password-input" class="form-control" placeholder="Wprowadź hasło" autocomplete="current-password" />
+              <button type="button" id="login-pass-toggle" aria-label="Pokaż hasło" title="Pokaż hasło"><i class="fa-solid fa-eye"></i></button>
+            </div>
           </div>
+
+          <label class="login-remember">
+            <input type="checkbox" id="login-remember" /> Zapamiętaj mnie na tym urządzeniu
+          </label>
 
           <div class="error-slot">
             <span id="login-error-msg" role="alert">Zły login lub hasło</span>
+            <span id="login-caps-hint" aria-live="polite"><i class="fa-solid fa-arrow-up-from-bracket"></i> Włączony Caps Lock</span>
           </div>
 
           <button id="btn-login" class="btn-primary" onclick="handleLogin()">Zaloguj się</button>
@@ -121,7 +135,7 @@
     </div>
 
     <div class="auth-footer-copyright">
-      &copy; 2026 Adrian Gadowski
+      &copy; 2026 Adrian Gadowski<span id="auth-version"></span>
     </div>
   </div>
 
@@ -162,6 +176,11 @@
             <i class="fa-solid fa-rotate"></i> Aktualizacje
           </button>
         </li>
+        <li class="menu-item" data-tab="options" id="nav-options" style="display: none;">
+          <button class="menu-btn" onclick="navigateTo('options')">
+            <i class="fa-solid fa-sliders"></i> Opcje
+          </button>
+        </li>
       </ul>
 
       <div class="user-footer">
@@ -193,31 +212,108 @@
     </main>
   </div>
 
+  <!-- Portal pracownika: podgląd własnych godzin (bez menu) -->
+  <div id="employee-portal" class="ep-root">
+    <header class="ep-top">
+      <div class="ep-brand"><i class="fa-solid fa-industry"></i> Odlewnie Polskie</div>
+      <button type="button" class="ep-logout" onclick="epLogout()" aria-label="Wyloguj">
+        <i class="fa-solid fa-right-from-bracket"></i> <span>Wyloguj</span>
+      </button>
+    </header>
+
+    <main class="ep-main">
+      <div class="page-hero">
+        <div>
+          <div class="eyebrow">Moje godziny</div>
+          <h3 id="ep-name">Pracownik</h3>
+          <p id="ep-sub"></p>
+        </div>
+        <div class="page-hero-actions">
+          <select id="ep-year" class="form-control" aria-label="Rok" onchange="epLoad()"></select>
+          <select id="ep-month" class="form-control" aria-label="Miesiąc" onchange="epLoad()"></select>
+        </div>
+      </div>
+
+      <div id="ep-lock" class="ep-lock unknown" role="status"></div>
+
+      <div class="eh-tiles" id="ep-tiles"></div>
+
+      <div class="ep-card">
+        <table class="eh-table">
+          <thead>
+            <tr>
+              <th>Dzień</th>
+              <th>Zmiana</th>
+              <th>Od</th>
+              <th>Do</th>
+              <th>Godziny</th>
+              <th>Status</th>
+              <th>Nr raportu</th>
+            </tr>
+          </thead>
+          <tbody id="ep-body"></tbody>
+        </table>
+      </div>
+      <div id="ep-mobile-empty" class="ep-empty only-mobile" style="display: none;">Brak wpisów w wybranym miesiącu.</div>
+    </main>
+  </div>
+
+  <!-- Wymuszona zmiana hasła przy pierwszym logowaniu -->
+  <div id="modal-force-password" class="modal">
+    <div class="modal-box" style="max-width: 420px;">
+      <div style="width: 55px; height: 55px; border-radius: 50%; background: rgba(252, 212, 68, 0.25); color: #92590A; display: flex; align-items: center; justify-content: center; font-size: 1.4rem; margin: 0 auto 15px auto;">
+        <i class="fa-solid fa-key"></i>
+      </div>
+      <h3 style="color: var(--primary); margin-bottom: 8px; text-align: center;">Ustaw własne hasło</h3>
+      <p style="color: var(--text-muted); font-size: 0.9rem; line-height: 1.5; margin-bottom: 18px; text-align: center;">
+        Logujesz się hasłem startowym. Zanim przejdziesz dalej, ustaw hasło, które znasz tylko Ty.
+      </p>
+
+      <form onsubmit="event.preventDefault(); submitForcePassword();" autocomplete="off">
+        <div class="form-group">
+          <label for="force-pass-new">Nowe hasło</label>
+          <input type="password" id="force-pass-new" class="form-control" autocomplete="new-password" />
+          <small style="display: block; margin-top: 5px; font-size: 0.75rem; color: var(--text-muted);">Co najmniej 6 znaków.</small>
+        </div>
+        <div class="form-group">
+          <label for="force-pass-repeat">Powtórz nowe hasło</label>
+          <input type="password" id="force-pass-repeat" class="form-control" autocomplete="new-password" />
+        </div>
+
+        <div id="force-pass-msg" role="alert" style="display: none; font-size: 0.86rem; margin-bottom: 12px; color: var(--danger);"></div>
+
+        <button type="submit" id="force-pass-save" class="btn-primary">Zapisz hasło i zaloguj</button>
+        <button type="button" class="link-btn" style="width: 100%; text-align: center; margin-top: 10px;" onclick="cancelForcePassword()">Anuluj</button>
+      </form>
+    </div>
+  </div>
+
   <div id="modal-forgot-password" class="modal">
-    <div class="modal-box">
-      <h3 style="color: var(--primary); margin-bottom: 15px;">Odzyskiwanie hasła</h3>
-      <div class="form-group">
-        <label>Login</label>
-        <input type="text" id="forgot-login" class="form-control" placeholder="Wpisz login" />
+    <div class="modal-box" style="max-width: 420px; text-align: center;">
+      <div style="width: 55px; height: 55px; border-radius: 50%; background: rgba(8, 88, 75, 0.1); color: var(--primary); display: flex; align-items: center; justify-content: center; font-size: 1.4rem; margin: 0 auto 15px auto;">
+        <i class="fa-solid fa-key"></i>
       </div>
-      <div class="form-group">
-        <label>E-mail</label>
-        <input type="email" id="forgot-email" class="form-control" placeholder="Wpisz adres e-mail" />
-      </div>
-      <button class="btn-primary" onclick="handleForgotPassword()">Wyślij hasło</button>
-      <button class="link-btn" style="width: 100%; text-align: center; margin-top: 10px;" onclick="toggleModal('modal-forgot-password', false)">Anuluj</button>
+      <h3 style="color: var(--primary); margin-bottom: 10px;">Nie pamiętasz hasła?</h3>
+      <p style="color: var(--text-muted); font-size: 0.95rem; line-height: 1.5; margin-bottom: 22px;">
+        Hasło może ustawić na nowo administrator systemu. Skontaktuj się z nim i podaj swój login.
+      </p>
+      <button class="btn-primary" onclick="toggleModal('modal-forgot-password', false)">Rozumiem</button>
     </div>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="js/app.js?v=20261024"></script>
-  <script src="js/login-fx.js?v=20261024"></script>
-  <script src="js/menu-fx.js?v=20261024"></script>
-  <script src="js/mobile.js?v=20261024"></script>
-  <script src="js/report_time.js?v=20261024"></script>
-  <script src="js/reports.js?v=20261024"></script>
-  <script src="js/updates.js?v=20261024"></script>
-  <script src="js/dashboard.js?v=20261024"></script>
-  <script src="js/user.js?v=20261024"></script>
+  <script src="js/app.js?v=20261041"></script>
+  <script src="js/login-fx.js?v=20261041"></script>
+  <script src="js/menu-fx.js?v=20261041"></script>
+  <script src="js/mobile.js?v=20261041"></script>
+  <script src="js/report_time.js?v=20261041"></script>
+  <script src="js/reports.js?v=20261041"></script>
+  <script src="js/updates.js?v=20261041"></script>
+  <script src="js/dashboard.js?v=20261041"></script>
+  <script src="js/user.js?v=20261041"></script>
+  <script src="js/employee_hours.js?v=20261041"></script>
+  <script src="js/options.js?v=20261041"></script>
+  <script src="js/employee_portal.js?v=20261041"></script>
+  <script src="js/password.js?v=20261041"></script>
 </body>
 </html>

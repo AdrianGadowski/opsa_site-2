@@ -25,6 +25,7 @@ let rtConflicts = {};        // { [employeeId]: [rekordy work_reports] }
 let rtBannerTimer = null;
 let rtRefreshToken = 0;
 let rtSaving = false;
+let rtLocked = false;        // miesiąc wybranej daty raportu jest zablokowany (Opcje -> Blokada miesiąca)
 
 // ---------- Pomocnicze ----------
 function rtEsc(value) {
@@ -122,9 +123,16 @@ function rtTimeOptions(which, d) {
   const min = which === "to" ? (d.from ? rtSlot(d.from) + 1 : 1) : 0;
   const max = which === "from" ? (d.to ? rtSlot(d.to) - 1 : slots - 1) : slots;
 
-  let html = empty;
-  for (let k = min; k <= max; k++) html += opt(RT_ALL_TIMES[((start + k * 30) % 1440) / 30]);
-  return html;
+  // Na górze listy pełne połówki zmiany (co 4 h od jej początku, np. 10:30 i 14:30), niżej reszta
+  let top = "", rest = "";
+  for (let k = min; k <= max; k++) {
+    const html = opt(RT_ALL_TIMES[((start + k * 30) % 1440) / 30]);
+    if (k % 8 === 0) top += html;
+    else rest += html;
+  }
+  return empty +
+    (top ? `<optgroup label="Najczęstsze">${top}</optgroup>` : "") +
+    (rest ? `<optgroup label="Pozostałe godziny">${rest}</optgroup>` : "");
 }
 
 function rtRowState(d) {
@@ -432,7 +440,7 @@ async function rtOpenConfirm() {
   rtMeta.shift = rtShift;
 
   document.getElementById("rt-meta-date").value = rtMeta.date || "";
-  document.getElementById("rt-meta-shift").value = rtMeta.shift;
+  document.getElementById("rt-meta-shift").textContent = rtMeta.shift || "—";
   rtHideSummaryMsg();
   toggleModal("modal-rt-confirm", true);
   await rtRefreshSummary();
@@ -470,7 +478,7 @@ function rtUpdateSaveButton() {
   const btn = document.getElementById("rt-btn-save");
   if (!btn) return;
   const noEntries = rtFilledEntries().length === 0;
-  btn.disabled = rtSaving || noEntries || !rtMeta.date || rtHasConflicts();
+  btn.disabled = rtSaving || noEntries || !rtMeta.date || rtLocked || rtHasConflicts();
 }
 
 // Szuka wpisów tych pracowników w wybranym dniu i zmianie, które nakładają się godzinowo
@@ -499,15 +507,19 @@ async function rtFetchConflicts(entries) {
 
 async function rtRefreshSummary() {
   const body = document.getElementById("rt-summary-body");
-  const info = document.getElementById("rt-meta-info");
+  const info = document.getElementById("rt-summary-totals");
   if (!body) return;
 
   const entries = rtFilledEntries();
   const token = ++rtRefreshToken;
 
   if (info) {
-    const total = entries.reduce((s, e) => s + e.hours, 0);
-    info.textContent = `Pozycji: ${entries.length} • Suma: ${rtFmtHours(total)}`;
+    const present = entries.filter(e => !e.absent).reduce((s, e) => s + e.hours, 0);
+    const absent = entries.filter(e => e.absent).reduce((s, e) => s + e.hours, 0);
+    info.innerHTML = `
+      <span>Pracowników:<strong>${entries.length}</strong></span>
+      <span>Godziny obecne:<strong class="ok">${rtFmtHours(present)}</strong></span>
+      <span>Godziny nieobecne:<strong class="absent">${rtFmtHours(absent)}</strong></span>`;
   }
 
   if (entries.length === 0) {
@@ -529,6 +541,27 @@ async function rtRefreshSummary() {
     <i class="fa-solid fa-spinner fa-spin"></i> Sprawdzanie duplikatów...</td></tr>`;
   const btn = document.getElementById("rt-btn-save");
   if (btn) btn.disabled = true;
+
+  // Zablokowany miesiąc: raportu nie można zapisać
+  let lockError = null;
+  try {
+    rtLocked = await opIsLocked(rtMeta.date.slice(0, 7));
+  } catch (err) {
+    console.error("Błąd sprawdzania blokady miesiąca:", err);
+    rtLocked = true;
+    lockError = err;
+  }
+  if (token !== rtRefreshToken) return;
+
+  if (rtLocked) {
+    rtConflicts = {};
+    rtRenderSummaryRows(entries);
+    rtShowSummaryMsg(lockError
+      ? "Nie udało się sprawdzić blokady miesiąca: " + (lockError.message || lockError)
+      : `Miesiąc ${opMonthLabel(rtMeta.date.slice(0, 7))} jest zablokowany. Nie można w nim tworzyć raportów.`, "#9b1c1f");
+    rtUpdateSaveButton();
+    return;
+  }
 
   const res = await rtFetchConflicts(entries);
   if (token !== rtRefreshToken) return; // ktoś zmienił datę/zmianę w trakcie
@@ -658,6 +691,13 @@ async function rtSaveReport() {
   }
 
   try {
+    // 0. Miesiąc mógł zostać zablokowany już po otwarciu okna
+    rtLocked = await opIsLocked(rtMeta.date.slice(0, 7));
+    if (rtLocked) {
+      rtShowSummaryMsg(`Miesiąc ${opMonthLabel(rtMeta.date.slice(0, 7))} jest zablokowany. Nie można w nim tworzyć raportów.`, "#9b1c1f");
+      return;
+    }
+
     // 1. Ostatnie sprawdzenie duplikatów tuż przed zapisem
     const check = await rtFetchConflicts(entries);
     if (check.error) throw check.error;

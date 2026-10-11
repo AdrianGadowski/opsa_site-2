@@ -155,3 +155,34 @@
 
   start();
 })();
+// ==========================================
+// DODATKI FORMULARZA: podgląd hasła i ostrzeżenie o Caps Locku
+// ==========================================
+(() => {
+  const input = document.getElementById("password-input");
+  const toggle = document.getElementById("login-pass-toggle");
+  const capsHint = document.getElementById("login-caps-hint");
+  if (!input) return;
+
+  if (toggle) {
+    toggle.addEventListener("click", () => {
+      const show = input.type === "password";
+      input.type = show ? "text" : "password";
+      const label = show ? "Ukryj hasło" : "Pokaż hasło";
+      toggle.setAttribute("aria-label", label);
+      toggle.title = label;
+      toggle.innerHTML = `<i class="fa-solid ${show ? "fa-eye-slash" : "fa-eye"}"></i>`;
+      input.focus();
+    });
+  }
+
+  if (capsHint) {
+    const update = (e) => {
+      if (typeof e.getModifierState !== "function") return;
+      capsHint.classList.toggle("visible", e.getModifierState("CapsLock"));
+    };
+    input.addEventListener("keydown", update);
+    input.addEventListener("keyup", update);
+    input.addEventListener("blur", () => capsHint.classList.remove("visible"));
+  }
+})();
