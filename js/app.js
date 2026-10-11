@@ -1,14 +1,54 @@
 // ==========================================
 // 1. INICJALIZACJA SUPABASE (Baza: opsa)
 // ==========================================
-const SUPABASE_URL = "https://vrfyniyvawyungkslwod.supabase.co"; 
-const SUPABASE_ANON_KEY = "sb_publishable_64Xg3rGa9kuBZo5KjGgCrg_X8felZMu";  
+const SUPABASE_URL = "https://vrfyniyvawyungkslwod.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_64Xg3rGa9kuBZo5KjGgCrg_X8felZMu";
 
-const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+// Magazyn sesji Supabase Auth. "Zapamiętaj mnie" = localStorage (przetrwa zamknięcie
+// przeglądarki), bez zaznaczenia = sessionStorage (do zamknięcia karty).
+const AUTH_STORAGE_KEY = "opsaAuth";
+const AUTH_REMEMBER_KEY = "opsaRemember";
+
+function setAuthRemember(remember) {
+  try { window.localStorage.setItem(AUTH_REMEMBER_KEY, remember ? "1" : "0"); } catch (e) { /* ignoruj */ }
+}
+
+const authStorage = {
+  getItem(key) {
+    try {
+      return window.sessionStorage.getItem(key) ?? window.localStorage.getItem(key);
+    } catch (e) {
+      return null;
+    }
+  },
+  setItem(key, value) {
+    try {
+      const remember = window.localStorage.getItem(AUTH_REMEMBER_KEY) === "1";
+      (remember ? window.localStorage : window.sessionStorage).setItem(key, value);
+      (remember ? window.sessionStorage : window.localStorage).removeItem(key);
+    } catch (e) { /* brak dostępu do magazynu - sesja nie przetrwa odświeżenia */ }
+  },
+  removeItem(key) {
+    try {
+      window.sessionStorage.removeItem(key);
+      window.localStorage.removeItem(key);
+    } catch (e) { /* ignoruj */ }
+  }
+};
+
+const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  auth: {
+    storage: authStorage,
+    storageKey: AUTH_STORAGE_KEY,
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: false
+  }
+});
 
 // Numer wydania doklejany do adresów plików, żeby przeglądarka nie używała starych kopii.
 // Zmieniaj przy każdej publikacji - tutaj i w index.html (?v=...).
-const APP_BUILD = "20261041";
+const APP_BUILD = "20261042";
 
 let currentUser = null;
 let cachedUsers = [];
@@ -116,16 +156,18 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 // Kolumny użytkownika pobierane przy logowaniu i przy przywracaniu sesji
+// (hasła nie ma w tabeli - trzyma je Supabase Auth)
 const USER_SELECT = `
   id,
+  auth_id,
   login,
-  password,
   name,
   last_name,
   role_id,
   role:role_id ( role ),
   department_id,
   department:department_id ( department ),
+  must_change_password,
   allow_dashboard,
   allow_employees,
   allow_time_reporting,
@@ -135,92 +177,112 @@ const USER_SELECT = `
   allow_options
 `;
 
-// ---------- Sesja: logowanie przetrwa odświeżenie strony ----------
-// W przeglądarce zapisywane jest tylko ID użytkownika, ostatni widok i czas ostatniej
-// aktywności (bez hasła). "Zapamiętaj mnie" = localStorage (przetrwa zamknięcie
-// przeglądarki), bez zaznaczenia = sessionStorage (do zamknięcia karty).
-const SESSION_KEY = "opsaSession";
+// ---------- Konto w Supabase Auth ----------
+// Supabase loguje adresem e-mail, a w systemie są loginy. Adres jest sztuczny i powstaje
+// z loginu: jego bajty UTF-8 zapisane szesnastkowo + stała końcówka (osobna dla użytkowników
+// i pracowników). Ta sama reguła jest w bazie: funkcja public.app_email().
+const AUTH_DOMAINS = { user: "@u.opsa.local", employee: "@p.opsa.local" };
+
+function authEmail(kind, login) {
+  const bytes = new TextEncoder().encode(String(login || "").trim());
+  const hex = Array.from(bytes, b => b.toString(16).padStart(2, "0")).join("");
+  return hex + (AUTH_DOMAINS[kind] || AUTH_DOMAINS.user);
+}
+
+// Czy błąd logowania to brak sieci / awaria serwera, a nie zły login lub hasło
+function isAuthNetworkError(error) {
+  if (!error) return false;
+  return !navigator.onLine || error.status === 0 || error.status >= 500 ||
+    /fetch|network|timeout/i.test(error.message || "") || error.name === "AuthRetryableFetchError";
+}
+
+// ---------- Sesja ----------
+// Sesję (token) trzyma Supabase Auth w magazynie przeglądarki (patrz authStorage na górze pliku).
+// Obok zapisywany jest tylko ostatni widok i czas ostatniej aktywności.
+const SESSION_KEY = "opsaActivity";
 const SESSION_IDLE_LIMIT = 8 * 60 * 60 * 1000; // wylogowanie po 8 h bez aktywności
-let sessionStore = null;      // magazyn bieżącej sesji (localStorage / sessionStorage)
 let sessionTouchedAt = 0;
 
-function readStoredSession() {
-  for (const store of [window.sessionStorage, window.localStorage]) {
-    try {
-      const data = JSON.parse(store.getItem(SESSION_KEY) || "null");
-      if (data && data.id != null) return { store, data };
-    } catch (e) { /* brak dostępu do magazynu albo uszkodzony wpis - ignoruj */ }
+function readActivity() {
+  try {
+    return JSON.parse(window.localStorage.getItem(SESSION_KEY) || "null") || {};
+  } catch (e) {
+    return {};
   }
-  return null;
 }
 
 function writeSession(view) {
-  if (!sessionStore || !currentUser) return;
   sessionTouchedAt = Date.now();
   try {
-    const prev = JSON.parse(sessionStore.getItem(SESSION_KEY) || "null") || {};
-    sessionStore.setItem(SESSION_KEY, JSON.stringify({
-      id: currentUser.id,
+    const prev = readActivity();
+    window.localStorage.setItem(SESSION_KEY, JSON.stringify({
       view: view || prev.view || null,
       ts: sessionTouchedAt
     }));
-  } catch (e) { /* brak dostępu - sesja po prostu nie zostanie zapamiętana */ }
-}
-
-function startSession(remember) {
-  clearSession();
-  try {
-    sessionStore = remember ? window.localStorage : window.sessionStorage;
-  } catch (e) {
-    sessionStore = null;
-  }
-  writeSession(null);
+  } catch (e) { /* brak dostępu do magazynu - ignoruj */ }
 }
 
 function clearSession() {
-  sessionStore = null;
-  for (const name of ["sessionStorage", "localStorage"]) {
-    try { window[name].removeItem(SESSION_KEY); } catch (e) { /* ignoruj */ }
+  sessionTouchedAt = 0;
+  try { window.localStorage.removeItem(SESSION_KEY); } catch (e) { /* ignoruj */ }
+}
+
+// Wylogowanie z Supabase Auth (tylko w tej przeglądarce)
+async function authSignOut() {
+  try {
+    await supabaseClient.auth.signOut({ scope: "local" });
+  } catch (err) {
+    console.error("Błąd wylogowania:", err);
   }
 }
 
-// Po odświeżeniu strony: wczytaj użytkownika z bazy i pomiń ekran logowania
+// Po odświeżeniu strony: jeśli jest ważna sesja, pomiń ekran logowania
 async function restoreSession() {
-  const stored = readStoredSession();
   const overlay = document.getElementById("auth-overlay");
-  if (!stored) return;
-
-  if (Date.now() - (stored.data.ts || 0) > SESSION_IDLE_LIMIT) {
-    clearSession();
-    overlay?.classList.remove("session-check");
-    return;
-  }
-
   try {
-    const { data: user, error } = await supabaseClient
+    const { data, error } = await supabaseClient.auth.getSession();
+    if (error) throw error;
+    const session = data && data.session;
+    if (!session) return;
+
+    const activity = readActivity();
+    if (activity.ts && Date.now() - activity.ts > SESSION_IDLE_LIMIT) {
+      clearSession();
+      await authSignOut();
+      return;
+    }
+
+    // Konto użytkownika systemu?
+    const { data: user, error: userErr } = await supabaseClient
       .from("users")
       .select(USER_SELECT)
-      .eq("id", stored.data.id)
+      .eq("auth_id", session.user.id)
       .maybeSingle();
-    if (error) throw error;
-    if (!user) {
-      clearSession(); // konto usunięte
-      return;
-    }
-    if (await passwordChangeRequired("users", user.id)) {
-      clearSession(); // hasło zresetowane przez administratora: trzeba zalogować się nim i ustawić własne
+    if (userErr) throw userErr;
+
+    if (user) {
+      if (user.must_change_password) {
+        // hasło tymczasowe: trzeba zalogować się nim i ustawić własne
+        clearSession();
+        await authSignOut();
+        return;
+      }
+      currentUser = user;
+      writeSession(activity.view);
+      loadTopbarVersion();
+      if (overlay) overlay.style.display = "none";
+      initDashboardApp(activity.view);
       return;
     }
 
-    currentUser = user;
-    sessionStore = stored.store;
-    writeSession(stored.data.view);
-    loadTopbarVersion();
+    // Konto pracownika (portal z godzinami)?
+    if (await epRestore(session.user.id)) return;
 
-    if (overlay) overlay.style.display = "none";
-    initDashboardApp(stored.data.view);
+    // Konto Auth bez profilu (usunięty albo nieaktywny) - wyloguj
+    clearSession();
+    await authSignOut();
   } catch (err) {
-    // np. brak internetu: zostaje ekran logowania, zapisana sesja nie jest kasowana
+    // np. brak internetu: zostaje ekran logowania, sesja nie jest kasowana
     console.error("Nie udało się przywrócić sesji:", err);
   } finally {
     overlay?.classList.remove("session-check");
@@ -228,7 +290,9 @@ async function restoreSession() {
 }
 
 // Zanim przyjdzie odpowiedź z bazy, nie pokazuj formularza logowania
-if (readStoredSession()) document.getElementById("auth-overlay")?.classList.add("session-check");
+if (authStorage.getItem(AUTH_STORAGE_KEY)) {
+  document.getElementById("auth-overlay")?.classList.add("session-check");
+}
 
 document.addEventListener("DOMContentLoaded", () => {
   loadTopbarVersion();
@@ -237,13 +301,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
 // Aktywność odświeża czas sesji (najwyżej raz na minutę); bez aktywności - wylogowanie
 document.addEventListener("click", () => {
-  if (currentUser && Date.now() - sessionTouchedAt > 60 * 1000) writeSession();
+  if ((currentUser || epEmployee) && Date.now() - sessionTouchedAt > 60 * 1000) writeSession();
 });
 setInterval(() => {
-  if (currentUser && sessionStore && Date.now() - sessionTouchedAt > SESSION_IDLE_LIMIT) {
-    handleLogout();
-    showLoginError("Sesja wygasła z powodu braku aktywności. Zaloguj się ponownie.", false);
-  }
+  if (!sessionTouchedAt || Date.now() - sessionTouchedAt <= SESSION_IDLE_LIMIT) return;
+  if (currentUser) handleLogout();
+  else if (epEmployee) epLogout();
+  else return;
+  showLoginError("Sesja wygasła z powodu braku aktywności. Zaloguj się ponownie.", false);
 }, 60 * 1000);
 
 // ---------- Blokada po kilku błędnych próbach ----------
@@ -310,38 +375,54 @@ async function handleLogin() {
       loginBtn.innerText = "Logowanie...";
     }
 
-    const { data: user, error } = await supabaseClient
-      .from("users")
-      .select(USER_SELECT)
-      .eq("login", loginInput)
-      .maybeSingle();
+    // "Zapamiętaj mnie" decyduje, gdzie Supabase zapisze sesję - trzeba ustawić przed logowaniem
+    setAuthRemember(!!document.getElementById("login-remember")?.checked);
 
-    if (error) {
-      console.error("Błąd zapytania Supabase:", error);
-      // brak sieci to nie jest błąd loginu ani hasła - nie podświetlaj pól
-      const offline = !navigator.onLine || /fetch|network/i.test(error.message || "");
-      showLoginError(offline
-        ? "Brak połączenia z serwerem. Sprawdź internet."
-        : "Błąd bazy danych. Spróbuj ponownie.", false);
+    const { data: auth, error: authError } = await supabaseClient.auth.signInWithPassword({
+      email: authEmail("user", loginInput),
+      password: passwordInput
+    });
+
+    if (authError) {
+      if (isAuthNetworkError(authError)) {
+        console.error("Błąd logowania:", authError);
+        showLoginError("Brak połączenia z serwerem. Sprawdź internet.", false);
+      } else {
+        registerFailedLogin();
+      }
       return;
     }
 
-    if (!user || user.password !== passwordInput) {
+    const { data: user, error } = await supabaseClient
+      .from("users")
+      .select(USER_SELECT)
+      .eq("auth_id", auth.user.id)
+      .maybeSingle();
+
+    if (error) {
+      console.error("Błąd pobierania profilu użytkownika:", error);
+      await authSignOut();
+      showLoginError("Błąd bazy danych. Spróbuj ponownie.", false);
+      return;
+    }
+    if (!user) {
+      // konto Auth istnieje, ale nie ma już profilu w tabeli users
+      await authSignOut();
       registerFailedLogin();
       return;
     }
 
     loginFailedAttempts = 0;
+
     // Pierwsze logowanie albo hasło ustawione przez administratora: najpierw własne hasło
-    if (await passwordChangeRequired("users", user.id)) {
+    if (user.must_change_password) {
       openForcePassword({
-        table: "users",
-        id: user.id,
         current: passwordInput,
-        onDone: (newPassword) => {
-          user.password = newPassword;
+        onDone: () => {
+          user.must_change_password = false;
           completeUserLogin(user);
-        }
+        },
+        onCancel: authSignOut
       });
       return;
     }
@@ -363,7 +444,8 @@ async function handleLogin() {
 // Wejście do systemu po poprawnym logowaniu: sesja i animacja powitania
 function completeUserLogin(user) {
   currentUser = user;
-  startSession(!!document.getElementById("login-remember")?.checked);
+  clearSession();           // nowe logowanie zaczyna od pulpitu, nie od ostatniego widoku
+  writeSession(null);
   loadTopbarVersion();
 
   const iconBox = document.getElementById("auth-icon-box");
@@ -598,6 +680,7 @@ function toggleModal(modalId, show) {
 // 5. WYLOGOWANIE
 // ==========================================
 function handleLogout() {
+  authSignOut();
   currentUser = null;
   clearSession();
   clearLoginError();
@@ -960,9 +1043,17 @@ async function handleSaveUser(e) {
     saveBtn.disabled = true;
     saveBtn.innerText = "Zapisywanie...";
 
+    // Hasło trzyma Supabase Auth; ustawia je funkcja bazy app_set_password (wymaga min. 6 znaków)
+    const passwordGiven = !!(password && password.trim() !== "");
+    if ((mode === "create" || passwordGiven) && password.length < 6) {
+      msgBox.innerText = "Hasło musi mieć co najmniej 6 znaków.";
+      msgBox.style.color = "var(--danger, #ef4444)";
+      msgBox.style.display = "block";
+      return;
+    }
+
     if (mode === "create") {
       userPayload.login = login;
-      userPayload.password = password;
 
       const { data: existingUser } = await supabaseClient
         .from("users")
@@ -979,33 +1070,44 @@ async function handleSaveUser(e) {
         return;
       }
 
-      const { error: insertError } = await supabaseClient
+      const { data: inserted, error: insertError } = await supabaseClient
         .from("users")
-        .insert([userPayload]);
+        .insert([userPayload])
+        .select("id");
 
       if (insertError) throw insertError;
+      if (!inserted || !inserted[0]) throw new Error("Użytkownik nie został dodany (brak uprawnień w bazie).");
 
-      // nowe konto: przy pierwszym logowaniu użytkownik ustawia własne hasło
-      await setPasswordChangeRequired("users", login, true, "login");
-
-    } else if (mode === "edit") {
-      const passwordChanged = !!(password && password.trim() !== "");
-      if (passwordChanged) {
-        userPayload.password = password;
+      // konto logowania; przy pierwszym logowaniu użytkownik ustawia własne hasło
+      const { error: accountError } = await supabaseClient.rpc("app_set_password", {
+        p_kind: "user",
+        p_id: inserted[0].id,
+        p_password: password
+      });
+      if (accountError) {
+        throw new Error("Użytkownik został dodany, ale nie udało się utworzyć konta logowania: " +
+          accountError.message + " Otwórz jego edycję i ustaw hasło ponownie.");
       }
 
-      const { error: updateError } = await supabaseClient
+    } else if (mode === "edit") {
+      const { data: updated, error: updateError } = await supabaseClient
         .from("users")
         .update(userPayload)
-        .eq("login", originalLogin);
+        .eq("login", originalLogin)
+        .select("id");
 
       if (updateError) throw updateError;
+      if (!updated || !updated[0]) throw new Error("Zmiany nie zostały zapisane (brak uprawnień w bazie).");
 
-      // hasło nadane komuś przez administratora jest tymczasowe; własnego nie trzeba zmieniać ponownie
-      if (passwordChanged) {
-        const own = !!currentUser && originalLogin === currentUser.login;
-        await setPasswordChangeRequired("users", originalLogin, !own, "login");
-        if (own) currentUser.password = password;
+      // hasło nadane komuś przez administratora jest tymczasowe (wymusi zmianę przy logowaniu);
+      // przy zmianie własnego hasła baza tego nie wymusza
+      if (passwordGiven) {
+        const { error: passwordError } = await supabaseClient.rpc("app_set_password", {
+          p_kind: "user",
+          p_id: updated[0].id,
+          p_password: password
+        });
+        if (passwordError) throw new Error("Dane zapisane, ale hasło nie zostało zmienione: " + passwordError.message);
       }
     }
 
@@ -1100,7 +1202,7 @@ async function loadEmployeesList() {
         last_name,
         phone_number,
         login,
-        password,
+        auth_id,
         business_id,
         department_id,
         active,
@@ -1355,6 +1457,7 @@ async function openCreateEmployeeModal() {
   if (form) form.dataset.loginAuto = "1";
   document.getElementById("form-emp-login").value = "";
   document.getElementById("form-emp-password").value = EMPLOYEE_DEFAULT_PASSWORD;
+  document.getElementById("form-emp-password").placeholder = "";
   document.getElementById("form-emp-login-hint").textContent =
     "Uzupełnia się z imienia i nazwiska. Zajęty login dostanie kolejny numer.";
 
@@ -1386,7 +1489,9 @@ async function openEditEmployeeModal(empId) {
   // Przy edycji login i hasło zmienia się tylko ręcznie
   if (form) form.dataset.loginAuto = "0";
   document.getElementById("form-emp-login").value = emp.login || "";
-  document.getElementById("form-emp-password").value = emp.password || "";
+  // hasła nie da się odczytać (trzyma je Supabase Auth): puste pole = bez zmiany
+  document.getElementById("form-emp-password").value = "";
+  document.getElementById("form-emp-password").placeholder = emp.auth_id ? "Wpisz, aby zmienić hasło" : "Ustaw hasło, aby utworzyć konto";
   document.getElementById("form-emp-login-hint").textContent = "";
 
   await populateEmployeeModalDropdowns(emp.business_id, emp.department_id);
@@ -1483,11 +1588,26 @@ async function handleSaveEmployee(e) {
     active: true
   };
 
+  // Hasło trzyma Supabase Auth; ustawia je funkcja bazy app_set_password
+  const setAccountPassword = async (id) => {
+    const { error } = await supabaseClient.rpc("app_set_password", {
+      p_kind: "employee",
+      p_id: id,
+      p_password: password
+    });
+    return error;
+  };
+
   if (msgBox) msgBox.style.display = "none";
 
   try {
     saveBtn.disabled = true;
     saveBtn.innerText = "Zapisywanie...";
+
+    if (password && password.length < 6) {
+      showError("Hasło musi mieć co najmniej 6 znaków.");
+      return;
+    }
 
     if (mode === "create") {
       if (!password) {
@@ -1504,29 +1624,49 @@ async function handleSaveEmployee(e) {
 
       const { data: inserted, error } = await supabaseClient
         .from("employees")
-        .insert([{ ...payload, login, password }])
+        .insert([{ ...payload, login }])
         .select("id");
 
       if (error) throw error;
-      // hasło startowe: pracownik zmienia je przy pierwszym logowaniu
-      if (inserted && inserted[0]) await setPasswordChangeRequired("employees", inserted[0].id, true);
+      if (!inserted || !inserted[0]) throw new Error("Pracownik nie został dodany (brak uprawnień w bazie).");
+
+      // konto logowania z hasłem startowym; pracownik zmienia je przy pierwszym logowaniu
+      const accountError = await setAccountPassword(inserted[0].id);
+      if (accountError) {
+        await loadEmployeesList();
+        applyEmployeeFilters();
+        throw new Error("Pracownik został dodany, ale nie udało się utworzyć konta logowania: " +
+          accountError.message + " Otwórz jego edycję i ustaw hasło ponownie.");
+      }
     } else {
+      const before = cachedEmployees.find(emp => String(emp.id) === String(empId));
+
       if (login && (await fetchTakenEmployeeLogins(login, empId)).has(login)) {
         showError(`Login „${login}” jest już zajęty przez innego pracownika.`);
         return;
       }
+      if (password && !login) {
+        showError("Żeby ustawić hasło, pracownik musi mieć login.");
+        return;
+      }
+      if (login && !password && before && !before.auth_id) {
+        showError("Ten pracownik nie ma jeszcze konta logowania. Podaj hasło, żeby je utworzyć.");
+        return;
+      }
 
-      const { error } = await supabaseClient
+      const { data: updated, error } = await supabaseClient
         .from("employees")
-        .update({ ...payload, login: login || null, password: password || null })
-        .eq("id", empId);
+        .update({ ...payload, login: login || null })
+        .eq("id", empId)
+        .select("id");
 
       if (error) throw error;
+      if (!updated || !updated[0]) throw new Error("Zmiany nie zostały zapisane (brak uprawnień w bazie).");
 
-      // hasło zmienione w kartotece jest tymczasowe: pracownik ustawi własne przy logowaniu
-      const before = cachedEmployees.find(emp => String(emp.id) === String(empId));
-      if (password && before && (before.password || "") !== password) {
-        await setPasswordChangeRequired("employees", empId, true);
+      // hasło wpisane w kartotece jest tymczasowe: pracownik ustawi własne przy logowaniu
+      if (password) {
+        const accountError = await setAccountPassword(empId);
+        if (accountError) throw new Error("Dane zapisane, ale hasło nie zostało zmienione: " + accountError.message);
       }
     }
 

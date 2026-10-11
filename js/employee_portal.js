@@ -2,22 +2,22 @@
 // PORTAL PRACOWNIKA
 // Zakładka "Pracownik" na ekranie logowania i strona z godzinami pracownika
 // w wybranym miesiącu (tylko podgląd, bez menu).
-// Logowanie: tabela employees (login, password, active).
+// Logowanie: Supabase Auth (konto powiązane z wierszem employees przez auth_id).
+// Baza sama pilnuje, że pracownik widzi tylko swoje godziny.
 // Wymaga: supabaseClient, loginMode, showLoginError, clearLoginError, registerFailedLogin,
-//         loginLockTimer, readStoredSession, SESSION_IDLE_LIMIT (app.js), rtEsc (report_time.js),
+//         loginLockTimer, authEmail, isAuthNetworkError, setAuthRemember, authSignOut,
+//         writeSession, clearSession (app.js), openForcePassword (password.js), rtEsc (report_time.js),
 //         rpFetchAll / RP_MONTHS / RP_YEARS_BACK (reports.js), ehBuild (employee_hours.js),
 //         opIsLocked / opPeriodKey / opMonthLabel (options.js)
 // ==========================================
 
-const EP_SESSION_KEY = "opsaEmpSession";
 const EP_SELECT = `
-  id, first_name, last_name, login, password, active,
+  id, auth_id, first_name, last_name, login, active, must_change_password,
   business:business_id ( business ),
   department:department_id ( department )
 `;
 
 let epEmployee = null;
-let epStore = null;          // localStorage / sessionStorage bieżącej sesji pracownika
 let epLoadToken = 0;
 
 // ---------- Zakładki na ekranie logowania ----------
@@ -38,29 +38,16 @@ function setLoginMode(mode) {
   document.getElementById("login-input")?.focus();
 }
 
-// ---------- Sesja pracownika ----------
-function epReadSession() {
-  for (const store of [window.sessionStorage, window.localStorage]) {
-    try {
-      const data = JSON.parse(store.getItem(EP_SESSION_KEY) || "null");
-      if (data && data.id != null) return { store, data };
-    } catch (e) { /* brak dostępu do magazynu - ignoruj */ }
-  }
-  return null;
-}
-
-function epWriteSession() {
-  if (!epStore || !epEmployee) return;
-  try {
-    epStore.setItem(EP_SESSION_KEY, JSON.stringify({ id: epEmployee.id, ts: Date.now() }));
-  } catch (e) { /* sesja po prostu nie zostanie zapamiętana */ }
-}
-
-function epClearSession() {
-  epStore = null;
-  for (const name of ["sessionStorage", "localStorage"]) {
-    try { window[name].removeItem(EP_SESSION_KEY); } catch (e) { /* ignoruj */ }
-  }
+// Profil aktywnego pracownika powiązany z kontem Auth (null = brak albo nieaktywny)
+async function epFetchProfile(authId) {
+  const { data, error } = await supabaseClient
+    .from("employees")
+    .select(EP_SELECT)
+    .eq("auth_id", authId)
+    .eq("active", true)
+    .maybeSingle();
+  if (error) throw error;
+  return data || null;
 }
 
 // ---------- Logowanie ----------
@@ -68,6 +55,7 @@ async function epLogin() {
   if (loginLockTimer) return;
   clearLoginError();
 
+  // loginy pracowników są zapisywane małymi literami
   const login = document.getElementById("login-input").value.trim().toLowerCase();
   const password = document.getElementById("password-input").value;
   const btn = document.getElementById("btn-login");
@@ -83,23 +71,36 @@ async function epLogin() {
       btn.innerText = "Logowanie...";
     }
 
-    const { data, error } = await supabaseClient
-      .from("employees")
-      .select(EP_SELECT)
-      .eq("login", login)
-      .eq("active", true);
+    // "Zapamiętaj mnie" decyduje, gdzie Supabase zapisze sesję - trzeba ustawić przed logowaniem
+    setAuthRemember(!!document.getElementById("login-remember")?.checked);
 
-    if (error) {
-      console.error("Błąd logowania pracownika:", error);
-      const offline = !navigator.onLine || /fetch|network/i.test(error.message || "");
-      showLoginError(offline
-        ? "Brak połączenia z serwerem. Sprawdź internet."
-        : "Błąd bazy danych. Spróbuj ponownie.", false);
+    const { data: auth, error: authError } = await supabaseClient.auth.signInWithPassword({
+      email: authEmail("employee", login),
+      password
+    });
+
+    if (authError) {
+      if (isAuthNetworkError(authError)) {
+        console.error("Błąd logowania pracownika:", authError);
+        showLoginError("Brak połączenia z serwerem. Sprawdź internet.", false);
+      } else {
+        registerFailedLogin();
+      }
       return;
     }
 
-    const emp = (data || []).find(e => e.password && e.password === password);
+    let emp;
+    try {
+      emp = await epFetchProfile(auth.user.id);
+    } catch (err) {
+      console.error("Błąd pobierania profilu pracownika:", err);
+      await authSignOut();
+      showLoginError("Błąd bazy danych. Spróbuj ponownie.", false);
+      return;
+    }
     if (!emp) {
+      // konto istnieje, ale pracownik jest nieaktywny albo usunięty
+      await authSignOut();
       registerFailedLogin();
       return;
     }
@@ -107,15 +108,14 @@ async function epLogin() {
     loginFailedAttempts = 0;
 
     // Pierwsze logowanie albo hasło zmienione w kartotece: najpierw własne hasło
-    if (await passwordChangeRequired("employees", emp.id)) {
+    if (emp.must_change_password) {
       openForcePassword({
-        table: "employees",
-        id: emp.id,
         current: password,
-        onDone: (newPassword) => {
-          emp.password = newPassword;
+        onDone: () => {
+          emp.must_change_password = false;
           epCompleteLogin(emp);
-        }
+        },
+        onCancel: authSignOut
       });
       return;
     }
@@ -134,13 +134,20 @@ async function epLogin() {
 
 function epCompleteLogin(emp) {
   epEmployee = emp;
-  try {
-    epStore = document.getElementById("login-remember")?.checked ? window.localStorage : window.sessionStorage;
-  } catch (e) {
-    epStore = null;
-  }
-  epWriteSession();
+  clearSession();
+  writeSession(null);
   epOpen();
+}
+
+// Przywrócenie portalu po odświeżeniu strony (wołane z restoreSession w app.js).
+// Zwraca true, gdy konto należy do aktywnego pracownika i portal został otwarty.
+async function epRestore(authId) {
+  const emp = await epFetchProfile(authId);
+  if (!emp || emp.must_change_password) return false; // hasło tymczasowe: trzeba zalogować się ponownie
+  epEmployee = emp;
+  writeSession(null);
+  epOpen();
+  return true;
 }
 
 // ---------- Strona pracownika ----------
@@ -173,9 +180,10 @@ function epOpen() {
 }
 
 function epLogout() {
+  authSignOut();
   epEmployee = null;
   epLoadToken++;
-  epClearSession();
+  clearSession();
 
   document.getElementById("employee-portal").style.display = "none";
   const overlay = document.getElementById("auth-overlay");
@@ -212,7 +220,7 @@ async function epLoad() {
   const month = document.getElementById("ep-month").value;
   const key = opPeriodKey(year, month);
   const token = ++epLoadToken;
-  epWriteSession(); // aktywność odświeża czas sesji
+  writeSession(null); // aktywność odświeża czas sesji
 
   body.innerHTML = `<tr><td colspan="7" class="ep-empty"><i class="fa-solid fa-spinner fa-spin"></i> Ładowanie godzin...</td></tr>`;
   document.getElementById("ep-mobile-empty").style.display = "none";
@@ -248,51 +256,3 @@ async function epLoad() {
       Nie udało się pobrać godzin: ${rtEsc(err.message || err)}</td></tr>`;
   }
 }
-
-// ---------- Przywrócenie sesji pracownika po odświeżeniu strony ----------
-async function epRestoreSession() {
-  const stored = epReadSession();
-  const overlay = document.getElementById("auth-overlay");
-  if (!stored) return;
-
-  // sesja użytkownika systemu ma pierwszeństwo
-  if (readStoredSession()) return;
-
-  if (Date.now() - (stored.data.ts || 0) > SESSION_IDLE_LIMIT) {
-    epClearSession();
-    overlay?.classList.remove("session-check");
-    return;
-  }
-
-  try {
-    const { data, error } = await supabaseClient
-      .from("employees")
-      .select(EP_SELECT)
-      .eq("id", stored.data.id)
-      .eq("active", true)
-      .maybeSingle();
-    if (error) throw error;
-    if (!data) {
-      epClearSession(); // konto usunięte albo nieaktywne
-      return;
-    }
-    if (await passwordChangeRequired("employees", data.id)) {
-      epClearSession(); // hasło zmienione w kartotece: trzeba zalogować się nim i ustawić własne
-      return;
-    }
-
-    epEmployee = data;
-    epStore = stored.store;
-    epWriteSession();
-    epOpen();
-  } catch (err) {
-    console.error("Nie udało się przywrócić sesji pracownika:", err);
-  } finally {
-    overlay?.classList.remove("session-check");
-  }
-}
-
-if (epReadSession() && !readStoredSession()) {
-  document.getElementById("auth-overlay")?.classList.add("session-check");
-}
-document.addEventListener("DOMContentLoaded", epRestoreSession);

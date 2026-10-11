@@ -107,33 +107,9 @@ async function usChangePassword() {
   if (btn) btn.disabled = true;
 
   try {
-    // Obecne hasło sprawdzane ze stanem w bazie, nie z kopią z logowania
-    const { data: row, error: readErr } = await supabaseClient
-      .from("users")
-      .select("password")
-      .eq("id", currentUser.id)
-      .maybeSingle();
-    if (readErr) throw readErr;
+    // Baza sprawdza obecne hasło, zapisuje nowe w Supabase Auth i zdejmuje wymóg zmiany
+    await changeOwnPassword(current, next);
 
-    if (!row || row.password !== current) {
-      usShowMsg("error", "Obecne hasło jest nieprawidłowe.");
-      return;
-    }
-
-    const { data, error } = await supabaseClient
-      .from("users")
-      .update({ password: next })
-      .eq("id", currentUser.id)
-      .select("id");
-    if (error) throw error;
-    if (!data || data.length === 0) {
-      usShowMsg("error", "Hasło nie zostało zmienione (brak uprawnień w bazie).");
-      return;
-    }
-    // własne hasło: zmiana przy logowaniu nie jest już wymagana
-    await setPasswordChangeRequired("users", currentUser.id, false);
-
-    currentUser.password = next;
     currentEl.value = "";
     newEl.value = "";
     repeatEl.value = "";
