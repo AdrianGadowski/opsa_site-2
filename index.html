@@ -5,16 +5,26 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Odlewnie Polskie - Ewidencja czasu pracy</title>
 
+  <!-- Instalacja jako aplikacja -->
+  <link rel="manifest" href="manifest.webmanifest" />
+  <meta name="theme-color" content="#06362F" />
+  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png" />
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="OP Czas pracy" />
+
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
 
-  <link rel="stylesheet" href="css/style.css?v=20261042" />
-  <link rel="stylesheet" href="css/login.css?v=20261042" />
-  <link rel="stylesheet" href="css/menu.css?v=20261042" />
-  <link rel="stylesheet" href="css/mobile.css?v=20261042" />
-  <link rel="stylesheet" href="css/portal.css?v=20261042" />
+  <link rel="stylesheet" href="css/style.css?v=20261043" />
+  <link rel="stylesheet" href="css/login.css?v=20261043" />
+  <link rel="stylesheet" href="css/menu.css?v=20261043" />
+  <link rel="stylesheet" href="css/mobile.css?v=20261043" />
+  <link rel="stylesheet" href="css/portal.css?v=20261043" />
 </head>
 <body>
 
@@ -108,6 +118,8 @@
 
           <button id="btn-login" class="btn-primary" onclick="handleLogin()">Zaloguj się</button>
           <button class="link-btn" onclick="toggleModal('modal-forgot-password', true)">Nie pamiętasz hasła?</button>
+          <button type="button" id="btn-install-app" class="login-install" style="display: none;"><i class="fa-solid fa-download"></i> Zainstaluj aplikację</button>
+          <div id="install-ios-hint" class="login-install-hint" style="display: none;">Aby dodać aplikację do ekranu głównego: przycisk <strong>Udostępnij</strong>, potem <strong>Do ekranu początkowego</strong>.</div>
         </div>
 
         <div id="step-success" class="card-body-step">
@@ -302,18 +314,19 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="js/app.js?v=20261042"></script>
-  <script src="js/login-fx.js?v=20261042"></script>
-  <script src="js/menu-fx.js?v=20261042"></script>
-  <script src="js/mobile.js?v=20261042"></script>
-  <script src="js/report_time.js?v=20261042"></script>
-  <script src="js/reports.js?v=20261042"></script>
-  <script src="js/updates.js?v=20261042"></script>
-  <script src="js/dashboard.js?v=20261042"></script>
-  <script src="js/user.js?v=20261042"></script>
-  <script src="js/employee_hours.js?v=20261042"></script>
-  <script src="js/options.js?v=20261042"></script>
-  <script src="js/employee_portal.js?v=20261042"></script>
-  <script src="js/password.js?v=20261042"></script>
+  <script src="js/app.js?v=20261043"></script>
+  <script src="js/login-fx.js?v=20261043"></script>
+  <script src="js/menu-fx.js?v=20261043"></script>
+  <script src="js/mobile.js?v=20261043"></script>
+  <script src="js/report_time.js?v=20261043"></script>
+  <script src="js/reports.js?v=20261043"></script>
+  <script src="js/updates.js?v=20261043"></script>
+  <script src="js/dashboard.js?v=20261043"></script>
+  <script src="js/user.js?v=20261043"></script>
+  <script src="js/employee_hours.js?v=20261043"></script>
+  <script src="js/options.js?v=20261043"></script>
+  <script src="js/employee_portal.js?v=20261043"></script>
+  <script src="js/password.js?v=20261043"></script>
+  <script src="js/pwa.js?v=20261043"></script>
 </body>
 </html>

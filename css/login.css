@@ -577,3 +577,20 @@
   #auth-overlay { overflow-y: auto; align-items: flex-start; padding: 16px 0; }
   .unified-auth-card { margin: auto; min-height: 0; padding-top: 24px; padding-bottom: 22px; }
 }
+
+/* ---------- Instalacja jako aplikacja ---------- */
+.login-install {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  margin-top: 10px; padding: 9px 16px; border-radius: 10px; cursor: pointer;
+  border: 1.5px dashed rgba(8, 88, 75, 0.45); background: rgba(8, 88, 75, 0.05);
+  color: var(--primary); font-size: 0.84rem; font-weight: 700;
+  transition: background-color 0.2s, border-color 0.2s;
+}
+.login-install:hover { background: rgba(8, 88, 75, 0.1); border-color: var(--primary); }
+.login-install:focus-visible { outline: 3px solid rgba(8, 88, 75, 0.35); outline-offset: 2px; }
+.login-install-hint { margin-top: 10px; font-size: 0.78rem; line-height: 1.45; color: var(--text-muted); }
+
+/* Uruchomiona jako aplikacja: odstęp na wycięcie ekranu i pasek systemowy telefonu */
+@media (display-mode: standalone) {
+  #auth-overlay { padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); }
+}
