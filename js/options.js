@@ -237,6 +237,7 @@ async function opToggleLock(month, lock) {
       if (insertErr) throw insertErr;
       if (!inserted || inserted.length === 0) throw new Error("brak uprawnień w bazie");
     }
+    logAction(lock ? "Zablokowanie miesiąca" : "Odblokowanie miesiąca", opMonthLabel(key));
   } catch (err) {
     console.error("Błąd zapisu blokady miesiąca:", err);
     opShowLockMsg(`Nie udało się ${lock ? "zablokować" : "odblokować"} miesiąca ${opMonthLabel(key)}: ${err.message || err}`);
@@ -262,8 +263,21 @@ const OP_DICTS = {
     title: "Firmy", one: "firmę", placeholder: "Nazwa nowej firmy", empty: "Nie ma jeszcze żadnej firmy.",
     deleteTitle: "Usuwanie firmy", deleteQuestion: "Czy na pewno chcesz usunąć firmę",
     usedIn: [["employees", "business_id", "pracowników"]]
+  },
+  role: {
+    table: "role", column: "role", icon: "fa-user-tag",
+    title: "Role", one: "rolę", placeholder: "Nazwa nowej roli", empty: "Nie ma jeszcze żadnej roli.",
+    deleteTitle: "Usuwanie roli", deleteQuestion: "Czy na pewno chcesz usunąć rolę",
+    usedIn: [["users", "role_id", "użytkowników"]],
+    // po nazwie tej roli system rozpoznaje administratora (pełne prawa do raportów) - nie wolno jej usunąć
+    protectedNames: ["administrator"]
   }
 };
+
+// Pozycja, której nie wolno usunąć (np. rola "Administrator")
+function opDictProtected(cfg, item) {
+  return (cfg.protectedNames || []).includes(String(item.name || "").toLowerCase());
+}
 
 let opDictKind = null;
 let opDictItems = [];
@@ -322,10 +336,14 @@ async function opLoadDict() {
     .map(r => ({ id: r.id, name: String(r[cfg.column] || "").trim() }))
     .sort((a, b) => a.name.localeCompare(b.name, "pl"));
 
-  list.innerHTML = opDictItems.length
-    ? opDictItems.map(it => `
+  // Pozycje chronione (rola "Administrator") w ogóle nie są pokazywane w panelu:
+  // nie da się ich tu usunąć ani zmienić. Zostają w opDictItems, żeby nie dało się dodać ich drugi raz.
+  const visible = opDictItems.filter(it => !opDictProtected(cfg, it));
+
+  list.innerHTML = visible.length
+    ? visible.map(it => `
         <div class="op-dict-row">
-          <span class="ico"><i class="fa-solid ${opDictKind === "business" ? "fa-building" : "fa-sitemap"}"></i></span>
+          <span class="ico"><i class="fa-solid ${cfg.icon || (opDictKind === "business" ? "fa-building" : "fa-sitemap")}"></i></span>
           <span class="name">${rtEsc(it.name || `(bez nazwy, id ${it.id})`)}</span>
           <button type="button" class="op-dict-del" title="Usuń" aria-label="Usuń: ${rtEsc(it.name)}" onclick="opOpenDictDelete(${Number(it.id)})"><i class="fa-solid fa-trash"></i></button>
         </div>`).join("")
@@ -343,7 +361,10 @@ async function opAddDictItem() {
     return;
   }
   if (opDictItems.some(it => it.name.toLowerCase() === name.toLowerCase())) {
-    opDictMsg(`„${name}” jest już na liście.`);
+    const taken = opDictItems.find(it => it.name.toLowerCase() === name.toLowerCase());
+    opDictMsg(opDictProtected(cfg, taken)
+      ? `Nazwa „${name}” jest zastrzeżona przez system.`
+      : `„${name}” jest już na liście.`);
     return;
   }
 
@@ -360,6 +381,7 @@ async function opAddDictItem() {
     if (error) throw error;
     if (!data || data.length === 0) throw new Error("brak uprawnień w bazie");
 
+    logAction("Dodanie pozycji słownika", `${cfg.title}: ${name}`);
     input.value = "";
     await opLoadDict();
     opDictMsg(`Dodano: ${name}`, true);
@@ -380,7 +402,7 @@ let opDictDeleteTimer = null;
 function opOpenDictDelete(id) {
   const cfg = OP_DICTS[opDictKind];
   const item = opDictItems.find(it => Number(it.id) === Number(id));
-  if (!cfg || !item) return;
+  if (!cfg || !item || opDictProtected(cfg, item)) return;
   opDictDeleteId = item.id;
 
   document.getElementById("op-delete-title").innerText = cfg.deleteTitle;
@@ -453,8 +475,10 @@ async function opConfirmDictDelete() {
   let message = "", ok = false;
   try {
     // Pozycji, do której coś jest przypisane, nie wolno usunąć - osierociłoby to pracowników i raporty
-    const usage = await opDictUsage(cfg, id);
-    if (usage.length) {
+    const usage = item && opDictProtected(cfg, item) ? [] : await opDictUsage(cfg, id);
+    if (item && opDictProtected(cfg, item)) {
+      message = `Pozycji „${item.name}” nie można usunąć - system z niej korzysta.`;
+    } else if (usage.length) {
       message = `Nie można usunąć „${item ? item.name : id}”: korzysta z niej ` +
         usage.map(u => `${u.count} ${u.label}`).join(", ") + ". Najpierw przypisz im inną pozycję.";
     } else {
@@ -462,6 +486,7 @@ async function opConfirmDictDelete() {
       if (error) throw error;
       if (!data || data.length === 0) throw new Error("brak uprawnień w bazie albo pozycja już nie istnieje");
       message = `Usunięto: ${item ? item.name : id}`;
+      logAction("Usunięcie pozycji słownika", `${cfg.title}: ${item ? item.name : id}`);
       ok = true;
     }
   } catch (err) {

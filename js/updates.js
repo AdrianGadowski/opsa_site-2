@@ -203,6 +203,7 @@ async function upSaveVersions() {
     if (ver) ver.value = upProgress;
 
     toggleModal("modal-up-versions", false);
+    logAction("Zmiana wersji systemu", `aktywna: ${newActive}, w budowie: ${newProgress}`);
     upShowBanner("success", "Wersje zostały zaktualizowane.");
   } catch (err) {
     console.error("Błąd zapisu wersji:", err);
@@ -412,6 +413,7 @@ async function upAddEntry() {
     });
     if (error) throw error;
 
+    logAction("Dodanie wpisu aktualizacji", `v${version}: ${desc}`);
     descEl.value = "";
     await upLoad();
     descEl.focus();
@@ -536,6 +538,8 @@ async function upConfirmDelete() {
     upShowBanner("warning", "Nie udało się usunąć wpisu: " + error.message);
   } else if (!data || data.length === 0) {
     upShowBanner("warning", "Wpis nie został usunięty (brak uprawnień w bazie lub został już usunięty).");
+  } else {
+    logAction("Usunięcie wpisu aktualizacji", `id ${id}`);
   }
   await upLoad();
 }

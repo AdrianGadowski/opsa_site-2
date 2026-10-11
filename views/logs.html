@@ -1,0 +1,125 @@
+<style>
+  /* ===== Logi ===== */
+  .lg-seg { display: inline-flex; padding: 4px; border-radius: 11px; background: #E9E9EE; gap: 2px; margin-bottom: 18px; }
+  .lg-seg button {
+    border: none; background: transparent; border-radius: 8px; padding: 9px 18px; cursor: pointer;
+    font-family: inherit; font-size: 0.86rem; font-weight: 600; color: #5B5B66;
+    display: inline-flex; align-items: center; gap: 8px; transition: background 0.2s, color 0.2s;
+  }
+  .lg-seg button.on { background: linear-gradient(90deg, #FCD444, #F6BE35); color: #03241E; font-weight: 700; box-shadow: 0 3px 10px rgba(245, 158, 11, 0.3); }
+  .lg-seg button:focus-visible { outline: 3px solid rgba(8, 88, 75, 0.35); outline-offset: 2px; }
+
+  .lg-toolbar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; padding: 12px 20px; border-bottom: 1px solid var(--border-color); }
+  .lg-toolbar .info { font-size: 0.86rem; color: var(--text-muted); }
+
+  .lg-table td { vertical-align: top; padding: 11px 16px; }
+  .lg-date { white-space: nowrap; font-variant-numeric: tabular-nums; color: var(--text-dark); font-weight: 600; }
+  .lg-who { white-space: nowrap; font-weight: 600; color: var(--primary); }
+  .lg-details { color: #4B5563; overflow-wrap: anywhere; }
+
+  .lg-chip { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 0.76rem; font-weight: 700; white-space: nowrap; background: #EEF0F3; color: #4B5563; }
+  .lg-chip.auth { background: #E0ECFB; color: #1E4E8C; }
+  .lg-chip.add { background: rgba(16, 185, 129, 0.14); color: #0b7a57; }
+  .lg-chip.danger { background: rgba(217, 56, 58, 0.12); color: #9b1c1f; }
+
+  .lg-more { display: flex; justify-content: center; padding: 14px; border-top: 1px solid var(--border-color); }
+
+  @media (max-width: 900px) {
+    .lg-filters { grid-template-columns: 1fr 1fr !important; }
+  }
+  @media (max-width: 768px) {
+    .lg-filters > :first-child { grid-column: 1 / -1; }
+    .lg-seg { display: flex; }
+    .lg-seg button { flex: 1; justify-content: center; padding: 9px 8px; }
+    .lg-toolbar { padding: 12px; }
+    .lg-date, .lg-who { white-space: normal; }
+  }
+</style>
+
+<div class="page-hero">
+  <div>
+    <div class="eyebrow">Nadzór</div>
+    <h3>Logi systemu</h3>
+    <p>Kto, kiedy i co zrobił: logowania, raporty, zmiany w użytkownikach, pracownikach, harmonogramie i opcjach.</p>
+  </div>
+</div>
+
+<!-- Zakładki: czyje logi -->
+<div class="lg-seg" id="lg-tabs" role="tablist" aria-label="Czyje logi">
+  <button type="button" role="tab" data-kind="user" class="on" aria-selected="true" onclick="lgSetKind('user')">
+    <i class="fa-solid fa-user-gear"></i> Użytkownicy
+  </button>
+  <button type="button" role="tab" data-kind="employee" aria-selected="false" onclick="lgSetKind('employee')">
+    <i class="fa-solid fa-helmet-safety"></i> Pracownicy
+  </button>
+</div>
+
+<!-- Filtry -->
+<div class="card" style="margin-bottom: 20px; padding: 16px 20px;">
+  <div class="lg-filters" style="display: grid; grid-template-columns: 2fr 1.2fr 1.4fr auto; gap: 14px; align-items: end;">
+    <div class="form-group" style="margin-bottom: 0;">
+      <label for="lg-filter-search" style="font-size: 0.8rem; color: var(--text-muted);">Szukaj</label>
+      <div style="position: relative;">
+        <input type="text" id="lg-filter-search" class="form-control" placeholder="Nazwisko, zdarzenie, numer raportu..." oninput="lgRender()" style="padding-left: 36px;" autocomplete="off" />
+        <i class="fa-solid fa-magnifying-glass" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 0.9rem;"></i>
+      </div>
+    </div>
+
+    <div class="form-group" style="margin-bottom: 0;">
+      <label for="lg-filter-period" style="font-size: 0.8rem; color: var(--text-muted);">Okres</label>
+      <select id="lg-filter-period" class="form-control" onchange="lgLoad(false)">
+        <option value="1">Dzisiaj</option>
+        <option value="7" selected>Ostatnie 7 dni</option>
+        <option value="30">Ostatnie 30 dni</option>
+        <option value="all">Wszystko</option>
+      </select>
+    </div>
+
+    <div class="form-group" style="margin-bottom: 0;">
+      <label for="lg-filter-action" style="font-size: 0.8rem; color: var(--text-muted);">Zdarzenie</label>
+      <select id="lg-filter-action" class="form-control" onchange="lgRender()">
+        <option value="">Wszystkie zdarzenia</option>
+      </select>
+    </div>
+
+    <div>
+      <button type="button" class="btn-secondary" style="height: 42px; padding: 0 16px; font-size: 0.85rem;" onclick="lgLoad(false)" title="Pobierz logi ponownie">
+        <i class="fa-solid fa-rotate" style="margin-right: 6px;"></i> Odśwież
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Tabela logów -->
+<div class="card" style="padding: 0; overflow: hidden;">
+  <div class="lg-toolbar">
+    <span class="info" id="lg-info"></span>
+    <span class="info">Najnowsze na górze</span>
+  </div>
+
+  <div style="overflow-x: auto;">
+    <table class="users-table lg-table" style="width: 100%; border-collapse: collapse; text-align: left;">
+      <thead>
+        <tr>
+          <th style="width: 180px;">Data i godzina</th>
+          <th>Kto</th>
+          <th>Zdarzenie</th>
+          <th>Szczegóły</th>
+        </tr>
+      </thead>
+      <tbody id="lg-table-body">
+        <tr>
+          <td colspan="4" style="text-align: center; padding: 30px; color: var(--text-muted);">
+            <i class="fa-solid fa-spinner fa-spin"></i> Ładowanie logów...
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="lg-more">
+    <button type="button" id="lg-more" class="btn-secondary" style="width: auto; padding: 10px 22px; display: none;" onclick="lgLoad(true)">
+      Pokaż starsze wpisy
+    </button>
+  </div>
+</div>

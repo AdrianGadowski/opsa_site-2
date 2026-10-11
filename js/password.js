@@ -76,6 +76,7 @@ async function submitForcePassword() {
 
     forcePasswordCtx = null;
     toggleModal("modal-force-password", false);
+    logAction("Zmiana hasła", "Ustawienie własnego hasła przy logowaniu");
     ctx.onDone();
   } catch (err) {
     console.error("Błąd ustawiania nowego hasła:", err);

@@ -20,11 +20,11 @@
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
 
-  <link rel="stylesheet" href="css/style.css?v=20261056" />
-  <link rel="stylesheet" href="css/login.css?v=20261056" />
-  <link rel="stylesheet" href="css/menu.css?v=20261056" />
-  <link rel="stylesheet" href="css/mobile.css?v=20261056" />
-  <link rel="stylesheet" href="css/portal.css?v=20261056" />
+  <link rel="stylesheet" href="css/style.css?v=20261060" />
+  <link rel="stylesheet" href="css/login.css?v=20261060" />
+  <link rel="stylesheet" href="css/menu.css?v=20261060" />
+  <link rel="stylesheet" href="css/mobile.css?v=20261060" />
+  <link rel="stylesheet" href="css/portal.css?v=20261060" />
 </head>
 <body>
 
@@ -198,6 +198,11 @@
             <i class="fa-solid fa-sliders"></i> Opcje
           </button>
         </li>
+        <li class="menu-item" data-tab="logs" id="nav-logs" style="display: none;">
+          <button class="menu-btn" onclick="navigateTo('logs')">
+            <i class="fa-solid fa-clipboard-list"></i> Logi
+          </button>
+        </li>
       </ul>
 
       <div class="user-footer">
@@ -246,8 +251,8 @@
           <p id="ep-sub"></p>
         </div>
         <div class="page-hero-actions">
-          <select id="ep-year" class="form-control" aria-label="Rok" onchange="epLoad()"></select>
-          <select id="ep-month" class="form-control" aria-label="Miesiąc" onchange="epLoad()"></select>
+          <select id="ep-year" class="form-control" aria-label="Rok" onchange="epLoad(true)"></select>
+          <select id="ep-month" class="form-control" aria-label="Miesiąc" onchange="epLoad(true)"></select>
         </div>
       </div>
 
@@ -322,20 +327,21 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="js/app.js?v=20261056"></script>
-  <script src="js/login-fx.js?v=20261056"></script>
-  <script src="js/menu-fx.js?v=20261056"></script>
-  <script src="js/mobile.js?v=20261056"></script>
-  <script src="js/report_time.js?v=20261056"></script>
-  <script src="js/reports.js?v=20261056"></script>
-  <script src="js/updates.js?v=20261056"></script>
-  <script src="js/dashboard.js?v=20261056"></script>
-  <script src="js/schedule.js?v=20261056"></script>
-  <script src="js/user.js?v=20261056"></script>
-  <script src="js/employee_hours.js?v=20261056"></script>
-  <script src="js/options.js?v=20261056"></script>
-  <script src="js/employee_portal.js?v=20261056"></script>
-  <script src="js/password.js?v=20261056"></script>
-  <script src="js/pwa.js?v=20261056"></script>
+  <script src="js/app.js?v=20261060"></script>
+  <script src="js/login-fx.js?v=20261060"></script>
+  <script src="js/menu-fx.js?v=20261060"></script>
+  <script src="js/mobile.js?v=20261060"></script>
+  <script src="js/report_time.js?v=20261060"></script>
+  <script src="js/reports.js?v=20261060"></script>
+  <script src="js/updates.js?v=20261060"></script>
+  <script src="js/dashboard.js?v=20261060"></script>
+  <script src="js/schedule.js?v=20261060"></script>
+  <script src="js/user.js?v=20261060"></script>
+  <script src="js/employee_hours.js?v=20261060"></script>
+  <script src="js/options.js?v=20261060"></script>
+  <script src="js/logs.js?v=20261060"></script>
+  <script src="js/employee_portal.js?v=20261060"></script>
+  <script src="js/password.js?v=20261060"></script>
+  <script src="js/pwa.js?v=20261060"></script>
 </body>
 </html>

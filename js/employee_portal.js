@@ -134,6 +134,7 @@ async function epLogin() {
 
 function epCompleteLogin(emp) {
   epEmployee = emp;
+  logAction("Logowanie");
   clearSession();
   writeSession(null);
   epOpen();
@@ -220,7 +221,8 @@ async function epLoadSchedule() {
 }
 
 function epLogout() {
-  authSignOut();
+  // log musi wyjść, zanim sesja zostanie zamknięta
+  (epEmployee ? logAction("Wylogowanie") : Promise.resolve()).finally(authSignOut);
   epEmployee = null;
   epLoadToken++;
   clearSession();
@@ -252,7 +254,7 @@ function epRenderLock(state, key) {
     <div><strong>${view[1]}</strong><span class="txt">${rtEsc(view[2])}</span></div>`;
 }
 
-async function epLoad() {
+async function epLoad(userAction) {
   const body = document.getElementById("ep-body");
   if (!body || !epEmployee) return;
 
@@ -261,6 +263,8 @@ async function epLoad() {
   const key = opPeriodKey(year, month);
   const token = ++epLoadToken;
   writeSession(null); // aktywność odświeża czas sesji
+  // zmiana miesiąca przez pracownika to jego jedyny "ruch" na stronie poza logowaniem
+  if (userAction === true) logAction("Podgląd godzin", opMonthLabel(key));
 
   body.innerHTML = `<tr><td colspan="7" class="ep-empty"><i class="fa-solid fa-spinner fa-spin"></i> Ładowanie godzin...</td></tr>`;
   document.getElementById("ep-mobile-empty").style.display = "none";

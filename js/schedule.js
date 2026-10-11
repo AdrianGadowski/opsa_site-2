@@ -316,6 +316,8 @@ async function shSave(id, value) {
     console.error("Błąd zapisu harmonogramu:", error);
   } else {
     emp[column] = value;
+    logAction("Zmiana harmonogramu",
+      `${emp.first_name || ""} ${emp.last_name || ""}`.trim() + `, tydzień ${week}: ${value || "wyczyszczono"}`);
   }
   if (token !== shLoadToken) return; // w międzyczasie zmieniono tydzień - tabela pokazuje już co innego
 
@@ -392,6 +394,7 @@ async function shCopyPrevious() {
     }));
   }
 
+  logAction("Harmonogram: uzupełnienie z poprzedniego tygodnia", `Tydzień ${week}, osób: ${todo.length - failed}`);
   shCopying = false;
   if (btn) btn.disabled = false;
   await shLoad();

@@ -785,6 +785,15 @@ async function rtDeleteExisting(btn, recordId) {
     rtShowSummaryMsg("Nie udało się usunąć wpisu: " + error.message);
   } else if (!data || data.length === 0) {
     rtShowSummaryMsg("Wpis nie został usunięty (brak uprawnień w bazie lub został już usunięty).");
+  } else {
+    // szczegóły wpisu z listy kolizji, z której go usunięto
+    const removed = Object.entries(rtConflicts)
+      .flatMap(([empId, list]) => list.map(c => ({ empId, c })))
+      .find(x => Number(x.c.id) === Number(recordId));
+    const emp = removed && rtEmpById[removed.empId];
+    logAction("Usunięcie pracownika z raportu", removed
+      ? `Raport nr ${removed.c.number_report}, ${rtIsoToPl(rtMeta.date)}: ${emp ? `${emp.first_name || ""} ${emp.last_name || ""}`.trim() : `pracownik #${removed.empId}`}`
+      : `wpis id ${recordId}`);
   }
 
   await rtRefreshSummary();
@@ -903,6 +912,8 @@ async function rtSaveReport() {
     rtCloseConfirm();
     rtRenderTable();
     rtUpdateStats();
+    logAction(target ? "Dopisanie do raportu" : "Utworzenie raportu",
+      `Raport nr ${reportNumber}, ${reportDate}, ${rtMeta.shift}, osób: ${records.length}`);
     rtClearTargets();
     rtShowBanner("success", target
       ? `Dopisano ${records.length} os. do raportu nr ${reportNumber} (${reportDate}, ${rtMeta.shift}).`

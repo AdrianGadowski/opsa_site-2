@@ -48,7 +48,7 @@ const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
 
 // Numer wydania doklejany do adresów plików, żeby przeglądarka nie używała starych kopii.
 // Zmieniaj przy każdej publikacji - tutaj i w index.html (?v=...).
-const APP_BUILD = "20261056";
+const APP_BUILD = "20261060";
 
 let currentUser = null;
 let cachedUsers = [];
@@ -64,7 +64,8 @@ const viewTitles = {
   users: "Zarządzanie użytkownikami",
   updates: "Aktualizacje systemu",
   user: "Moje konto",
-  options: "Opcje systemu"
+  options: "Opcje systemu",
+  logs: "Logi systemu"
 };
 
 // Kliknięcie w awatar lub dane użytkownika w stopce menu otwiera "Moje konto"
@@ -80,7 +81,8 @@ const permissionMap = {
   reports: { elementId: "nav-reports", column: "allow_reports" },
   users: { elementId: "nav-users", column: "allow_users" },
   updates: { elementId: "nav-updates", column: "allow_updates" },
-  options: { elementId: "nav-options", column: "allow_options" }
+  options: { elementId: "nav-options", column: "allow_options" },
+  logs: { elementId: "nav-logs", column: "allow_logs" }
 };
 
 function hasPermission(columnName) {
@@ -109,6 +111,22 @@ async function loadTopbarVersion() {
     console.error("Błąd pobierania aktualnej wersji:", err);
     setTopbarVersion("");
   }
+}
+
+// Dziennik zdarzeń (strona "Logi"). Zapis idzie przez funkcję bazy app_log, która sama
+// ustala, kto jest zalogowany - strona podaje tylko, co się stało.
+// Błąd zapisu logu nigdy nie przerywa właściwej operacji.
+function logAction(action, details) {
+  return supabaseClient
+    .rpc("app_log", { p_action: action, p_details: details ? String(details) : null })
+    .then(({ error }) => {
+      if (error) console.warn("Nie udało się zapisać logu:", error.message);
+    }, (err) => console.warn("Nie udało się zapisać logu:", err));
+}
+
+// Po tej nazwie roli system rozpoznaje administratora
+function isAdminRoleName(roleName) {
+  return String(roleName || "").trim().toLowerCase() === "administrator";
 }
 
 // Raport może zmieniać tylko jego autor albo administrator
@@ -159,25 +177,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
 // Kolumny użytkownika pobierane przy logowaniu i przy przywracaniu sesji
 // (hasła nie ma w tabeli - trzyma je Supabase Auth)
+// Gwiazdka zamiast listy kolumn: nowa kolumna uprawnienia (allow_...) nie zepsuje logowania,
+// nawet jeśli strona zostanie opublikowana przed dodaniem jej w bazie.
 const USER_SELECT = `
-  id,
-  auth_id,
-  login,
-  name,
-  last_name,
-  role_id,
+  *,
   role:role_id ( role ),
-  department_id,
-  department:department_id ( department ),
-  must_change_password,
-  allow_dashboard,
-  allow_employees,
-  allow_time_reporting,
-  allow_schedule,
-  allow_reports,
-  allow_users,
-  allow_updates,
-  allow_options
+  department:department_id ( department )
 `;
 
 // ---------- Konto w Supabase Auth ----------
@@ -447,6 +452,7 @@ async function handleLogin() {
 // Wejście do systemu po poprawnym logowaniu: sesja i animacja powitania
 function completeUserLogin(user) {
   currentUser = user;
+  logAction("Logowanie");
   clearSession();           // nowe logowanie zaczyna od pulpitu, nie od ostatniego widoku
   writeSession(null);
   loadTopbarVersion();
@@ -671,6 +677,9 @@ async function onViewLoaded(viewName) {
     case 'updates':
       await initUpdatesView();
       break;
+    case 'logs':
+      await initLogsView();
+      break;
     case 'user':
       initUserView();
       break;
@@ -686,7 +695,8 @@ function toggleModal(modalId, show) {
 // 5. WYLOGOWANIE
 // ==========================================
 function handleLogout() {
-  authSignOut();
+  // log musi wyjść, zanim sesja zostanie zamknięta
+  (currentUser ? logAction("Wylogowanie") : Promise.resolve()).finally(authSignOut);
   currentUser = null;
   clearSession();
   clearLoginError();
@@ -731,7 +741,9 @@ async function loadRoleAndDepartmentDropdowns(selectedRoleId = null, selectedDep
     const depts = deptsRes.data || [];
 
     roleSelect.innerHTML = `<option value="">Wybierz rangę...</option>` +
-      roles.map(r => `<option value="${r.id}">${r.role}</option>`).join("");
+      // roli Administrator nie nadaje się ze strony (tylko w panelu Supabase)
+      roles.filter(r => !isAdminRoleName(r.role))
+        .map(r => `<option value="${r.id}">${r.role}</option>`).join("");
 
     deptSelect.innerHTML = `<option value="">Wybierz dział...</option>` +
       depts.map(d => `<option value="${d.id}">${d.department}</option>`).join("");
@@ -808,6 +820,7 @@ async function openEditUserModal(login) {
   document.getElementById("perm-users").checked = !!(user.allow_users);
   document.getElementById("perm-updates").checked = !!(user.allow_updates);
   document.getElementById("perm-options").checked = !!(user.allow_options);
+  document.getElementById("perm-logs").checked = !!(user.allow_logs);
 
   const msgBox = document.getElementById("user-form-msg");
   if (msgBox) msgBox.style.display = "none";
@@ -895,6 +908,7 @@ async function confirmDeleteUser() {
       return;
     }
 
+    logAction("Usunięcie użytkownika", `login: ${userToDeleteLogin}`);
     closeDeleteConfirmModal();
     await loadUsersList();
 
@@ -914,25 +928,9 @@ async function loadUsersList() {
   if (!tbody) return;
 
   try {
-    const { data: users, error } = await supabaseClient
+    const { data: allUsers, error } = await supabaseClient
       .from("users")
-      .select(`
-        login,
-        name,
-        last_name,
-        role_id,
-        role:role_id ( role ),
-        department_id,
-        department:department_id ( department ),
-        allow_dashboard,
-        allow_employees,
-        allow_time_reporting,
-        allow_schedule,
-        allow_reports,
-        allow_users,
-        allow_updates,
-        allow_options
-      `)
+      .select(USER_SELECT)
       .order("name", { ascending: true });
 
     if (error) {
@@ -947,7 +945,9 @@ async function loadUsersList() {
       return;
     }
 
-    cachedUsers = users || [];
+    // Konta administratorów nie są pokazywane w tym panelu: nie da się ich tu edytować ani usunąć
+    const users = (allUsers || []).filter(u => !isAdminRoleName(u.role?.role));
+    cachedUsers = users;
 
     if (!users || users.length === 0) {
       tbody.innerHTML = `
@@ -969,7 +969,8 @@ async function loadUsersList() {
         { label: "Raporty", active: u.allow_reports },
         { label: "Użytkownicy", active: u.allow_users },
         { label: "Aktualizacje", active: u.allow_updates },
-        { label: "Opcje", active: u.allow_options }
+        { label: "Opcje", active: u.allow_options },
+        { label: "Logi", active: u.allow_logs }
       ];
 
       const activeBadges = permissions
@@ -1046,7 +1047,8 @@ async function handleSaveUser(e) {
     allow_reports: document.getElementById("perm-reports") ? document.getElementById("perm-reports").checked : false,
     allow_users: document.getElementById("perm-users") ? document.getElementById("perm-users").checked : false,
     allow_updates: document.getElementById("perm-updates") ? document.getElementById("perm-updates").checked : false,
-    allow_options: document.getElementById("perm-options") ? document.getElementById("perm-options").checked : false
+    allow_options: document.getElementById("perm-options") ? document.getElementById("perm-options").checked : false,
+    allow_logs: document.getElementById("perm-logs") ? document.getElementById("perm-logs").checked : false
   };
 
   try {
@@ -1121,6 +1123,8 @@ async function handleSaveUser(e) {
       }
     }
 
+    logAction(mode === "create" ? "Dodanie użytkownika" : "Edycja użytkownika",
+      `${name} ${last_name} (login: ${mode === "create" ? login : originalLogin})${passwordGiven && mode !== "create" ? ", ustawiono hasło" : ""}`);
     toggleModal("modal-user-form", false);
     await loadUsersList();
 
@@ -1375,6 +1379,10 @@ async function confirmDeleteEmployee() {
       return;
     }
 
+    {
+      const removed = cachedEmployees.find(emp => String(emp.id) === String(employeeToDeleteId));
+      logAction("Usunięcie pracownika", removed ? `${removed.first_name || ""} ${removed.last_name || ""}`.trim() : `id ${employeeToDeleteId}`);
+    }
     closeDeleteEmployeeModal();
     await loadEmployeesList();
     applyEmployeeFilters();
@@ -1680,6 +1688,8 @@ async function handleSaveEmployee(e) {
       }
     }
 
+    logAction(mode === "create" ? "Dodanie pracownika" : "Edycja pracownika",
+      `${first_name} ${last_name}${login ? ` (login: ${login})` : ""}${password && mode !== "create" ? ", ustawiono hasło" : ""}`);
     toggleModal("modal-employee-form", false);
     await loadEmployeesList();
     applyEmployeeFilters();

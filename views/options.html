@@ -59,6 +59,7 @@
   .op-dict-row .name { flex: 1; min-width: 0; font-size: 0.92rem; font-weight: 600; color: var(--text-dark); overflow-wrap: anywhere; }
   .op-dict-del { width: 34px; height: 34px; flex: none; border: none; border-radius: 8px; background: transparent; color: var(--danger); cursor: pointer; font-size: 0.9rem; }
   .op-dict-del:hover { background: #FEE2E2; }
+  .op-dict-lock { width: 34px; height: 34px; flex: none; display: grid; place-items: center; color: #9CA3AF; font-size: 0.85rem; cursor: help; }
   .op-dict-del:focus-visible { outline: 3px solid rgba(217, 56, 58, 0.35); }
 
   .op-switch { position: relative; display: inline-flex; cursor: pointer; flex: none; }
@@ -125,6 +126,17 @@
     </div>
     <h4>Firmy</h4>
     <p>Zobacz listę firm i dodaj nową. Firmę wybiera się potem przy pracowniku.</p>
+    <span class="go">Otwórz <i class="fa-solid fa-arrow-right"></i></span>
+  </button>
+
+  <!-- Role -->
+  <button type="button" class="op-tile" onclick="opOpenDict('role')">
+    <div class="top">
+      <span class="ico"><i class="fa-solid fa-user-tag"></i></span>
+      <span class="chip">Słownik</span>
+    </div>
+    <h4>Role</h4>
+    <p>Zobacz listę ról i dodaj nową. Rolę (rangę) wybiera się potem przy użytkowniku.</p>
     <span class="go">Otwórz <i class="fa-solid fa-arrow-right"></i></span>
   </button>
 </div>

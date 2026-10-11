@@ -380,7 +380,7 @@ function rpDeleteReport(number) {
   const rep = rpFindReport(number);
   if (!rep || !canModifyReport(rep.creatorId)) return;
   rpOpenDelete(
-    { type: "report", number: rep.number, label: rpLabel(rep), date: rep.date },
+    { type: "report", number: rep.number, label: rpLabel(rep), date: rep.date, info: `Raport nr ${rep.number}, ${rep.date}, ${rep.shift || "-"}, osób: ${rep.empIds.size}` },
     "Usuwanie raportu",
     "Czy na pewno chcesz usunąć raport",
     `nr ${rpLabel(rep)} z dnia ${rep.date} (${rep.shift || "-"}, pracowników: ${rep.empIds.size})`
@@ -393,7 +393,7 @@ function rpDeleteRow(recordId) {
   const row = rep && rep.rows.find(r => Number(r.id) === Number(recordId));
   if (!row || !canModifyReport(rep.creatorId)) return;
   rpOpenDelete(
-    { type: "row", id: row.id, date: rep.date },
+    { type: "row", id: row.id, date: rep.date, info: `Raport nr ${rep.number}, ${rep.date}: ${rpEmpName(row.first_name_id)}` },
     "Usuwanie pracownika z raportu",
     `Czy na pewno chcesz usunąć z raportu nr ${rpLabel(rep)} pracownika`,
     `${rpEmpName(row.first_name_id)} (${row.start_time || "?"}–${row.end_time || "?"})`
@@ -439,6 +439,9 @@ async function rpConfirmDelete() {
     rpBusy = false;
   }
 
+  if (!failure) {
+    logAction(p.type === "report" ? "Usunięcie raportu" : "Usunięcie pracownika z raportu", p.info);
+  }
   rpCloseDelete();
 
   if (p.type === "row") {
@@ -842,6 +845,9 @@ async function rpSaveAll() {
     if (failed.length) {
       rpShowDetailMsg(`Nie zapisano zmian dla: ${failed.join(", ")} (brak uprawnień w bazie lub wpis został usunięty).`);
     } else {
+      logAction("Edycja raportu", `Raport nr ${rep.number}, ${rep.date}` +
+        (newDate ? `, zmiana daty na ${newDate}` : "") +
+        (edits.length ? `, zmienionych wierszy: ${edits.length}` : ""));
       rpCloseDetail();
       rpShowBanner("success", newDate
         ? `Zapisano zmiany w raporcie nr ${rep.number}. Raport został przeniesiony z ${rep.date} na ${newDate}.`
@@ -986,6 +992,8 @@ async function rpAddEmployee() {
     });
     if (insertErr) throw insertErr;
 
+    logAction("Dodanie pracownika do raportu",
+      `Raport nr ${rep.number}, ${rep.date}: ${rpEmpName(emp.id)}, ${from}–${to}${absent ? " (nieobecność)" : ""}`);
     rpAddEmpId = null;
     document.getElementById("rp-add-absent").checked = false;
     await rpReloadAfterEdit();

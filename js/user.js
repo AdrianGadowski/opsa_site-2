@@ -13,7 +13,8 @@ const US_MODULES = [
   { column: "allow_reports", label: "Lista raportów", icon: "fa-file-lines" },
   { column: "allow_users", label: "Użytkownicy", icon: "fa-user-gear" },
   { column: "allow_updates", label: "Aktualizacje", icon: "fa-rotate" },
-  { column: "allow_options", label: "Opcje", icon: "fa-sliders" }
+  { column: "allow_options", label: "Opcje", icon: "fa-sliders" },
+  { column: "allow_logs", label: "Logi", icon: "fa-clipboard-list" }
 ];
 
 let usSaving = false;
@@ -114,6 +115,7 @@ async function usChangePassword() {
     currentEl.value = "";
     newEl.value = "";
     repeatEl.value = "";
+    logAction("Zmiana hasła", "Moje konto");
     usShowMsg("success", "Hasło zostało zmienione.");
   } catch (err) {
     console.error("Błąd zmiany hasła:", err);
