@@ -18,7 +18,14 @@
   }
 
   .content-area { min-width: 0; }
-  .topbar { height: 54px; padding: 0 12px; gap: 8px; }
+  /* Górny pasek z przyciskiem menu zostaje na ekranie podczas przewijania */
+  .topbar {
+    position: sticky; top: 0; z-index: 50;
+    height: 54px; padding: 0 12px; gap: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  }
+  /* Komunikat w rozliczaniu czasu przykleja się pod paskiem, a nie pod nim chowa */
+  .rt-banner { top: 62px !important; }
   .page-title { flex: 1; min-width: 0; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .main-body { padding: 14px; }
   .card { padding: 16px; }
