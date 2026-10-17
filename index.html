@@ -20,15 +20,19 @@
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
 
-  <link rel="stylesheet" href="css/style.css?v=20261060" />
-  <link rel="stylesheet" href="css/login.css?v=20261060" />
-  <link rel="stylesheet" href="css/menu.css?v=20261060" />
-  <link rel="stylesheet" href="css/mobile.css?v=20261060" />
-  <link rel="stylesheet" href="css/portal.css?v=20261060" />
+  <link rel="stylesheet" href="css/style.css?v=20261103" />
+  <link rel="stylesheet" href="css/login.css?v=20261103" />
+  <link rel="stylesheet" href="css/menu.css?v=20261103" />
+  <link rel="stylesheet" href="css/mobile.css?v=20261103" />
+  <link rel="stylesheet" href="css/portal.css?v=20261103" />
 </head>
 <body>
 
   <div id="auth-overlay">
+
+    <!-- Barwa tła zależna od wybranej zakładki (Pracownik / Zalew); Użytkownik = tło podstawowe -->
+    <div class="auth-tint tint-employee" aria-hidden="true"></div>
+    <div class="auth-tint tint-zalew" aria-hidden="true"></div>
 
     <!-- Warstwy tła: odlewnia -->
     <i class="fa-solid fa-gear foundry-gear gear-a" aria-hidden="true"></i>
@@ -92,6 +96,7 @@
           <div class="login-tabs" role="tablist" aria-label="Rodzaj konta">
             <button type="button" id="login-tab-user" class="on" role="tab" aria-selected="true" onclick="setLoginMode('user')"><i class="fa-solid fa-user-gear"></i> Użytkownik</button>
             <button type="button" id="login-tab-employee" role="tab" aria-selected="false" onclick="setLoginMode('employee')"><i class="fa-solid fa-helmet-safety"></i> Pracownik</button>
+            <button type="button" id="login-tab-zalew" role="tab" aria-selected="false" onclick="setLoginMode('zalew')"><i class="fa-solid fa-fire-flame-curved"></i> Zalew</button>
           </div>
 
           <div class="form-group" style="width: 100%; margin-bottom: 12px;">
@@ -234,6 +239,247 @@
     </main>
   </div>
 
+  <!-- Moduł Zalew: zalewy na liniach i słownik modeli -->
+  <div id="zalew-portal" class="ep-root">
+    <header class="ep-top">
+      <div class="ep-brand"><i class="fa-solid fa-fire-flame-curved"></i> Zalew</div>
+      <button type="button" class="ep-logout" onclick="zwLogout()" aria-label="Wyloguj">
+        <i class="fa-solid fa-right-from-bracket"></i> <span>Wyloguj</span>
+      </button>
+    </header>
+
+    <main class="ep-main">
+      <div class="page-hero">
+        <div>
+          <div class="eyebrow">Zalew</div>
+          <h3 id="zw-name">Zalew</h3>
+          <p>Co zalewamy z każdej kadzi na liniach Lora, HWS, HWS-D i SMS, oraz modele z wagą.</p>
+        </div>
+      </div>
+
+      <!-- Zakładki: linie + Modele -->
+      <div class="zw-tabs" id="zw-tabs" role="tablist" aria-label="Linia"></div>
+
+      <!-- ===== Zalewy wybranej linii ===== -->
+      <div id="zw-pours-card">
+        <div class="ep-card zw-card">
+          <div class="zw-toolbar">
+            <div>
+              <h4 id="zw-pours-title">Zalewy</h4>
+              <span class="zw-info">Wiersz to jeden model zalany z kadzi.</span>
+            </div>
+            <div class="zw-tools">
+              <input type="date" id="zw-date" class="form-control zw-date" aria-label="Dzień zalewów" onchange="zwOnDateChange()" />
+              <select id="zw-shift" class="form-control zw-date" aria-label="Zmiana" onchange="zwOnShiftChange()"></select>
+              <button type="button" class="btn-primary" style="width: auto; padding: 0 18px; height: 42px; white-space: nowrap;" onclick="zwOpenPour(null)">
+                <i class="fa-solid fa-plus"></i> Dodaj kadź
+              </button>
+            </div>
+          </div>
+
+          <div class="zw-sum" id="zw-sum"></div>
+
+          <div style="overflow-x: auto;">
+            <table class="zw-table">
+              <thead>
+                <tr>
+                  <th>Godzina</th>
+                  <th>Nr kadzi</th>
+                  <th>Temp. metalu</th>
+                  <th>ACEL</th>
+                  <th>Metal w kadzi</th>
+                  <th>Model</th>
+                  <th>Waga modelu</th>
+                  <th>Ilość form</th>
+                  <th>Razem</th>
+                  <th>Próba</th>
+                  <th>Uwagi</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="zw-pours-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== Modele (słownik z wagą) ===== -->
+      <div id="zw-models-card" style="display: none;">
+        <div class="zw-subtabs" id="zw-model-tabs" aria-label="Linia modeli"></div>
+
+        <div class="ep-card zw-card">
+          <div class="zw-toolbar">
+            <div>
+              <h4 id="zw-line-title">Modele</h4>
+              <span class="zw-info" id="zw-info"></span>
+            </div>
+            <div class="zw-tools">
+              <div style="position: relative;">
+                <input type="text" id="zw-search" class="form-control" placeholder="Szukaj numeru modelu..." aria-label="Szukaj numeru modelu" oninput="zwRenderModels()" style="padding-left: 36px;" autocomplete="off" />
+                <i class="fa-solid fa-magnifying-glass" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 0.9rem;"></i>
+              </div>
+              <button type="button" class="btn-primary" style="width: auto; padding: 0 18px; height: 42px; white-space: nowrap;" onclick="zwOpenModel(null)">
+                <i class="fa-solid fa-plus"></i> Dodaj model
+              </button>
+            </div>
+          </div>
+
+          <div style="overflow-x: auto;">
+            <table class="zw-table">
+              <thead>
+                <tr>
+                  <th>Numer modelu</th>
+                  <th>Linie</th>
+                  <th>Waga</th>
+                  <th>Ostatnia zmiana</th>
+                  <th>Zmienił</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="zw-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- Modal: dodawanie / edycja zalewu -->
+    <div id="modal-zw-pour" class="modal">
+      <div class="modal-box" style="max-width: 480px; width: 94%; position: relative; max-height: 92vh; overflow-y: auto;">
+        <h3 id="zw-pour-title" style="color: var(--primary); margin: 0 0 16px 0; font-size: 1.15rem; padding-right: 30px;">Nowy zalew</h3>
+        <button class="link-btn" onclick="zwClosePour()" style="position: absolute; top: 22px; right: 22px; font-size: 1.2rem;" title="Zamknij">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+        <form onsubmit="event.preventDefault(); zwSavePour();" autocomplete="off">
+          <div class="zw-form-grid">
+            <div class="form-group">
+              <label for="zw-pour-ladle">Numer kadzi (7 cyfr)</label>
+              <div class="zw-stepper">
+                <button type="button" onclick="zwStepLadle(-1)" title="Numer kadzi o 1 mniejszy" aria-label="Numer kadzi o 1 mniejszy"><i class="fa-solid fa-minus"></i></button>
+                <input type="text" id="zw-pour-ladle" class="form-control" maxlength="7" inputmode="numeric" pattern="[0-9]{7}" title="Dokładnie 7 cyfr" placeholder="0000000" />
+                <button type="button" onclick="zwStepLadle(1)" title="Numer kadzi o 1 większy" aria-label="Numer kadzi o 1 większy"><i class="fa-solid fa-plus"></i></button>
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="zw-pour-temp">Temperatura metalu (°C)</label>
+              <input type="text" id="zw-pour-temp" class="form-control" inputmode="numeric" />
+            </div>
+            <div class="form-group">
+              <label for="zw-pour-acel">ACEL</label>
+              <input type="text" id="zw-pour-acel" class="form-control" inputmode="decimal" />
+            </div>
+            <div class="form-group">
+              <label for="zw-pour-metal">Metal wlany do kadzi (kg)</label>
+              <input type="text" id="zw-pour-metal" class="form-control" inputmode="numeric" />
+            </div>
+            <div class="form-group">
+              <label for="zw-pour-forms">Ilość form</label>
+              <input type="text" id="zw-pour-forms" class="form-control" inputmode="numeric" oninput="zwPourPreview()" />
+            </div>
+          </div>
+          <div class="form-group">
+            <span class="zw-label">Zmiana</span>
+            <div id="zw-pour-shift" class="zw-shiftinfo" aria-live="polite"></div>
+          </div>
+          <div class="form-group">
+            <label for="zw-pour-model-input">Model</label>
+            <div class="zw-combo">
+              <i class="fa-solid fa-magnifying-glass zw-combo-icon" aria-hidden="true"></i>
+              <input type="text" id="zw-pour-model-input" class="form-control" autocomplete="off"
+                     role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="zw-combo-list"
+                     placeholder="Wpisz numer, np. S-123, albo wybierz z listy"
+                     onfocus="zwComboFocus()" oninput="zwComboInput()" onkeydown="zwComboKey(event)" onblur="zwComboBlur()" />
+              <button type="button" class="zw-combo-toggle" tabindex="-1" aria-label="Pokaż listę modeli" onmousedown="event.preventDefault(); zwComboToggle()">
+                <i class="fa-solid fa-chevron-down"></i>
+              </button>
+              <ul class="zw-combo-list" id="zw-combo-list" role="listbox" aria-label="Modele"></ul>
+            </div>
+            <input type="hidden" id="zw-pour-model" value="" />
+          </div>
+          <div class="zw-preview" id="zw-pour-preview">Razem: wybierz model i ilość form</div>
+          <div class="zw-sample-row">
+            <label class="zw-switch">
+              <input type="checkbox" id="zw-pour-sample" />
+              <span class="track"></span>
+              <span class="txt"><strong>Próba przylana</strong><small class="off">Nie - bez próby z tej kadzi</small><small class="on">Tak - próba przylana przy kadzi</small></span>
+            </label>
+          </div>
+          <div class="form-group" style="margin-top: 12px;">
+            <label for="zw-pour-notes">Uwagi</label>
+            <textarea id="zw-pour-notes" class="form-control zw-notes" rows="2" maxlength="500" placeholder="Opcjonalnie, np. przyczyna przestoju, problem z formą"></textarea>
+          </div>
+          <div id="zw-pour-msg" role="alert" style="display: none; font-size: 0.86rem; margin: 10px 0; color: var(--danger);"></div>
+          <div class="modal-btn-row" style="margin-top: 14px;">
+            <button type="button" class="btn-secondary" onclick="zwClosePour()">Anuluj</button>
+            <button type="submit" id="zw-pour-save" class="btn-primary">Zapisz</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Modal: dodawanie / edycja modelu -->
+    <div id="modal-zw-model" class="modal">
+      <div class="modal-box" style="max-width: 420px; width: 92%; position: relative;">
+        <h3 id="zw-model-title" style="color: var(--primary); margin: 0 0 16px 0; font-size: 1.2rem;">Nowy model</h3>
+        <button class="link-btn" onclick="zwCloseModel()" style="position: absolute; top: 22px; right: 22px; font-size: 1.2rem;" title="Zamknij">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+        <form onsubmit="event.preventDefault(); zwSaveModel();" autocomplete="off">
+          <div class="form-group">
+            <label for="zw-model-nr">Numer modelu</label>
+            <input type="text" id="zw-model-nr" class="form-control" maxlength="60" />
+          </div>
+          <div class="form-group">
+            <label for="zw-model-weight">Waga (kg)</label>
+            <input type="text" id="zw-model-weight" class="form-control" inputmode="numeric" placeholder="Liczba całkowita" />
+          </div>
+          <div class="form-group">
+            <span class="zw-label">Linie</span>
+            <div id="zw-model-lines" class="zw-line-checks" role="group" aria-label="Linie modelu"></div>
+          </div>
+          <div id="zw-model-msg" role="alert" style="display: none; font-size: 0.86rem; margin-bottom: 12px; color: var(--danger);"></div>
+          <div class="modal-btn-row">
+            <button type="button" class="btn-secondary" onclick="zwCloseModel()">Anuluj</button>
+            <button type="submit" id="zw-model-save" class="btn-primary">Zapisz</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Modal: ostrzeżenie o numerze kadzi (ta sama, pominięta albo cofnięta kadź) -->
+    <div id="modal-zw-warn" class="modal">
+      <div class="modal-box" style="max-width: 440px; width: 92%; text-align: center; padding: 25px 20px;">
+        <div style="width: 55px; height: 55px; border-radius: 50%; background: rgba(252, 212, 68, 0.3); color: #92590A; display: flex; align-items: center; justify-content: center; font-size: 1.6rem; margin: 0 auto 15px auto;">
+          <i class="fa-solid fa-triangle-exclamation"></i>
+        </div>
+        <h3 style="margin: 0 0 10px 0; font-size: 1.25rem;">Sprawdź numer kadzi</h3>
+        <p id="zw-warn-text" style="color: var(--text-dark); font-size: 0.95rem; margin-bottom: 24px; line-height: 1.5;"></p>
+        <div class="modal-btn-row">
+          <button type="button" class="btn-secondary" onclick="zwCloseLadleWarning()">Popraw numer</button>
+          <button type="button" class="btn-danger" onclick="zwConfirmLadleWarning()">Zapisz mimo to</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal: potwierdzenie usunięcia modelu lub zalewu (odliczanie 3s) -->
+    <div id="modal-zw-delete" class="modal">
+      <div class="modal-box" style="max-width: 440px; width: 92%; text-align: center; padding: 25px 20px;">
+        <div style="width: 55px; height: 55px; border-radius: 50%; background: rgba(217, 56, 58, 0.1); color: var(--danger); display: flex; align-items: center; justify-content: center; font-size: 1.6rem; margin: 0 auto 15px auto;">
+          <i class="fa-solid fa-triangle-exclamation"></i>
+        </div>
+        <h3 id="zw-delete-title" style="margin: 0 0 10px 0; font-size: 1.25rem;">Usuwanie</h3>
+        <p style="color: var(--text-muted); font-size: 0.95rem; margin-bottom: 24px; line-height: 1.5;">
+          <span id="zw-delete-question"></span> <br/>
+          <strong id="zw-delete-target" style="color: var(--text-dark); font-size: 1.05rem;"></strong>?
+        </p>
+        <div class="modal-btn-row">
+          <button type="button" class="btn-secondary" onclick="zwCloseDelete()">Nie</button>
+          <button type="button" id="zw-btn-confirm-delete" class="btn-danger" disabled onclick="zwConfirmDelete()">Tak (3s)</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Portal pracownika: podgląd własnych godzin (bez menu) -->
   <div id="employee-portal" class="ep-root">
     <header class="ep-top">
@@ -327,21 +573,22 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="js/app.js?v=20261060"></script>
-  <script src="js/login-fx.js?v=20261060"></script>
-  <script src="js/menu-fx.js?v=20261060"></script>
-  <script src="js/mobile.js?v=20261060"></script>
-  <script src="js/report_time.js?v=20261060"></script>
-  <script src="js/reports.js?v=20261060"></script>
-  <script src="js/updates.js?v=20261060"></script>
-  <script src="js/dashboard.js?v=20261060"></script>
-  <script src="js/schedule.js?v=20261060"></script>
-  <script src="js/user.js?v=20261060"></script>
-  <script src="js/employee_hours.js?v=20261060"></script>
-  <script src="js/options.js?v=20261060"></script>
-  <script src="js/logs.js?v=20261060"></script>
-  <script src="js/employee_portal.js?v=20261060"></script>
-  <script src="js/password.js?v=20261060"></script>
-  <script src="js/pwa.js?v=20261060"></script>
+  <script src="js/app.js?v=20261103"></script>
+  <script src="js/login-fx.js?v=20261103"></script>
+  <script src="js/menu-fx.js?v=20261103"></script>
+  <script src="js/mobile.js?v=20261103"></script>
+  <script src="js/report_time.js?v=20261103"></script>
+  <script src="js/reports.js?v=20261103"></script>
+  <script src="js/updates.js?v=20261103"></script>
+  <script src="js/dashboard.js?v=20261103"></script>
+  <script src="js/schedule.js?v=20261103"></script>
+  <script src="js/user.js?v=20261103"></script>
+  <script src="js/employee_hours.js?v=20261103"></script>
+  <script src="js/options.js?v=20261103"></script>
+  <script src="js/logs.js?v=20261103"></script>
+  <script src="js/employee_portal.js?v=20261103"></script>
+  <script src="js/zalew.js?v=20261103"></script>
+  <script src="js/password.js?v=20261103"></script>
+  <script src="js/pwa.js?v=20261103"></script>
 </body>
 </html>

@@ -594,3 +594,48 @@
 @media (display-mode: standalone) {
   #auth-overlay { padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); }
 }
+
+/* =========================================================
+   BARWA TŁA WEDŁUG ZAKŁADKI LOGOWANIA
+   Użytkownik: tło podstawowe (zieleń). Pracownik: złoto-żółte.
+   Zalew: czerwień rozgrzanego metalu. Warstwy płynnie się przenikają.
+   Kolory z palety strony: żółć #FCD444, żar #F59E0B, czerwień #D9383A.
+   ========================================================= */
+.auth-tint {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.6s ease;
+}
+
+.auth-tint.tint-employee {
+  background-color: #A06C04;
+  background-image:
+    radial-gradient(at 0% 0%, rgba(255, 236, 150, 0.55) 0px, transparent 48%),
+    radial-gradient(at 100% 100%, rgba(92, 56, 0, 0.9) 0px, transparent 55%),
+    radial-gradient(at 50% 15%, rgba(252, 212, 68, 0.6) 0px, transparent 50%),
+    radial-gradient(rgba(255, 255, 255, 0.06) 1px, transparent 1px);
+  background-size: 100% 100%, 100% 100%, 100% 100%, 28px 28px;
+}
+
+.auth-tint.tint-zalew {
+  background-color: #3E0909;
+  background-image:
+    radial-gradient(at 0% 0%, rgba(245, 158, 11, 0.22) 0px, transparent 48%),
+    radial-gradient(at 100% 100%, rgba(122, 16, 16, 0.9) 0px, transparent 55%),
+    radial-gradient(at 50% 15%, rgba(217, 56, 58, 0.55) 0px, transparent 50%),
+    radial-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+  background-size: 100% 100%, 100% 100%, 100% 100%, 28px 28px;
+}
+
+#auth-overlay.mode-employee .tint-employee,
+#auth-overlay.mode-zalew .tint-zalew { opacity: 1; }
+
+/* Napis w stopce czytelny na każdym tle */
+#auth-overlay.mode-employee .auth-footer-copyright { color: rgba(43, 26, 0, 0.85); }
+#auth-overlay.mode-zalew .auth-footer-copyright { color: rgba(255, 255, 255, 0.82); }
+
+@media (prefers-reduced-motion: reduce) {
+  .auth-tint { transition: none; }
+}

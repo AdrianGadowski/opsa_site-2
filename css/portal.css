@@ -24,7 +24,8 @@
 .login-tabs button:focus-visible { outline: 3px solid rgba(8, 88, 75, 0.35); outline-offset: 1px; }
 
 /* ---------- Strona pracownika ---------- */
-#employee-portal {
+#employee-portal,
+#zalew-portal {
   display: none;
   position: fixed; inset: 0; z-index: 900;
   overflow-y: auto;
@@ -156,3 +157,216 @@
   .ep-root .eh-table tbody td:nth-child(6) { order: 6; margin-left: auto; }
   .ep-root .eh-table tbody td:nth-child(7) { display: none; }
 }
+
+/* Trzy zakładki logowania w wąskiej karcie: ciaśniej, a na telefonie bez ikon */
+.login-tabs button { padding: 9px 6px; font-size: 0.8rem; gap: 6px; white-space: nowrap; }
+@media (max-width: 400px) {
+  .login-tabs button i { display: none; }
+}
+
+/* =========================================================
+   ZALEW: zakładki linii i tabela modeli
+   ========================================================= */
+.zw-tabs { display: flex; width: 100%; padding: 4px; gap: 2px; margin-bottom: 16px; border-radius: 11px; background: #E9E9EE; flex-wrap: wrap; }
+.zw-tabs button {
+  border: none; background: transparent; border-radius: 8px; padding: 9px 20px; cursor: pointer;
+  font-family: inherit; font-size: 0.88rem; font-weight: 700; color: #5B5B66; transition: background 0.2s, color 0.2s;
+}
+/* wybrana linia na zielono, jak nagłówki i podsumowania */
+.zw-tabs button.on { background: linear-gradient(90deg, #0B6B5B, #08584B); color: #FFFFFF; box-shadow: 0 3px 10px rgba(8, 88, 75, 0.3); }
+.zw-tabs button:not(.on):hover { background: rgba(0, 0, 0, 0.05); color: var(--text-dark); }
+.zw-tabs button:focus-visible { outline: 3px solid rgba(8, 88, 75, 0.35); outline-offset: 2px; }
+
+.zw-toolbar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; padding: 16px 20px; border-bottom: 1px solid var(--border-color); }
+.zw-toolbar h4 { margin: 0; font-size: 1rem; color: var(--text-dark); }
+.zw-info { font-size: 0.8rem; color: var(--text-muted); }
+.zw-tools { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.zw-tools .form-control { width: 240px; }
+
+.zw-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+.zw-table th {
+  background: #F9FAFB; padding: 12px 14px; text-align: center; font-size: 0.76rem; text-transform: uppercase;
+  letter-spacing: 0.03em; color: #4B5563; border-bottom: 1px solid var(--border-color);
+}
+.zw-table td { padding: 10px 14px; border-bottom: 1px solid #F0F0F0; text-align: center; vertical-align: middle; }
+.zw-table th:first-child, .zw-table td:first-child { text-align: left; }
+.zw-table tbody tr:hover { background: #FAFAFA; }
+.zw-nr { font-weight: 700; color: var(--text-dark); }
+.zw-weight { font-weight: 600; font-variant-numeric: tabular-nums; }
+.zw-actions { white-space: nowrap; width: 90px; }
+.zw-act { width: 32px; height: 32px; border: none; border-radius: 8px; background: transparent; color: var(--primary); cursor: pointer; }
+.zw-act:hover { background: rgba(8, 88, 75, 0.1); }
+.zw-act.del { color: var(--danger); }
+.zw-act.del:hover { background: #FEE2E2; }
+.zw-act:focus-visible { outline: 3px solid rgba(8, 88, 75, 0.35); }
+
+@media (max-width: 768px) {
+  .zw-tabs { display: flex; }
+  .zw-tabs button { flex: 1; padding: 9px 6px; }
+  .zw-toolbar { padding: 12px; }
+  .zw-tools, .zw-tools > div, .zw-tools .form-control { width: 100%; }
+  .zw-tools button { width: 100% !important; justify-content: center; }
+  .zw-card { background: #FFFFFF; border: 1px solid var(--border-color); }
+  .zw-table th, .zw-table td { padding: 9px 8px; font-size: 0.84rem; }
+}
+
+/* Zalew: zakładka Modele odróżniona od linii, podzakładki linii w Modelach */
+.zw-tabs button.models { border-left: 1px solid #D1D5DB; border-radius: 0 8px 8px 0; margin-left: 4px; }
+.zw-tabs button.models.on { background: linear-gradient(90deg, #0B6B5B, #08584B); box-shadow: 0 3px 10px rgba(8, 88, 75, 0.3); }
+.zw-subtabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+.zw-subtabs button {
+  border: 1.5px solid #D9D9D9; background: #FFFFFF; border-radius: 999px; padding: 6px 14px; cursor: pointer;
+  font-family: inherit; font-size: 0.82rem; font-weight: 700; color: #4B5563;
+}
+.zw-subtabs button.on { border-color: var(--primary); background: rgba(8, 88, 75, 0.08); color: var(--primary); }
+.zw-subtabs button:focus-visible { outline: 3px solid rgba(8, 88, 75, 0.35); outline-offset: 1px; }
+
+/* Zalewy: podsumowanie dnia i sumy kadzi */
+.zw-date { width: auto; }
+.zw-sum { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; padding: 14px 20px; border-bottom: 1px solid var(--border-color); }
+.zw-sum:empty { display: none; }
+.zw-tile { border-radius: 12px; padding: 12px 14px; background: #F5F5F7; }
+.zw-tile .lbl { font-size: 0.76rem; font-weight: 600; color: var(--text-muted); }
+.zw-tile .val { margin-top: 3px; font-size: 1.35rem; font-weight: 700; color: var(--text-dark); font-variant-numeric: tabular-nums; }
+.zw-tile.main { background: linear-gradient(135deg, #0B6B5B 0%, #08584B 50%, #053D34 100%); }   /* zielony jak nagłówki systemu */
+.zw-tile.main .lbl { color: rgba(255, 255, 255, 0.85); }
+.zw-tile.main .val { color: #FFFFFF; }
+
+.zw-model { font-weight: 600; }
+.zw-total { font-weight: 700; color: #0B5D44; font-variant-numeric: tabular-nums; }
+.zw-table tr.zw-subtotal td { background: #FDF1F1; font-weight: 700; color: var(--text-dark); border-bottom: 2px solid #F3C9C9; }
+.zw-table tr.zw-subtotal td:first-child { text-align: right; color: #7F1D1D; }
+.zw-table tr.zw-grandtotal td { background: #08584B; color: #FFFFFF; font-weight: 800; }   /* zielony jak kafelek wagi */
+.zw-table tr.zw-grandtotal td:first-child { text-align: right; }
+.zw-table tr.zw-grandtotal .zw-total { color: #FFFFFF; }
+.zw-table tr.zw-subtotal:hover, .zw-table tr.zw-grandtotal:hover { background: none; }
+
+/* Okno zalewu */
+.zw-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; }
+.zw-preview { padding: 12px 14px; border-radius: 10px; background: #E6F4EA; border: 1px solid #B7E0CB; color: #0B5D44; font-size: 0.92rem; }
+.zw-preview strong { font-size: 1.1rem; }
+
+@media (max-width: 768px) {
+  .zw-sum { grid-template-columns: 1fr 1fr; padding: 12px; }
+  .zw-tile.main { grid-column: 1 / -1; }
+  .zw-date { width: 100% !important; }
+  .zw-form-grid { grid-template-columns: 1fr; }
+  .zw-tabs button.models { border-radius: 8px; margin-left: 0; border-left: none; flex-basis: 100%; }
+}
+
+/* Zalew: podział na zmiany (widok "Wszystkie zmiany") */
+.zw-table tr.zw-shifthead td {
+  background: #F3F4F6; color: var(--text-dark); font-weight: 800; text-align: left !important;
+  font-size: 0.86rem; letter-spacing: 0.01em; border-top: 2px solid #E5E7EB;
+}
+.zw-table tr.zw-shifthead td i { color: #B52B2D; margin-right: 6px; }
+.zw-table tr.zw-shifttotal td { background: #DDF1E7; color: #0B5D44; font-weight: 800; border-bottom: 2px solid #B7E0CB; }
+.zw-table tr.zw-shifttotal .zw-total { color: #0B5D44; }
+.zw-table tr.zw-shifttotal td:first-child { text-align: right; }
+.zw-table tr.zw-shifthead:hover, .zw-table tr.zw-shifttotal:hover { background: none; }
+
+/* Zalew: zmiana w oknie zalewu - tylko informacja, bez wyboru */
+.zw-label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; color: var(--text-dark); }
+.zw-shiftinfo {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; padding: 11px 13px; border-radius: 6px;
+  background: #F5F5F7; border: 1.5px dashed #D9D9D9; font-size: 0.92rem; font-weight: 700; color: var(--text-dark);
+}
+.zw-shiftinfo i { color: var(--primary); }
+.zw-shiftinfo span { font-size: 0.76rem; font-weight: 500; color: var(--text-muted); }
+
+/* Zalew: numer kadzi z przyciskami -1 / +1 */
+.zw-stepper { display: flex; align-items: stretch; }
+.zw-stepper .form-control { border-radius: 0; text-align: center; font-weight: 700; min-width: 0; }
+.zw-stepper button {
+  flex: none; width: 42px; border: 1.5px solid #D9D9D9; background: #F5F5F7; color: var(--text-dark);
+  cursor: pointer; font-size: 0.85rem; transition: background-color 0.15s, color 0.15s;
+}
+.zw-stepper button:first-child { border-right: none; border-radius: 6px 0 0 6px; }
+.zw-stepper button:last-child { border-left: none; border-radius: 0 6px 6px 0; }
+.zw-stepper button:hover { background: #FDF1F1; color: #B52B2D; }
+.zw-stepper button:active { background: #FBE2E2; }
+.zw-stepper button:focus-visible { outline: 3px solid rgba(217, 56, 58, 0.35); outline-offset: 1px; position: relative; }
+
+/* Zalew: model na wielu liniach */
+.zw-line-chip { display: inline-block; margin: 2px; padding: 3px 9px; border-radius: 999px; font-size: 0.74rem; font-weight: 700; background: #FDF1F1; color: #7F1D1D; border: 1px solid #F3C9C9; white-space: nowrap; }
+.zw-line-chip.none { background: #F3F4F6; color: var(--text-muted); border-color: #E5E7EB; }
+.zw-line-checks { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.zw-line-check { display: flex; align-items: center; justify-content: center; gap: 6px; padding: 9px 6px; border-radius: 8px; border: 1.5px solid #D9D9D9; background: #fff; cursor: pointer; font-size: 0.86rem; font-weight: 700; user-select: none; }
+.zw-line-check input { width: 16px; height: 16px; accent-color: #B52B2D; cursor: pointer; }
+.zw-line-check:has(input:checked) { border-color: #D9383A; background: #FDF1F1; color: #7F1D1D; }
+@media (max-width: 480px) {
+  .zw-line-checks { grid-template-columns: 1fr 1fr; }
+}
+
+/* Zalew: jedno pole modelu z listą podpowiedzi (wpisz albo wybierz) */
+.zw-combo { position: relative; }
+.zw-combo .form-control { padding-left: 36px; padding-right: 40px; font-weight: 700; }
+.zw-combo-icon { position: absolute; left: 12px; top: 21px; transform: translateY(-50%); color: var(--text-muted); font-size: 0.9rem; pointer-events: none; }
+.zw-combo-toggle {
+  position: absolute; right: 4px; top: 4px; width: 34px; height: 34px; border: none; border-radius: 6px;
+  background: transparent; color: var(--text-muted); cursor: pointer;
+}
+.zw-combo-toggle:hover { background: #F3F4F6; color: var(--text-dark); }
+.zw-combo-list {
+  display: none; position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 20;
+  max-height: 240px; overflow-y: auto; margin: 0; padding: 4px; list-style: none;
+  background: #FFFFFF; border: 1px solid var(--border-color); border-radius: 10px;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.16);
+}
+.zw-combo-list.open { display: block; }
+.zw-combo-list li {
+  display: flex; justify-content: space-between; align-items: center; gap: 10px;
+  padding: 10px 12px; border-radius: 7px; cursor: pointer; font-size: 0.9rem;
+}
+.zw-combo-list li .nr { font-weight: 700; color: var(--text-dark); }
+.zw-combo-list li .w { font-size: 0.8rem; color: var(--text-muted); white-space: nowrap; }
+.zw-combo-list li.active { background: #FDF1F1; }
+.zw-combo-list li.selected .nr { color: #B52B2D; }
+.zw-combo-list li.selected .nr::before { content: "\2713  "; }
+.zw-combo-list li.empty { cursor: default; color: var(--text-muted); justify-content: center; }
+
+/* Zalew: uwagi do zalewu */
+.zw-notes { resize: vertical; min-height: 60px; font-family: inherit; line-height: 1.4; }
+.zw-table td.zw-note { text-align: left !important; max-width: 220px; font-size: 0.82rem; color: #4B5563; }
+.zw-table td.zw-note span { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+
+/* Zalew: próba przylana przy kadzi - suwak w oknie i oznaczenie w tabeli */
+.zw-sample-row { margin-top: 12px; padding: 10px 12px; border-radius: 10px; background: #F5F5F7; }
+.zw-switch { position: relative; display: flex; align-items: center; gap: 12px; cursor: pointer; user-select: none; }
+.zw-switch input { position: absolute; opacity: 0; width: 0; height: 0; }
+.zw-switch .track { flex: none; width: 46px; height: 26px; border-radius: 999px; background: #D1D5DB; position: relative; transition: background 0.2s; }
+.zw-switch .track::after {
+  content: ""; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%;
+  background: #fff; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25); transition: transform 0.2s;
+}
+.zw-switch input:checked + .track { background: var(--primary); }
+.zw-switch input:checked + .track::after { transform: translateX(20px); }
+.zw-switch input:focus-visible + .track { outline: 3px solid rgba(8, 88, 75, 0.35); outline-offset: 2px; }
+.zw-switch .txt { display: flex; flex-direction: column; font-size: 0.9rem; color: var(--text-dark); }
+.zw-switch .txt small { font-size: 0.76rem; color: var(--text-muted); }
+.zw-switch .txt small.on { display: none; color: #0b7a57; font-weight: 600; }
+.zw-switch input:checked ~ .txt small.on { display: block; }
+.zw-switch input:checked ~ .txt small.off { display: none; }
+
+.zw-sample { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: 999px; font-size: 0.76rem; font-weight: 700; background: #F3F4F6; color: #9CA3AF; white-space: nowrap; }
+.zw-sample.yes { background: rgba(16, 185, 129, 0.14); color: #0b7a57; }
+@media (prefers-reduced-motion: reduce) {
+  .zw-switch .track, .zw-switch .track::after { transition: none; }
+}
+
+/* Zalew: szersza strona, żeby cała tabela zalewów mieściła się bez paska przewijania w bok */
+#zalew-portal .ep-main { max-width: 1480px; }
+@media (min-width: 769px) {
+  .zw-table th { padding: 11px 8px; font-size: 0.72rem; }
+  .zw-table td { padding: 9px 8px; }
+  .zw-table td.zw-note { max-width: 180px; }
+}
+
+/* Zalew: zakładki linii na całą szerokość - każda zakładka tej samej szerokości */
+.zw-tabs button { flex: 1 1 0; min-width: 0; }
+
+/* Logowanie: zakładki (Użytkownik, Pracownik, Zalew) zawsze dokładnie tej samej szerokości.
+   Siatka z kolumnami minmax(0, 1fr) dzieli pasek po równo niezależnie od długości napisów;
+   ukryta zakładka (wyłączony moduł) nie zajmuje kolumny. */
+.login-tabs { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
+.login-tabs button { width: 100%; min-width: 0; overflow: hidden; text-overflow: ellipsis; }

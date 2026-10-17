@@ -48,7 +48,7 @@ const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
 
 // Numer wydania doklejany do adresów plików, żeby przeglądarka nie używała starych kopii.
 // Zmieniaj przy każdej publikacji - tutaj i w index.html (?v=...).
-const APP_BUILD = "20261060";
+const APP_BUILD = "20261103";
 
 let currentUser = null;
 let cachedUsers = [];
@@ -88,6 +88,84 @@ const permissionMap = {
 function hasPermission(columnName) {
   if (!currentUser) return false;
   return currentUser[columnName] === true || currentUser[columnName] === 1;
+}
+
+// ---------- Włączanie i wyłączanie modułów (Opcje -> Moduły) ----------
+// Trzy rodzaje logowania można wyłączyć dla wszystkich: użytkowników systemu, pracowników
+// (portal z godzinami) i Zalew. Moduły wewnątrz systemu (raporty, harmonogram itd.)
+// zależą tylko od uprawnień użytkownika. Stan trzyma tabela app_modules; brak wpisu = włączony.
+// Logowania użytkowników nie da się zablokować administratorowi - inaczej nikt nie włączyłby go z powrotem.
+const APP_MODULES = [
+  {
+    key: "user_login", label: "Użytkownicy", icon: "fa-user-gear",
+    hint: "Logowanie do systemu (zakładka „Użytkownik”). Administrator może się zalogować zawsze."
+  },
+  {
+    key: "employee_portal", label: "Pracownicy", icon: "fa-helmet-safety",
+    hint: "Zakładka „Pracownik” na ekranie logowania i strona z godzinami"
+  },
+  {
+    key: "zalew", label: "Zalew", icon: "fa-fire-flame-curved",
+    hint: "Zakładka „Zalew” na ekranie logowania"
+  }
+];
+const LOGIN_TAB_MODULES = { employee: "employee_portal", zalew: "zalew" };
+
+let appModules = {};         // { klucz: true/false }; brak klucza = włączony
+
+function moduleEnabled(key) {
+
+  return appModules[key] !== false;
+}
+
+async function loadModules() {
+  try {
+    const { data, error } = await supabaseClient.from("app_modules").select("key, enabled");
+    if (error) throw error;
+    appModules = {};
+    (data || []).forEach(m => { appModules[m.key] = m.enabled !== false; });
+  } catch (err) {
+    // bez tabeli albo bez sieci: wszystko włączone, jak przed wprowadzeniem tej funkcji
+    console.warn("Nie udało się pobrać ustawień modułów (wszystkie włączone):", err.message || err);
+    appModules = {};
+  }
+  applyLoginTabs();
+}
+
+// Zakładki "Pracownik" i "Zalew" na ekranie logowania
+function applyLoginTabs() {
+  let visible = 0;
+  Object.entries(LOGIN_TAB_MODULES).forEach(([mode, key]) => {
+    const tab = document.getElementById(`login-tab-${mode}`);
+    const on = moduleEnabled(key);
+    if (tab) tab.style.display = on ? "" : "none";
+    if (on) visible++;
+  });
+  // sama zakładka "Użytkownik" nie potrzebuje paska zakładek
+  const bar = document.querySelector(".login-tabs");
+  if (bar) bar.style.display = visible ? "" : "none";
+  if (typeof loginMode !== "undefined" && loginMode !== "user" && !moduleEnabled(LOGIN_TAB_MODULES[loginMode])) {
+    setLoginMode("user");
+  }
+}
+
+// Czy zalogowany użytkownik może otworzyć widok (decyduje uprawnienie)
+function canOpenView(viewKey) {
+  const info = permissionMap[viewKey];
+  if (info && !hasPermission(info.column)) return false;
+  return true;
+}
+
+// Pokazuje w menu tylko dostępne moduły; zwraca pierwszy dostępny widok
+function applyNavVisibility() {
+  let firstAvailable = null;
+  Object.keys(permissionMap).forEach((viewKey) => {
+    const allowed = canOpenView(viewKey);
+    const navElement = document.getElementById(permissionMap[viewKey].elementId);
+    if (navElement) navElement.style.display = allowed ? "block" : "none";
+    if (allowed && !firstAvailable) firstAvailable = viewKey;
+  });
+  return firstAvailable;
 }
 
 // Aktualna wersja systemu w prawym górnym rogu (tabela Check_version, wiersz "aktualna_wersja")
@@ -189,7 +267,7 @@ const USER_SELECT = `
 // Supabase loguje adresem e-mail, a w systemie są loginy. Adres jest sztuczny i powstaje
 // z loginu: jego bajty UTF-8 zapisane szesnastkowo + stała końcówka (osobna dla użytkowników
 // i pracowników). Ta sama reguła jest w bazie: funkcja public.app_email().
-const AUTH_DOMAINS = { user: "@u.opsa.local", employee: "@p.opsa.local" };
+const AUTH_DOMAINS = { user: "@u.opsa.local", employee: "@p.opsa.local", zalew: "@z.opsa.local" };
 
 function authEmail(kind, login) {
   const bytes = new TextEncoder().encode(String(login || "").trim());
@@ -269,6 +347,12 @@ async function restoreSession() {
     if (userErr) throw userErr;
 
     if (user) {
+      if (!moduleEnabled("user_login") && !isAdminRoleName(user.role?.role)) {
+        // logowanie użytkowników wyłączone - wpuszczany jest tylko administrator
+        clearSession();
+        await authSignOut();
+        return;
+      }
       if (user.must_change_password) {
         // hasło tymczasowe: trzeba zalogować się nim i ustawić własne
         clearSession();
@@ -285,6 +369,9 @@ async function restoreSession() {
 
     // Konto pracownika (portal z godzinami)?
     if (await epRestore(session.user.id)) return;
+
+    // Konto modułu Zalew?
+    if (await zwRestore(session.user.id)) return;
 
     // Konto Auth bez profilu (usunięty albo nieaktywny) - wyloguj
     clearSession();
@@ -304,17 +391,19 @@ if (authStorage.getItem(AUTH_STORAGE_KEY)) {
 
 document.addEventListener("DOMContentLoaded", () => {
   loadTopbarVersion();
-  restoreSession();
+  // stan modułów decyduje m.in. o zakładkach logowania i o tym, czy portal może się otworzyć
+  loadModules().then(restoreSession);
 });
 
 // Aktywność odświeża czas sesji (najwyżej raz na minutę); bez aktywności - wylogowanie
 document.addEventListener("click", () => {
-  if ((currentUser || epEmployee) && Date.now() - sessionTouchedAt > 60 * 1000) writeSession();
+  if ((currentUser || epEmployee || zwUser) && Date.now() - sessionTouchedAt > 60 * 1000) writeSession();
 });
 setInterval(() => {
   if (!sessionTouchedAt || Date.now() - sessionTouchedAt <= SESSION_IDLE_LIMIT) return;
   if (currentUser) handleLogout();
   else if (epEmployee) epLogout();
+  else if (zwUser) zwLogout();
   else return;
   showLoginError("Sesja wygasła z powodu braku aktywności. Zaloguj się ponownie.", false);
 }, 60 * 1000);
@@ -365,6 +454,7 @@ let loginMode = "user";       // zakładka na ekranie logowania: "user" | "emplo
 
 async function handleLogin() {
   if (loginMode === "employee") return epLogin();
+  if (loginMode === "zalew") return zwLogin();
   if (loginLockTimer) return; // trwa blokada po błędnych próbach
   clearLoginError();
 
@@ -417,6 +507,13 @@ async function handleLogin() {
       // konto Auth istnieje, ale nie ma już profilu w tabeli users
       await authSignOut();
       registerFailedLogin();
+      return;
+    }
+
+    // Logowanie użytkowników wyłączone (Opcje -> Moduły): wpuszczany jest tylko administrator
+    if (!moduleEnabled("user_login") && !isAdminRoleName(user.role?.role)) {
+      await authSignOut();
+      showLoginError("Logowanie użytkowników jest wyłączone.", false);
       return;
     }
 
@@ -575,25 +672,12 @@ function initDashboardApp(startView) {
     deptEl.innerText = currentUser.department?.department || "Brak działu";
   }
 
-  let firstAvailableView = null;
-
-  Object.keys(permissionMap).forEach((viewKey) => {
-    const config = permissionMap[viewKey];
-    const isAllowed = hasPermission(config.column);
-    const navElement = document.getElementById(config.elementId);
-
-    if (navElement) navElement.style.display = isAllowed ? "block" : "none";
-
-    if (isAllowed && !firstAvailableView) {
-      firstAvailableView = viewKey;
-    }
-  });
+  const firstAvailableView = applyNavVisibility();
 
   // Po odświeżeniu strony wróć do ostatnio otwartego widoku, jeśli nadal jest dozwolony
-  const startInfo = startView ? permissionMap[startView] : null;
-  if (startView && viewTitles[startView] && (!startInfo || hasPermission(startInfo.column))) {
+  if (startView && viewTitles[startView] && canOpenView(startView)) {
     navigateTo(startView);
-  } else if (hasPermission("allow_dashboard")) {
+  } else if (canOpenView("dashboard")) {
     navigateTo("dashboard");
   } else if (firstAvailableView) {
     navigateTo(firstAvailableView);
@@ -615,7 +699,7 @@ async function navigateTo(viewName) {
   const topbarTitle = document.getElementById("topbar-title");
 
   const permissionInfo = permissionMap[viewName];
-  if (permissionInfo && !hasPermission(permissionInfo.column)) {
+  if (!canOpenView(viewName)) {
     alert("Brak uprawnień do tego modułu.");
     return;
   }

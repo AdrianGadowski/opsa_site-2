@@ -21,19 +21,28 @@ let epEmployee = null;
 let epLoadToken = 0;
 
 // ---------- Zakładki na ekranie logowania ----------
+const LOGIN_MODES = {
+  user: { tab: "login-tab-user", subtitle: "System Ewidencji Czasu Pracy" },
+  employee: { tab: "login-tab-employee", subtitle: "Podgląd godzin pracownika" },
+  zalew: { tab: "login-tab-zalew", subtitle: "Moduł Zalew" }
+};
+
 function setLoginMode(mode) {
-  loginMode = mode === "employee" ? "employee" : "user";
-  document.getElementById("login-tab-user")?.classList.toggle("on", loginMode === "user");
-  document.getElementById("login-tab-employee")?.classList.toggle("on", loginMode === "employee");
-  document.getElementById("login-tab-user")?.setAttribute("aria-selected", String(loginMode === "user"));
-  document.getElementById("login-tab-employee")?.setAttribute("aria-selected", String(loginMode === "employee"));
+  loginMode = LOGIN_MODES[mode] ? mode : "user";
+  Object.entries(LOGIN_MODES).forEach(([key, cfg]) => {
+    const tab = document.getElementById(cfg.tab);
+    if (!tab) return;
+    tab.classList.toggle("on", key === loginMode);
+    tab.setAttribute("aria-selected", String(key === loginMode));
+  });
+
+  // barwa tła ekranu logowania: Pracownik = żółta, Zalew = czerwona, Użytkownik = podstawowa
+  const overlay = document.getElementById("auth-overlay");
+  overlay?.classList.toggle("mode-employee", loginMode === "employee");
+  overlay?.classList.toggle("mode-zalew", loginMode === "zalew");
 
   const subtitle = document.querySelector("#step-login .subtitle");
-  if (subtitle) {
-    subtitle.textContent = loginMode === "employee"
-      ? "Podgląd godzin pracownika"
-      : "System Ewidencji Czasu Pracy";
-  }
+  if (subtitle) subtitle.textContent = LOGIN_MODES[loginMode].subtitle;
   if (!loginLockTimer) clearLoginError();
   document.getElementById("login-input")?.focus();
 }
@@ -52,6 +61,10 @@ async function epFetchProfile(authId) {
 
 // ---------- Logowanie ----------
 async function epLogin() {
+  if (!moduleEnabled("employee_portal")) {
+    showLoginError("Logowanie pracowników jest wyłączone.", false);
+    return;
+  }
   if (loginLockTimer) return;
   clearLoginError();
 
@@ -143,6 +156,7 @@ function epCompleteLogin(emp) {
 // Przywrócenie portalu po odświeżeniu strony (wołane z restoreSession w app.js).
 // Zwraca true, gdy konto należy do aktywnego pracownika i portal został otwarty.
 async function epRestore(authId) {
+  if (!moduleEnabled("employee_portal")) return false; // moduł wyłączony: sesja zostanie zamknięta
   const emp = await epFetchProfile(authId);
   if (!emp || emp.must_change_password) return false; // hasło tymczasowe: trzeba zalogować się ponownie
   epEmployee = emp;

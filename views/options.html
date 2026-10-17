@@ -79,6 +79,28 @@
     .op-lock-list { overflow: visible; min-height: 0; }
   }
 
+
+  /* --- Moduły: wyłączony wiersz przygaszony, przełącznik zielony (włączony) --- */
+  .op-lock-row.off .name { color: var(--text-muted); }
+  .op-lock-row.off .ico { background: #ECEEF1; color: #9CA3AF; }
+  .op-switch.green input:checked + .track { background: var(--primary); }
+
+  /* --- Konta Zalew --- */
+  .za-form { background: #F5F5F7; padding: 14px; border-radius: 10px; margin-bottom: 14px; }
+  .za-form-title { font-size: 0.9rem; font-weight: 700; color: var(--text-dark); margin-bottom: 10px; }
+  .za-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; }
+  .za-grid .form-group { margin-bottom: 10px; }
+  .za-actions { display: flex; justify-content: flex-end; gap: 10px; flex-wrap: wrap; }
+  .za-actions button { width: auto; padding: 10px 18px; }
+  .za-sub { font-size: 0.76rem; color: var(--text-muted); overflow-wrap: anywhere; }
+  .op-dict-row.editing { background: #FFF8DB; }
+  .op-dict-edit { width: 34px; height: 34px; flex: none; border: none; border-radius: 8px; background: transparent; color: var(--primary); cursor: pointer; font-size: 0.85rem; }
+  .op-dict-edit:hover { background: rgba(8, 88, 75, 0.1); }
+  .op-dict-edit:focus-visible { outline: 3px solid rgba(8, 88, 75, 0.35); }
+  @media (max-width: 768px) {
+    .za-grid { grid-template-columns: 1fr; }
+    .za-actions button { flex: 1; }
+  }
   @media (prefers-reduced-motion: reduce) {
     .op-tile, .op-tile .go i { transition: none; }
     .op-tile:hover { transform: none; }
@@ -139,8 +161,95 @@
     <p>Zobacz listę ról i dodaj nową. Rolę (rangę) wybiera się potem przy użytkowniku.</p>
     <span class="go">Otwórz <i class="fa-solid fa-arrow-right"></i></span>
   </button>
+
+  <!-- Moduły: włączanie i wyłączanie -->
+  <button type="button" class="op-tile" onclick="opOpenModules()">
+    <div class="top">
+      <span class="ico"><i class="fa-solid fa-toggle-on"></i></span>
+      <span class="chip">System</span>
+    </div>
+    <h4>Moduły</h4>
+    <p>Włącz albo wyłącz logowanie: użytkowników, pracowników i modułu Zalew.</p>
+    <span class="go">Otwórz <i class="fa-solid fa-arrow-right"></i></span>
+  </button>
+
+  <!-- Konta modułu Zalew -->
+  <button type="button" class="op-tile" onclick="opOpenZalew()">
+    <div class="top">
+      <span class="ico"><i class="fa-solid fa-fire-flame-curved"></i></span>
+      <span class="chip">Zalew</span>
+    </div>
+    <h4>Konta Zalew</h4>
+    <p>Dodawaj, edytuj i usuwaj konta do logowania w module Zalew, zmieniaj im login i hasło.</p>
+    <span class="go">Otwórz <i class="fa-solid fa-arrow-right"></i></span>
+  </button>
 </div>
 
+
+<!-- Modal: moduły (włączanie i wyłączanie) -->
+<div id="modal-op-modules" class="modal">
+  <div class="modal-box op-lock-box">
+    <h3 style="color: var(--primary); margin: 0 0 4px 0; font-size: 1.25rem;">Moduły</h3>
+    <p style="color: var(--text-muted); font-size: 0.86rem; margin: 0 0 16px 0; padding-right: 30px;">
+      Wyłączony moduł blokuje logowanie dla wszystkich. Administrator może się zalogować zawsze, żeby móc go włączyć z powrotem. Moduły wewnątrz systemu zależą od uprawnień w module „Użytkownicy”.
+    </p>
+    <button class="link-btn" onclick="toggleModal('modal-op-modules', false)" style="position: absolute; top: 22px; right: 22px; font-size: 1.2rem;" title="Zamknij">
+      <i class="fa-solid fa-xmark"></i>
+    </button>
+
+    <div id="op-modules-msg" role="status" style="display: none; font-size: 0.88rem; margin-bottom: 12px;"></div>
+
+    <div id="op-modules-list" class="op-lock-list"></div>
+
+    <div style="display: flex; justify-content: flex-end; margin-top: 16px;">
+      <button type="button" class="btn-secondary" style="width: auto; padding: 11px 20px;" onclick="toggleModal('modal-op-modules', false)">Zamknij</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: konta modułu Zalew -->
+<div id="modal-op-zalew" class="modal">
+  <div class="modal-box op-lock-box" style="max-width: 620px;">
+    <h3 style="color: var(--primary); margin: 0 0 16px 0; font-size: 1.25rem;">Konta Zalew</h3>
+    <button class="link-btn" onclick="opCloseZalew()" style="position: absolute; top: 22px; right: 22px; font-size: 1.2rem;" title="Zamknij">
+      <i class="fa-solid fa-xmark"></i>
+    </button>
+
+    <form class="za-form" onsubmit="event.preventDefault(); zaSave();" autocomplete="off">
+      <div class="za-form-title" id="za-form-title">Nowe konto</div>
+      <div class="za-grid">
+        <div class="form-group">
+          <label for="za-login">Login</label>
+          <input type="text" id="za-login" class="form-control" autocomplete="off" maxlength="60" />
+        </div>
+        <div class="form-group">
+          <label for="za-password">Hasło</label>
+          <input type="text" id="za-password" class="form-control" autocomplete="off" />
+        </div>
+        <div class="form-group">
+          <label for="za-first">Imię</label>
+          <input type="text" id="za-first" class="form-control" autocomplete="off" maxlength="60" />
+        </div>
+        <div class="form-group">
+          <label for="za-last">Nazwisko</label>
+          <input type="text" id="za-last" class="form-control" autocomplete="off" maxlength="60" />
+        </div>
+      </div>
+      <div class="za-actions">
+        <button type="button" id="za-cancel" class="btn-secondary" style="display: none;" onclick="zaResetForm(); zaLoad();">Anuluj edycję</button>
+        <button type="submit" id="za-save" class="btn-primary">Dodaj konto</button>
+      </div>
+    </form>
+
+    <div id="za-msg" role="status" style="display: none; font-size: 0.88rem; margin-bottom: 12px;"></div>
+
+    <div id="za-list" class="op-lock-list"></div>
+
+    <div style="display: flex; justify-content: flex-end; margin-top: 16px;">
+      <button type="button" class="btn-secondary" style="width: auto; padding: 11px 20px;" onclick="opCloseZalew()">Zamknij</button>
+    </div>
+  </div>
+</div>
 <!-- Modal: blokada miesiąca -->
 <div id="modal-op-locks" class="modal">
   <div class="modal-box op-lock-box">
@@ -215,7 +324,7 @@
       <button type="button" class="btn-secondary" onclick="opCloseDictDelete()">
         Nie
       </button>
-      <button type="button" id="op-btn-confirm-delete" class="btn-danger" disabled onclick="opConfirmDictDelete()">
+      <button type="button" id="op-btn-confirm-delete" class="btn-danger" disabled onclick="opConfirmDelete()">
         Tak (3s)
       </button>
     </div>

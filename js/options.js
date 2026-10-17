@@ -409,6 +409,14 @@ function opOpenDictDelete(id) {
   document.getElementById("op-delete-question").innerText = cfg.deleteQuestion;
   document.getElementById("op-delete-target").innerText = item.name || `id ${item.id}`;
 
+  opDeleteKind = "dict";
+  opStartDeleteConfirm();
+}
+
+// Wspólne okno potwierdzenia usunięcia (słowniki i konta Zalew): odliczanie 3 s
+let opDeleteKind = "dict";   // "dict" | "zalew" - co usuwa przycisk "Tak"
+
+function opStartDeleteConfirm() {
   const confirmBtn = document.getElementById("op-btn-confirm-delete");
 
   if (opDictDeleteTimer) {
@@ -437,8 +445,13 @@ function opOpenDictDelete(id) {
   toggleModal("modal-op-delete-confirm", true);
 }
 
+function opConfirmDelete() {
+  return opDeleteKind === "zalew" ? zaConfirmDelete() : opConfirmDictDelete();
+}
+
 function opCloseDictDelete() {
   opDictDeleteId = null;
+  zaDeleteId = null;
   if (opDictDeleteTimer) {
     clearInterval(opDictDeleteTimer);
     opDictDeleteTimer = null;
@@ -499,4 +512,296 @@ async function opConfirmDictDelete() {
   opCloseDictDelete();
   await opLoadDict();
   opDictMsg(message, ok);
+}
+
+// ---------- Okno: moduły (włączanie i wyłączanie) ----------
+// Lista modułów i ich stan są w app.js (APP_MODULES, appModules, moduleEnabled).
+let opModuleBusy = false;
+
+function opOpenModules() {
+  opModulesMsg("");
+  opRenderModules();
+  toggleModal("modal-op-modules", true);
+}
+
+function opModulesMsg(text, ok) {
+  const el = document.getElementById("op-modules-msg");
+  if (!el) return;
+  el.textContent = text;
+  el.style.color = ok ? "#0b7a57" : "var(--danger)";
+  el.style.display = text ? "block" : "none";
+}
+
+function opRenderModules() {
+  const list = document.getElementById("op-modules-list");
+  if (!list) return;
+
+  const row = (m, locked) => {
+    const on = locked || moduleEnabled(m.key);
+    return `
+      <div class="op-lock-row ${on ? "" : "off"}">
+        <span class="ico"><i class="fa-solid ${m.icon}"></i></span>
+        <div class="info">
+          <div class="name">${rtEsc(m.label)}</div>
+          <div class="st">${rtEsc(locked ? "Zawsze włączone" : (on ? "Włączony" : "Wyłączony"))}${m.hint ? ` • ${rtEsc(m.hint)}` : ""}</div>
+        </div>
+        ${locked
+          ? `<span class="op-dict-lock" title="Tego modułu nie można wyłączyć"><i class="fa-solid fa-lock"></i></span>`
+          : `<label class="op-switch green">
+               <input type="checkbox" ${on ? "checked" : ""} aria-label="${rtEsc(m.label)}"
+                      data-module="${rtEsc(m.key)}" onchange="opToggleModule(this.dataset.module, this.checked)" />
+               <span class="track"></span>
+             </label>`}
+      </div>`;
+  };
+
+  list.innerHTML = APP_MODULES.map(m => row(m, false)).join("");
+}
+
+async function opToggleModule(key, enabled) {
+  const mod = APP_MODULES.find(m => m.key === key);
+  if (!mod || opModuleBusy) {
+    opRenderModules();
+    return;
+  }
+  opModuleBusy = true;
+  opModulesMsg("");
+
+  try {
+    const { data, error } = await supabaseClient
+      .from("app_modules")
+      .upsert({ key, enabled, updated_at: new Date().toISOString() }, { onConflict: "key" })
+      .select("key");
+    if (error) throw error;
+    if (!data || data.length === 0) throw new Error("brak uprawnień w bazie");
+
+    appModules[key] = enabled;
+    logAction(enabled ? "Włączenie modułu" : "Wyłączenie modułu", mod.label);
+    // zakładki logowania od razu według nowego stanu
+    applyLoginTabs();
+    opModulesMsg(`${mod.label}: ${enabled ? "włączony" : "wyłączony"}.`, true);
+  } catch (err) {
+    console.error("Błąd zmiany stanu modułu:", err);
+    opModulesMsg(`Nie udało się ${enabled ? "włączyć" : "wyłączyć"} modułu „${mod.label}”: ${err.message || err}`);
+  } finally {
+    opModuleBusy = false;
+    opRenderModules();
+  }
+}
+
+// ---------- Okno: konta modułu Zalew ----------
+// Tabela zalew_users (bez hasła). Hasło ustawia funkcja bazy app_set_zalew_password
+// prosto w Supabase Auth (sql/11); osoba ustawia własne hasło przy pierwszym logowaniu.
+let zaAccounts = [];
+let zaEditId = null;         // null = dodawanie nowego konta
+let zaDeleteId = null;
+let zaBusy = false;
+let zaToken = 0;
+
+function opOpenZalew() {
+  zaResetForm();
+  toggleModal("modal-op-zalew", true);
+  zaLoad();
+}
+
+function opCloseZalew() {
+  zaToken++;
+  toggleModal("modal-op-zalew", false);
+}
+
+function zaMsg(text, ok) {
+  const el = document.getElementById("za-msg");
+  if (!el) return;
+  el.textContent = text;
+  el.style.color = ok ? "#0b7a57" : "var(--danger)";
+  el.style.display = text ? "block" : "none";
+}
+
+function zaResetForm() {
+  zaEditId = null;
+  ["za-login", "za-first", "za-last", "za-password"].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = "";
+  });
+  document.getElementById("za-password").placeholder = "Hasło startowe (min. 6 znaków)";
+  document.getElementById("za-form-title").textContent = "Nowe konto";
+  document.getElementById("za-save").innerHTML = `<i class="fa-solid fa-plus" style="margin-right: 8px;"></i> Dodaj konto`;
+  document.getElementById("za-cancel").style.display = "none";
+  zaMsg("");
+}
+
+async function zaLoad() {
+  const list = document.getElementById("za-list");
+  if (!list) return;
+  const token = ++zaToken;
+
+  const { data, error } = await supabaseClient
+    .from("zalew_users")
+    .select("id, login, first_name, last_name, auth_id, must_change_password")
+    .order("login", { ascending: true });
+  if (token !== zaToken) return;
+
+  if (error) {
+    console.error("Błąd pobierania kont Zalew:", error);
+    zaAccounts = [];
+    list.innerHTML = `<div class="op-lock-empty">Nie udało się pobrać kont: ${rtEsc(error.message)}</div>`;
+    return;
+  }
+
+  zaAccounts = data || [];
+  if (zaAccounts.length === 0) {
+    list.innerHTML = `<div class="op-lock-empty" style="color: var(--text-muted);">Nie ma jeszcze żadnego konta.</div>`;
+    return;
+  }
+
+  list.innerHTML = zaAccounts.map(a => {
+    const name = `${a.first_name || ""} ${a.last_name || ""}`.trim() || "—";
+    const status = !a.auth_id ? "Brak hasła - nie zaloguje się"
+      : a.must_change_password ? "Zmieni hasło przy logowaniu" : "Konto aktywne";
+    return `
+      <div class="op-dict-row ${Number(zaEditId) === Number(a.id) ? "editing" : ""}">
+        <span class="ico"><i class="fa-solid fa-fire-flame-curved"></i></span>
+        <div style="flex: 1; min-width: 0;">
+          <div class="name">${rtEsc(name)}</div>
+          <div class="za-sub">login: <b>${rtEsc(a.login)}</b> • ${rtEsc(status)}</div>
+        </div>
+        <button type="button" class="op-dict-edit" title="Edytuj" aria-label="Edytuj konto ${rtEsc(a.login)}" onclick="zaEdit(${Number(a.id)})"><i class="fa-solid fa-pen"></i></button>
+        <button type="button" class="op-dict-del" title="Usuń" aria-label="Usuń konto ${rtEsc(a.login)}" onclick="zaOpenDelete(${Number(a.id)})"><i class="fa-solid fa-trash"></i></button>
+      </div>`;
+  }).join("");
+}
+
+function zaEdit(id) {
+  const a = zaAccounts.find(x => Number(x.id) === Number(id));
+  if (!a) return;
+  zaEditId = a.id;
+  document.getElementById("za-login").value = a.login || "";
+  document.getElementById("za-first").value = a.first_name || "";
+  document.getElementById("za-last").value = a.last_name || "";
+  document.getElementById("za-password").value = "";
+  document.getElementById("za-password").placeholder = "Nowe hasło (puste = bez zmiany)";
+  document.getElementById("za-form-title").textContent = `Edycja konta: ${a.login}`;
+  document.getElementById("za-save").innerHTML = `<i class="fa-solid fa-floppy-disk" style="margin-right: 8px;"></i> Zapisz zmiany`;
+  document.getElementById("za-cancel").style.display = "";
+  zaMsg("");
+  document.getElementById("za-login").focus();
+  zaLoad();
+}
+
+async function zaSave() {
+  if (zaBusy) return;
+  const login = document.getElementById("za-login").value.trim();
+  const first_name = document.getElementById("za-first").value.trim() || null;
+  const last_name = document.getElementById("za-last").value.trim() || null;
+  const password = document.getElementById("za-password").value;
+  const editing = zaEditId !== null;
+
+  if (!login) {
+    zaMsg("Podaj login.");
+    return;
+  }
+  if (zaAccounts.some(a => a.login === login && Number(a.id) !== Number(zaEditId))) {
+    zaMsg(`Login „${login}” jest już zajęty.`);
+    return;
+  }
+  if (!editing && !password) {
+    zaMsg("Podaj hasło startowe.");
+    return;
+  }
+  if (password && password.length < 6) {
+    zaMsg("Hasło musi mieć co najmniej 6 znaków.");
+    return;
+  }
+
+  // hasła nie ma w tabeli - ustawia je osobno funkcja bazy w Supabase Auth
+  const payload = { login, first_name, last_name };
+
+  const btn = document.getElementById("za-save");
+  zaBusy = true;
+  if (btn) btn.disabled = true;
+  zaMsg("");
+
+  try {
+    const query = editing
+      ? supabaseClient.from("zalew_users").update(payload).eq("id", zaEditId)
+      : supabaseClient.from("zalew_users").insert(payload);
+    const { data, error } = await query.select("id");
+    if (error) throw error;
+    if (!data || data.length === 0) throw new Error("brak uprawnień w bazie");
+
+    // Hasło prosto do Supabase Auth (zakłada też konto logowania przy nowym koncie)
+    if (password) {
+      const { error: pwErr } = await supabaseClient.rpc("app_set_zalew_password", {
+        p_id: data[0].id,
+        p_password: password
+      });
+      if (pwErr) {
+        await zaLoad();
+        throw new Error((editing
+          ? "Dane zapisane, ale hasło nie zostało zmienione: "
+          : "Konto dodane, ale bez hasła - nie zaloguje się, dopóki go nie ustawisz w edycji: ") + pwErr.message);
+      }
+    }
+
+    const name = `${first_name || ""} ${last_name || ""}`.trim();
+    logAction(editing ? "Edycja konta Zalew" : "Dodanie konta Zalew",
+      `${name ? `${name} ` : ""}(login: ${login})${editing && password ? ", ustawiono hasło" : ""}`);
+
+    zaResetForm();
+    await zaLoad();
+    zaMsg(editing
+      ? `Zapisano zmiany konta ${login}.`
+      : `Dodano konto ${login}. Przy pierwszym logowaniu ustawi własne hasło.`, true);
+  } catch (err) {
+    console.error("Błąd zapisu konta Zalew:", err);
+    zaMsg("Nie udało się zapisać: " + (err.message || err));
+  } finally {
+    zaBusy = false;
+    if (btn) btn.disabled = false;
+  }
+}
+
+function zaOpenDelete(id) {
+  const a = zaAccounts.find(x => Number(x.id) === Number(id));
+  if (!a) return;
+  zaDeleteId = a.id;
+  document.getElementById("op-delete-title").innerText = "Usuwanie konta Zalew";
+  document.getElementById("op-delete-question").innerText = "Czy na pewno chcesz usunąć konto";
+  document.getElementById("op-delete-target").innerText =
+    `${`${a.first_name || ""} ${a.last_name || ""}`.trim() || a.login} (login: ${a.login})`;
+  opDeleteKind = "zalew";
+  opStartDeleteConfirm();
+}
+
+async function zaConfirmDelete() {
+  const id = zaDeleteId;
+  if (id === null || zaBusy) return;
+  const a = zaAccounts.find(x => Number(x.id) === Number(id));
+
+  const confirmBtn = document.getElementById("op-btn-confirm-delete");
+  if (confirmBtn) {
+    confirmBtn.disabled = true;
+    confirmBtn.innerText = "Usuwanie...";
+  }
+
+  zaBusy = true;
+  let message = "", ok = false;
+  try {
+    const { data, error } = await supabaseClient.from("zalew_users").delete().eq("id", id).select("id");
+    if (error) throw error;
+    if (!data || data.length === 0) throw new Error("brak uprawnień w bazie albo konto już nie istnieje");
+    logAction("Usunięcie konta Zalew", a ? `login: ${a.login}` : `id ${id}`);
+    message = `Usunięto konto ${a ? a.login : id}.`;
+    ok = true;
+    if (Number(zaEditId) === Number(id)) zaResetForm();
+  } catch (err) {
+    console.error("Błąd usuwania konta Zalew:", err);
+    message = "Nie udało się usunąć: " + (err.message || err);
+  } finally {
+    zaBusy = false;
+  }
+
+  opCloseDictDelete();
+  await zaLoad();
+  zaMsg(message, ok);
 }

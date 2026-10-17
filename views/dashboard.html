@@ -111,6 +111,61 @@
   .db-mgroup.selected .mn { color: var(--primary); font-weight: 700; }
 
 
+  /* --- Zalew: kolory zmian (I zielona, II żółta, III czerwona) --- */
+  .db-root { --db-z1: #0E8A6C; --db-z2: #F2BE2E; --db-z3: #D9383A; }
+  .db-legend .z1 { background: var(--db-z1); }
+  .db-legend .z2 { background: var(--db-z2); }
+  .db-legend .z3 { background: var(--db-z3); }
+  .db-col .seg.z1 { background: var(--db-z1); }
+  .db-col .seg.z2 { background: var(--db-z2); }
+  .db-col .seg.z3 { background: var(--db-z3); }
+  .db-zw-tile.z1 { border-top: 4px solid var(--db-z1); }
+  .db-zw-tile.z2 { border-top: 4px solid var(--db-z2); }
+  .db-zw-tile.z3 { border-top: 4px solid var(--db-z3); }
+  .db-zw-chart { margin: 4px 0 18px 0; }
+  /* Zalew: wykresy osobno dla każdej linii (2 x 2) */
+  .db-zw-lines { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 6px; }
+  .db-zw-line { border: 1px solid var(--border-color); border-radius: 12px; padding: 12px 12px 4px 4px; }
+  .db-zw-line-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; padding: 0 0 8px 10px; }
+  .db-zw-line-head .name { font-weight: 800; color: var(--db-ink); }
+  .db-zw-line-head .sum { font-size: 0.78rem; color: var(--db-ink-3); white-space: nowrap; }
+  .db-zw-chart.small { height: 180px; margin-bottom: 4px; }
+  .db-zw-chart.small .db-col .stack { max-width: 16px; }
+  .db-zw-chart.small .db-col .xl { font-size: 0.62rem; }
+
+  /* --- Zalew: kafelki zmian i tabela linii --- */
+  .db-zw-tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 14px; }
+  .db-zw-tile { border-radius: 12px; padding: 14px 16px; background: #F5F5F7; border: 1px solid var(--border-color); }
+  .db-zw-tile .lbl { font-size: 0.8rem; font-weight: 700; color: var(--db-ink-2); }
+  .db-zw-tile .val { margin-top: 6px; font-size: 1.4rem; font-weight: 700; color: var(--db-ink); letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
+  .db-zw-tile .note { margin-top: 4px; font-size: 0.78rem; color: var(--db-ink-3); }
+  .db-zw-tile .note b { color: var(--db-ink-2); }
+  .db-zw-tile.main { background: linear-gradient(135deg, #0B6B5B 0%, #08584B 50%, #053D34 100%); border-color: transparent; box-shadow: 0 8px 22px rgba(8, 88, 75, 0.25); }
+  .db-zw-tile.main .lbl, .db-zw-tile.main .note, .db-zw-tile.main .note b { color: rgba(255, 255, 255, 0.85); }
+  .db-zw-tile.main .val { color: #FFFFFF; }
+  .db-zw-other { margin: 0 0 12px 0; font-size: 0.8rem; color: #92590A; }
+  .db-zw-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+  .db-zw-table th { padding: 10px 12px; text-align: center; font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.03em; color: #4B5563; background: #F9FAFB; border-bottom: 1px solid var(--border-color); }
+  .db-zw-table th:first-child, .db-zw-table td.ln { text-align: left; }
+  .db-zw-table td { padding: 9px 12px; text-align: center; border-bottom: 1px solid #F0F0F0; font-variant-numeric: tabular-nums; }
+  .db-zw-table td.ln { font-weight: 700; color: var(--db-ink); }
+  .db-zw-table td.tot { font-weight: 700; color: #0B5D44; }
+  .db-zw-table tr.sum td { background: #DDF1E7; font-weight: 700; color: #0B5D44; border-bottom: none; }
+  .db-zw-h { margin: 18px 0 8px 0; font-size: 0.9rem; font-weight: 700; color: var(--db-ink); }
+  .db-zw-table td .w { font-weight: 700; color: var(--db-ink); }
+  .db-zw-table td .kf { margin-top: 2px; font-size: 0.74rem; color: var(--db-ink-3); white-space: nowrap; }
+  .db-zw-table td .kf b { color: var(--db-ink-2); }
+  .db-zw-table td .none { color: #C9CED4; }
+  .db-zw-table td.tot .w { color: #0B5D44; }
+  .db-zw-table tr.sum td .w, .db-zw-table tr.sum td .kf, .db-zw-table tr.sum td .kf b { color: #0B5D44; }
+  .db-zw-dot { display: inline-block; width: 9px; height: 9px; border-radius: 3px; margin-right: 6px; vertical-align: middle; }
+  .db-zw-dot.z1 { background: var(--db-z1); }
+  .db-zw-dot.z2 { background: var(--db-z2); }
+  .db-zw-dot.z3 { background: var(--db-z3); }
+  .db-zw-table.models td.share { white-space: nowrap; text-align: left; }
+  .db-zw-table.models .bar { display: inline-block; width: 70px; height: 7px; margin-right: 8px; border-radius: 999px; background: var(--db-track); overflow: hidden; vertical-align: middle; }
+  .db-zw-table.models .bar span { display: block; height: 100%; border-radius: 999px; background: var(--db-present); }
+
   /* --- Listy słupków poziomych --- */
   .db-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; margin-top: 16px; }
   .db-bars { display: flex; flex-direction: column; gap: 12px; }
@@ -160,6 +215,11 @@
     .db-col .wk { visibility: hidden; }  /* numery tygodni się nie mieszczą - są w dymku */
     .db-mgroup .mn { font-size: 0.62rem; }
     .db-grid { grid-template-columns: 1fr; }
+    .db-zw-tiles { grid-template-columns: 1fr 1fr; gap: 10px; }
+    .db-zw-tile.main { grid-column: 1 / -1; }
+    .db-zw-tile .val { font-size: 1.15rem; }
+    .db-zw-lines { grid-template-columns: 1fr; }
+    .db-zw-chart.small { height: 160px; }
   }
 </style>
 
@@ -174,6 +234,22 @@
       <select id="db-filter-year" class="form-control" aria-label="Rok" onchange="dbLoad()"></select>
       <select id="db-filter-month" class="form-control" aria-label="Miesiąc" onchange="dbLoad()"></select>
     </div>
+  </div>
+
+  <!-- Zalew: podsumowanie zalewów w wybranym okresie -->
+  <div class="db-panel" id="db-zalew-panel" style="margin-bottom: 16px;">
+    <div class="db-panel-head">
+      <div>
+        <h4><i class="fa-solid fa-fire-flame-curved" style="color: #B52B2D; margin-right: 6px;"></i>Zalew</h4>
+        <p class="sub" id="db-zalew-sub"></p>
+      </div>
+      <div class="db-legend">
+        <span><i class="z1"></i> Zmiana I</span>
+        <span><i class="z2"></i> Zmiana II</span>
+        <span><i class="z3"></i> Zmiana III</span>
+      </div>
+    </div>
+    <div id="db-zalew"></div>
   </div>
 
   <div class="db-kpis" id="db-kpis"></div>
