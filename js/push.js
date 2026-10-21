@@ -113,10 +113,34 @@ async function pushForget() {
   } catch (err) { /* wylogowanie i tak trwa */ }
 }
 
+let pushLastState = null;
+let pushLastHint = "";
+let pushBusy = false;
+
+// Dzwonek w menu: przełącza powiadomienia na tym urządzeniu
+async function pushToggle() {
+  if (pushBusy) return;
+  const state = pushLastState || await pushState();
+  if (state === "on") {
+    pushBusy = true;
+    await pushDisable();
+    pushBusy = false;
+  } else if (state === "off") {
+    pushBusy = true;
+    await pushEnable();
+    pushBusy = false;
+  } else {
+    // zablokowane / iPhone bez instalacji / brak obsługi: wyjaśnij, co zrobić
+    await pushRefreshButtons();
+    alert(pushLastHint || "Powiadomienia nie są dostępne na tym urządzeniu.");
+  }
+}
+
 // Przyciski "Powiadomienia" (data-push-btn) i podpowiedzi (data-push-hint) na stronie
 async function pushRefreshButtons() {
   const btns = document.querySelectorAll("[data-push-btn]");
-  if (!btns.length) return;
+  const bell = document.getElementById("ab-bell");
+  if (!btns.length && !bell) return;
   const state = await pushState();
   const view = {
     on: { text: "Powiadomienia włączone", icon: "fa-bell", cls: "on", hint: "To urządzenie dostaje powiadomienia. Kliknij, aby wyłączyć." },
@@ -133,6 +157,21 @@ async function pushRefreshButtons() {
     btn.disabled = ["denied", "unsupported", "not-configured", "ios-install"].includes(state);
     btn.onclick = state === "on" ? pushDisable : pushEnable;
   });
+  // Dzwonek przy imieniu i nazwisku w menu: włącznik powiadomień (żółty - włączone, szary - wyłączone)
+  if (bell) {
+    const on = state === "on";
+    const count = Number(bell.dataset.count) || 0;
+    bell.classList.toggle("push-on", on);
+    bell.classList.toggle("push-off", !on);
+    bell.setAttribute("aria-pressed", String(on));
+    const icon = bell.querySelector("i");
+    if (icon) icon.className = `fa-solid ${on ? "fa-bell" : "fa-bell-slash"}`;   // wyłączone - przekreślony
+    bell.title = (on ? "Powiadomienia włączone — kliknij, aby wyłączyć" : view.hint || "Powiadomienia wyłączone — kliknij, aby włączyć") +
+      (count ? `\nZgłoszenia do rozpatrzenia: ${count}` : "");
+  }
+  pushLastState = state;
+  pushLastHint = view.hint;
+
   document.querySelectorAll("[data-push-hint]").forEach(el => {
     el.textContent = view.hint;
     el.style.display = view.hint && state !== "on" ? "" : "none";

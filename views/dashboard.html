@@ -221,6 +221,26 @@
     .db-zw-lines { grid-template-columns: 1fr; }
     .db-zw-chart.small { height: 160px; }
   }
+
+  /* Wybór okresu w zielonym nagłówku: strzałki ‹ › jak w Harmonogramie */
+  .db-periodpick { display: flex; align-items: center; gap: 6px; }
+  .db-periodpick button {
+    width: 42px; height: 44px; flex-shrink: 0; border-radius: 12px; cursor: pointer; font-size: 0.9rem;
+    border: 1px solid rgba(255, 255, 255, 0.25); background: rgba(255, 255, 255, 0.12); color: #fff;
+  }
+  .db-periodpick button:hover:not(:disabled) { background: rgba(255, 255, 255, 0.22); }
+  .db-periodpick button:disabled { opacity: 0.4; cursor: default; }
+  .db-periodpick button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+  .db-period-label {
+    width: 200px; height: 44px; display: inline-flex; align-items: center; justify-content: center; padding: 0 10px; text-align: center; box-sizing: border-box;
+    border-radius: 12px; background: rgba(255, 255, 255, 0.95); color: var(--primary); font-weight: 700; font-size: 0.95rem; white-space: nowrap;
+  }
+  /* strzałki i "Cały rok": treść zawsze na środku kafelka; stała szerokość - kafelki nie skaczą przy zmianie okresu */
+  .db-periodpick button { display: inline-flex; align-items: center; justify-content: center; text-align: center; }
+  @media (max-width: 768px) {
+    .db-periodpick { width: 100%; }
+    .db-period-label { flex: 1; width: auto; min-width: 0; font-size: 0.88rem; }
+  }
 </style>
 
 <div class="db-root" id="db-root">
@@ -231,8 +251,13 @@
       <p id="db-period-label">Podsumowanie czasu pracy z raportów.</p>
     </div>
     <div class="page-hero-actions">
-      <select id="db-filter-year" class="form-control" aria-label="Rok" onchange="dbLoad()"></select>
-      <select id="db-filter-month" class="form-control" aria-label="Miesiąc" onchange="dbLoad()"></select>
+      <div class="db-periodpick">
+        <button type="button" id="db-prev" onclick="dbStepPeriod(-1)" title="Poprzedni miesiąc" aria-label="Poprzedni okres"><i class="fa-solid fa-chevron-left"></i></button>
+        <input type="hidden" id="db-filter-year" />
+        <input type="hidden" id="db-filter-month" />
+        <span class="db-period-label" id="db-period-text" aria-live="polite">—</span>
+        <button type="button" id="db-next" onclick="dbStepPeriod(1)" title="Następny miesiąc" aria-label="Następny okres"><i class="fa-solid fa-chevron-right"></i></button>
+      </div>
     </div>
   </div>
 

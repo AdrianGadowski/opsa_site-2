@@ -44,26 +44,65 @@ function dbHoursLines(present, absent) {
   ];
 }
 
+// ---------- Wybór okresu: strzałki ‹ › (bez list rozwijanych) ----------
+// Okres trzymają ukryte pola db-filter-year ("2026") i db-filter-month ("01".."12", "" = cały rok).
+// Z wybranym miesiącem strzałki zmieniają miesiąc (styczeń ‹ = grudzień poprzedniego roku,
+// grudzień › = styczeń następnego). Nie da się wyjść poza bieżący miesiąc.
+
+function dbPeriod() {
+  return {
+    year: Number(document.getElementById("db-filter-year")?.value) || new Date().getFullYear(),
+    month: Number(document.getElementById("db-filter-month")?.value) || 0
+  };
+}
+
+function dbSetPeriod(year, month) {
+  document.getElementById("db-filter-year").value = String(year);
+  document.getElementById("db-filter-month").value = month ? String(month).padStart(2, "0") : "";
+  dbSyncPeriodArrows();
+}
+
+function dbStepPeriod(delta) {
+  let { year, month } = dbPeriod();
+  if (month) {
+    month += delta;
+    if (month < 1) { month = 12; year--; }
+    if (month > 12) { month = 1; year++; }
+  } else {
+    year += delta;
+  }
+  if (dbPeriodInFuture(year, month)) return;
+  dbSetPeriod(year, month);
+  dbLoad();
+}
+
+function dbPeriodInFuture(year, month) {
+  const now = new Date();
+  return year > now.getFullYear() || (year === now.getFullYear() && month > now.getMonth() + 1);
+}
+
+function dbSyncPeriodArrows() {
+  const { year, month } = dbPeriod();
+  const label = month ? "miesiąc" : "rok";
+  const text = document.getElementById("db-period-text");
+  if (text) text.textContent = month ? `${RP_MONTHS[month - 1]} ${year}` : `Rok ${year}`;
+  const prev = document.getElementById("db-prev");
+  const next = document.getElementById("db-next");
+  if (prev) prev.title = `Poprzedni ${label}`;
+  if (next) {
+    next.title = `Następny ${label}`;
+    const ny = month ? (month === 12 ? year + 1 : year) : year + 1;
+    const nm = month ? (month === 12 ? 1 : month + 1) : 0;
+    next.disabled = dbPeriodInFuture(ny, nm);
+  }
+}
+
 // ---------- Inicjalizacja ----------
 async function initDashboardView() {
   const now = new Date();
-  const yearSel = document.getElementById("db-filter-year");
-  const monthSel = document.getElementById("db-filter-month");
+  dbSetPeriod(now.getFullYear(), now.getMonth() + 1);
 
-  if (yearSel) {
-    const y = now.getFullYear();
-    yearSel.innerHTML = Array.from({ length: RP_YEARS_BACK + 1 }, (_, i) =>
-      `<option value="${y - i}">${y - i}</option>`).join("");
-  }
-  if (monthSel) {
-    const current = String(now.getMonth() + 1).padStart(2, "0");
-    monthSel.innerHTML = `<option value="">Cały rok</option>` +
-      RP_MONTHS.map((name, i) => {
-        const v = String(i + 1).padStart(2, "0");
-        return `<option value="${v}"${v === current ? " selected" : ""}>${name}</option>`;
-      }).join("");
-  }
-
+  dbSyncPeriodArrows();
   dbInitTooltip();
 
   try {

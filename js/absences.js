@@ -323,10 +323,11 @@ async function abSubmitRequest() {
 // =====================================================
 // 2. MISTRZ: LICZNIK W MENU
 // =====================================================
+// Nieobecności: mistrz (rola "Mistrz") albo administrator, i tylko z dostępem do Harmonogramu
 function abCanReview() {
   if (!currentUser) return false;
   const role = String(currentUser.role?.role || "").trim().toLowerCase();
-  return role === "mistrz" || isAdminRoleName(currentUser.role?.role);
+  return (role === "mistrz" || isAdminRoleName(currentUser.role?.role)) && hasPermission("allow_schedule");
 }
 
 function abSetBadge(count) {
@@ -336,7 +337,8 @@ function abSetBadge(count) {
   if (bell) {
     bell.style.display = abCanReview() ? "" : "none";
     bell.classList.toggle("has", n > 0);
-    bell.title = n ? `Zgłoszenia nieobecności do rozpatrzenia: ${n}` : "Zgłoszenia nieobecności";
+    // kolor dzwonka = stan powiadomień (push.js); liczba = zgłoszenia do rozpatrzenia
+    bell.dataset.count = String(n);
   }
   document.querySelectorAll(".ab-badge").forEach(b => {
     b.textContent = text;

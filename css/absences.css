@@ -9,7 +9,6 @@
   background: transparent; color: var(--text-muted); font-size: 1rem; display: inline-flex; align-items: center; justify-content: center;
 }
 .ab-bell:hover { background: rgba(8, 88, 75, 0.08); color: var(--primary); }
-.ab-bell.has { color: var(--primary); }
 .ab-bell.has i { animation: ab-ring 2.4s ease-in-out infinite; transform-origin: 50% 10%; }
 @keyframes ab-ring { 0%, 86%, 100% { transform: rotate(0); } 89% { transform: rotate(14deg); } 93% { transform: rotate(-12deg); } 97% { transform: rotate(6deg); } }
 @media (prefers-reduced-motion: reduce) { .ab-bell.has i { animation: none; } }
@@ -19,9 +18,12 @@
 }
 .ab-bell .ab-badge { position: absolute; top: -4px; right: -5px; }
 .menu-btn .ab-badge { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); box-shadow: none; }
-.sidebar .ab-bell { color: rgba(255, 255, 255, 0.7); }
+/* dzwonek = włącznik powiadomień: żółty - włączone, szary - wyłączone */
+.sidebar .ab-bell { color: rgba(255, 255, 255, 0.45); }
+.sidebar .ab-bell.push-on { color: var(--accent); }
+.sidebar .ab-bell.push-off i { opacity: 0.8; }
 .sidebar .ab-bell:hover { background: rgba(255, 255, 255, 0.1); color: #fff; }
-.sidebar .ab-bell.has { color: var(--accent); }
+.sidebar .ab-bell.push-on:hover { color: var(--accent); }
 .sidebar .ab-bell .ab-badge { box-shadow: 0 0 0 2px #053D34; }
 .ab-badge-inline { display: inline-block; margin-left: 6px; box-shadow: none; }
 /* telefon: kropka na przycisku menu, gdy są zgłoszenia */

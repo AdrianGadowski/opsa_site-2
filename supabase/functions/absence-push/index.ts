@@ -43,8 +43,18 @@ function when(r: { date_from: string; date_to: string; time_from: string | null;
 
 Deno.serve(async (req) => {
   if (req.method !== "POST") return new Response("Method not allowed", { status: 405 });
-  if (!env("PUSH_HOOK_SECRET") || req.headers.get("x-push-secret") !== env("PUSH_HOOK_SECRET")) {
-    return new Response("Forbidden", { status: 403 });
+  // Hasło wywołania (spacje / entery na końcach są pomijane). Odpowiedź mówi, co jest nie tak,
+  // ale nigdy nie zdradza samego hasła - tylko długości do porównania.
+  const expected = env("PUSH_HOOK_SECRET").trim();
+  const got = (req.headers.get("x-push-secret") ?? "").trim();
+  if (!expected) {
+    return new Response("Forbidden: funkcja nie ma sekretu PUSH_HOOK_SECRET (Edge Functions -> Secrets)", { status: 403 });
+  }
+  if (got !== expected) {
+    return new Response(
+      `Forbidden: hasło z bazy nie pasuje do PUSH_HOOK_SECRET (długość z bazy: ${got.length}, w sekrecie: ${expected.length})`,
+      { status: 403 },
+    );
   }
 
   let body: { request_id?: number; event?: string };
@@ -80,13 +90,15 @@ Deno.serve(async (req) => {
   let title = "", text = "", url = "./";
 
   if (event === "new" || event === "cancelled") {
-    // mistrzowie działu (rola "Mistrz"), a gdy ich brak - administratorzy
+    // mistrzowie działu (rola "Mistrz"), a gdy ich brak - administratorzy;
+    // w obu przypadkach tylko z dostępem do Harmonogramu (allow_schedule)
     const { data: users } = await db
       .from("users")
-      .select("id, department_id, role:role_id ( role )");
+      .select("id, department_id, allow_schedule, role:role_id ( role )");
     const role = (u: { role?: { role?: string } | null }) => String(u.role?.role ?? "").trim().toLowerCase();
-    let ids = (users ?? []).filter((u) => role(u) === "mistrz" && u.department_id === r.department_id).map((u) => u.id);
-    if (!ids.length) ids = (users ?? []).filter((u) => role(u) === "administrator").map((u) => u.id);
+    const allowed = (users ?? []).filter((u) => u.allow_schedule === true);
+    let ids = allowed.filter((u) => role(u) === "mistrz" && u.department_id === r.department_id).map((u) => u.id);
+    if (!ids.length) ids = allowed.filter((u) => role(u) === "administrator").map((u) => u.id);
     if (ids.length) {
       const { data } = await db.from("push_subscriptions").select("id, endpoint, p256dh, auth").in("user_id", ids);
       subs = data ?? [];
