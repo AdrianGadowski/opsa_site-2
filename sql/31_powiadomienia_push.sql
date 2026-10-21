@@ -31,9 +31,9 @@ revoke all on public.app_private_settings from anon, authenticated;
 
 insert into public.app_private_settings (key, value) values
   ('push_function_url', 'https://vrfyniyvawyungkslwod.supabase.co/functions/v1/absence-push'),
-  ('push_hook_secret', 'BFZWApHRRyph6cF-_UWMITsQ05rgQ-y-')
+  ('push_hook_secret', 'asrnhNKc_VypculfR0FfSccLBs2m-w4W')
 on conflict (key) do update set value = excluded.value
-  where excluded.value <> 'BFZWApHRRyph6cF-_UWMITsQ05rgQ-y-';   -- ponowne uruchomienie nie kasuje wpisanego hasła
+  where excluded.value <> 'asrnhNKc_VypculfR0FfSccLBs2m-w4W';   -- ponowne uruchomienie nie kasuje wpisanego hasła
 
 -- ---------------------------------------------------------------------
 -- 2. Urządzenia z włączonymi powiadomieniami
@@ -126,7 +126,7 @@ begin
 
   select value into v_url from public.app_private_settings where key = 'push_function_url';
   select value into v_secret from public.app_private_settings where key = 'push_hook_secret';
-  if v_url is null or v_secret is null or v_secret = 'BFZWApHRRyph6cF-_UWMITsQ05rgQ-y-' then
+  if v_url is null or v_secret is null or v_secret = 'asrnhNKc_VypculfR0FfSccLBs2m-w4W' then
     return new;                      -- powiadomienia nieskonfigurowane: zgłoszenie działa normalnie
   end if;
 

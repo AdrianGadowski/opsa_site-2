@@ -10,7 +10,7 @@
 // ==========================================
 
 // Klucz publiczny VAPID (jawny). Wygeneruj w tools/vapid.html i wklej tutaj.
-const PUSH_VAPID_PUBLIC_KEY = "";
+const PUSH_VAPID_PUBLIC_KEY = "BIFppTkxJ4RHcOk7rs9aaQXR6XgMgVR6nEeDFZJ6ADIZWFYgV8nsX90sbpa9HErrBmviEHskxXC-DudhlJXgt9s";
 
 function pushSupported() {
   return "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
