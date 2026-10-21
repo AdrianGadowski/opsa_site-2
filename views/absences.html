@@ -1,0 +1,45 @@
+<div class="page-hero">
+  <div>
+    <div class="eyebrow">Planowanie</div>
+    <h3>Zgłoszenia nieobecności</h3>
+    <p>Nieobecności zgłoszone przez pracowników w portalu. Po akceptacji dni trafiają do harmonogramu jako zgłoszona nieobecność.</p>
+  </div>
+</div>
+
+<div class="ab-top">
+  <div class="ab-hint" id="ab-hint"></div>
+  <div class="ab-push">
+    <button type="button" class="push-btn" data-push-btn><i class="fa-solid fa-bell"></i> Powiadomienia</button>
+    <div class="push-hint" data-push-hint style="display: none;"></div>
+  </div>
+</div>
+
+<div class="card" style="padding: 0; overflow: hidden;">
+  <div class="ab-tabs" role="tablist">
+    <button type="button" class="ab-tab on" data-tab="pending" role="tab" onclick="abSetTab('pending')">
+      <i class="fa-solid fa-hourglass-half"></i> Do rozpatrzenia <span class="ab-badge ab-badge-inline" style="display: none;"></span>
+    </button>
+    <button type="button" class="ab-tab" data-tab="done" role="tab" onclick="abSetTab('done')">
+      <i class="fa-solid fa-clock-rotate-left"></i> Rozpatrzone (ostatnie 90 dni)
+    </button>
+  </div>
+
+  <div style="overflow-x: auto;">
+    <table class="users-table ab-table" style="width: 100%; border-collapse: collapse;">
+      <thead>
+        <tr>
+          <th>Pracownik</th>
+          <th>Dział</th>
+          <th>Termin</th>
+          <th>Powód</th>
+          <th>Zgłoszono</th>
+          <th>Status</th>
+          <th id="ab-head-action"></th>
+        </tr>
+      </thead>
+      <tbody id="ab-body">
+        <tr><td colspan="7" class="ab-empty"><i class="fa-solid fa-spinner fa-spin"></i> Ładowanie zgłoszeń...</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>

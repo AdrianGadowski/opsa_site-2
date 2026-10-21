@@ -20,11 +20,14 @@
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
 
-  <link rel="stylesheet" href="css/style.css?v=20261103" />
-  <link rel="stylesheet" href="css/login.css?v=20261103" />
-  <link rel="stylesheet" href="css/menu.css?v=20261103" />
-  <link rel="stylesheet" href="css/mobile.css?v=20261103" />
-  <link rel="stylesheet" href="css/portal.css?v=20261103" />
+  <link rel="stylesheet" href="css/style.css?v=20261137" />
+  <link rel="stylesheet" href="css/login.css?v=20261137" />
+  <link rel="stylesheet" href="css/menu.css?v=20261137" />
+  <link rel="stylesheet" href="css/mobile.css?v=20261137" />
+  <link rel="stylesheet" href="css/portal.css?v=20261137" />
+  <link rel="stylesheet" href="css/timepicker.css?v=20261137" />
+  <link rel="stylesheet" href="css/emp_lists.css?v=20261137" />
+  <link rel="stylesheet" href="css/absences.css?v=20261137" />
 </head>
 <body>
 
@@ -183,6 +186,11 @@
             <i class="fa-solid fa-calendar-week"></i> Harmonogram
           </button>
         </li>
+        <li class="menu-item" data-tab="absences" id="nav-absences" style="display: none;">
+          <button class="menu-btn" onclick="navigateTo('absences')">
+            <i class="fa-solid fa-user-clock"></i> Nieobecności <span class="ab-badge" style="display: none;"></span>
+          </button>
+        </li>
         <li class="menu-item" data-tab="reports" id="nav-reports" style="display: none;">
           <button class="menu-btn" onclick="navigateTo('reports')">
             <i class="fa-solid fa-file-lines"></i> Lista raportów
@@ -219,6 +227,10 @@
             <span id="current-user-dept" class="user-dept">Dział</span>
           </div>
         </div>
+        <!-- Zgłoszenia nieobecności do rozpatrzenia (mistrz, administrator) - js/absences.js -->
+        <button type="button" id="ab-bell" class="ab-bell" style="display: none;" onclick="navigateTo('absences')" title="Zgłoszenia nieobecności" aria-label="Zgłoszenia nieobecności">
+          <i class="fa-solid fa-bell"></i><span class="ab-badge" style="display: none;"></span>
+        </button>
         <button class="link-btn" onclick="handleLogout()" title="Wyloguj" aria-label="Wyloguj"><i class="fa-solid fa-right-from-bracket"></i></button>
       </div>
     </aside>
@@ -505,6 +517,19 @@
       <!-- Godziny pracy z harmonogramu: ten i przyszły tydzień -->
       <div class="ep-schedule" id="ep-schedule"></div>
 
+      <!-- Zgłoszenia nieobecności pracownika - js/absences.js -->
+      <div class="ep-abs">
+        <div class="ep-abs-head">
+          <h4><i class="fa-solid fa-user-clock"></i> Moje zgłoszenia nieobecności</h4>
+          <div class="ep-abs-actions">
+            <button type="button" class="push-btn" data-push-btn><i class="fa-solid fa-bell"></i> Powiadomienia</button>
+            <button type="button" class="ep-abs-btn" onclick="abOpenRequest()"><i class="fa-solid fa-plus"></i> Zgłoś nieobecność</button>
+          </div>
+        </div>
+        <div class="push-hint" data-push-hint style="display: none;"></div>
+        <div id="ep-abs-list"></div>
+      </div>
+
       <div id="ep-lock" class="ep-lock unknown" role="status"></div>
 
       <div class="eh-tiles" id="ep-tiles"></div>
@@ -527,6 +552,140 @@
       </div>
       <div id="ep-mobile-empty" class="ep-empty only-mobile" style="display: none;">Brak wpisów w wybranym miesiącu.</div>
     </main>
+  </div>
+
+  <!-- Modal: moje (prywatne) listy pracowników (Rozliczenie czasu, Harmonogram) - js/emp_lists.js -->
+  <div id="modal-rt-lists" class="modal">
+    <div class="modal-box rtl-box">
+      <button type="button" class="link-btn" onclick="rtlClose()" style="position: absolute; top: 22px; right: 22px; font-size: 1.2rem;" title="Zamknij" aria-label="Zamknij">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+      <h3 style="color: var(--primary); margin: 0 0 4px 0; font-size: 1.15rem; padding-right: 30px;">Moje listy pracowników</h3>
+      <p style="margin: 0 0 14px 0; font-size: 0.82rem; color: var(--text-muted);">Listy są prywatne — widzisz je tylko Ty. Wybrana lista działa jak filtr w tabeli.</p>
+  
+      <div class="rtl-row">
+        <div class="form-group">
+          <label for="rtl-pick">Lista</label>
+          <select id="rtl-pick" class="form-control" onchange="rtlPick(this.value)"></select>
+        </div>
+        <div class="form-group">
+          <label for="rtl-name">Nazwa listy</label>
+          <input type="text" id="rtl-name" class="form-control" maxlength="60" placeholder="np. Moja brygada" autocomplete="off" />
+        </div>
+      </div>
+  
+      <div class="form-group" style="margin-bottom: 8px; position: relative;">
+        <input type="text" id="rtl-search" class="form-control" placeholder="Szukaj: imię, nazwisko, dział lub firma..." oninput="rtlRender()" style="padding-left: 36px;" autocomplete="off" aria-label="Szukaj pracownika" />
+        <i class="fa-solid fa-magnifying-glass" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 0.9rem;"></i>
+      </div>
+      <div class="rtl-tools">
+        <span id="rtl-count">Zaznaczono: 0</span>
+        <span class="spacer"></span>
+        <button type="button" onclick="rtlFromVisible()" title="Zaznacza dokładnie tych pracowników, którzy są teraz widoczni w tabeli (z bieżącymi filtrami)">Zaznacz widocznych w tabeli</button>
+        <button type="button" id="rtl-toggle-all" onclick="rtlToggleAll()">Zaznacz widocznych</button>
+      </div>
+      <div id="rtl-items" class="rtl-items"></div>
+  
+      <div id="rtl-msg" style="display: none; font-size: 0.86rem; margin-top: 10px;"></div>
+  
+      <div class="rtl-foot">
+        <button type="button" id="rtl-delete" class="btn-danger" style="width: auto; padding: 10px 16px; display: none;" onclick="rtlDelete()">
+          <i class="fa-solid fa-trash"></i> Usuń listę
+        </button>
+        <span class="spacer"></span>
+        <button type="button" class="btn-secondary" style="width: auto; padding: 10px 18px;" onclick="rtlClose()">Anuluj</button>
+        <button type="button" id="rtl-save" class="btn-primary" style="width: auto; padding: 10px 22px;" onclick="rtlSave()">
+          <i class="fa-solid fa-floppy-disk"></i> Zapisz listę
+        </button>
+      </div>
+    </div>
+  </div>
+  <!-- Zgłoszenie nieobecności (portal pracownika) - js/absences.js -->
+  <div id="modal-ab-request" class="modal">
+    <div class="modal-box ab-modal-box">
+      <button type="button" class="link-btn" onclick="abCloseRequest()" style="position: absolute; top: 22px; right: 22px; font-size: 1.2rem;" title="Zamknij" aria-label="Zamknij">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+      <h3 style="color: var(--primary); margin: 0 0 14px 0; font-size: 1.15rem; padding-right: 30px;">Zgłoś nieobecność</h3>
+
+      <div id="ab-approvers" class="ab-approvers"></div>
+
+      <div class="ab-quick">
+        <button type="button" onclick="abQuick('today')">Dziś</button>
+        <button type="button" onclick="abQuick('tomorrow')">Jutro</button>
+        <button type="button" onclick="abQuick('week')">Do końca tygodnia</button>
+      </div>
+      <div class="ab-row2">
+        <div class="form-group">
+          <label for="ab-from">Od dnia</label>
+          <input type="date" id="ab-from" class="form-control" onchange="abSyncDays()" />
+        </div>
+        <div class="form-group">
+          <label for="ab-to">Do dnia</label>
+          <input type="date" id="ab-to" class="form-control" onchange="abSyncDays()" />
+        </div>
+      </div>
+      <div class="ab-days" id="ab-days"></div>
+
+      <div class="form-group">
+        <label>Zakres</label>
+        <div class="ab-span" id="ab-span" role="group" aria-label="Zakres nieobecności">
+          <button type="button" data-span="day" onclick="abSetSpan('day')">Cały dzień</button>
+          <button type="button" data-span="I" onclick="abSetSpan('I')" title="Zmiana I: 06:30–14:30">I</button>
+          <button type="button" data-span="II" onclick="abSetSpan('II')" title="Zmiana II: 14:30–22:30">II</button>
+          <button type="button" data-span="III" onclick="abSetSpan('III')" title="Zmiana III: 22:30–06:30">III</button>
+          <button type="button" data-span="hours" onclick="abSetSpan('hours')">Godziny</button>
+        </div>
+        <div class="ab-hours" id="ab-hours" style="display: none;">
+          <button type="button" id="ab-time-from" class="rt-time ab-time empty" data-value="" aria-label="Od" aria-haspopup="dialog" aria-expanded="false" onclick="abOpenSpanTime('from')">--:--</button>
+          <span aria-hidden="true">–</span>
+          <button type="button" id="ab-time-to" class="rt-time ab-time empty" data-value="" aria-label="Do" aria-haspopup="dialog" aria-expanded="false" onclick="abOpenSpanTime('to')">--:--</button>
+        </div>
+        <div class="ab-days" id="ab-span-info" style="margin: 6px 0 0;"></div>
+      </div>
+
+      <div class="form-group">
+        <label for="ab-reason">Powód</label>
+        <select id="ab-reason" class="form-control">
+          <option value="urlop">Urlop</option>
+          <option value="urlop_na_zadanie">Urlop na żądanie</option>
+          <option value="l4">L4 (zwolnienie lekarskie)</option>
+          <option value="opieka">Opieka</option>
+          <option value="inny">Inny</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="ab-desc">Opis dla mistrza (opcjonalnie)</label>
+        <textarea id="ab-desc" class="form-control" rows="2" maxlength="200" placeholder="np. wizyta u lekarza"></textarea>
+      </div>
+
+      <div id="ab-req-msg" style="display: none; font-size: 0.86rem; margin-bottom: 10px;"></div>
+      <div class="modal-btn-row">
+        <button type="button" class="btn-secondary" onclick="abCloseRequest()">Anuluj</button>
+        <button type="button" id="ab-submit" class="btn-primary" onclick="abSubmitRequest()"><i class="fa-solid fa-paper-plane"></i> Wyślij zgłoszenie</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Akceptacja / odrzucenie zgłoszenia (mistrz) - js/absences.js -->
+  <div id="modal-ab-decide" class="modal">
+    <div class="modal-box ab-modal-box">
+      <button type="button" class="link-btn" onclick="abCloseDecide()" style="position: absolute; top: 22px; right: 22px; font-size: 1.2rem;" title="Zamknij" aria-label="Zamknij">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+      <h3 id="ab-dec-title" style="color: var(--primary); margin: 0 0 14px 0; font-size: 1.15rem; padding-right: 30px;">Zgłoszenie</h3>
+      <div id="ab-dec-summary" class="ab-summary"></div>
+      <div id="ab-dec-info" class="ab-info"></div>
+      <div class="form-group">
+        <label for="ab-dec-note">Komentarz dla pracownika</label>
+        <textarea id="ab-dec-note" class="form-control" rows="2" maxlength="200"></textarea>
+      </div>
+      <div id="ab-dec-msg" style="display: none; font-size: 0.86rem; margin-bottom: 10px;"></div>
+      <div class="modal-btn-row">
+        <button type="button" class="btn-secondary" onclick="abCloseDecide()">Anuluj</button>
+        <button type="button" id="ab-dec-confirm" class="btn-primary" onclick="abConfirmDecide()">Zapisz</button>
+      </div>
+    </div>
   </div>
 
   <!-- Wymuszona zmiana hasła przy pierwszym logowaniu -->
@@ -573,22 +732,26 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="js/app.js?v=20261103"></script>
-  <script src="js/login-fx.js?v=20261103"></script>
-  <script src="js/menu-fx.js?v=20261103"></script>
-  <script src="js/mobile.js?v=20261103"></script>
-  <script src="js/report_time.js?v=20261103"></script>
-  <script src="js/reports.js?v=20261103"></script>
-  <script src="js/updates.js?v=20261103"></script>
-  <script src="js/dashboard.js?v=20261103"></script>
-  <script src="js/schedule.js?v=20261103"></script>
-  <script src="js/user.js?v=20261103"></script>
-  <script src="js/employee_hours.js?v=20261103"></script>
-  <script src="js/options.js?v=20261103"></script>
-  <script src="js/logs.js?v=20261103"></script>
-  <script src="js/employee_portal.js?v=20261103"></script>
-  <script src="js/zalew.js?v=20261103"></script>
-  <script src="js/password.js?v=20261103"></script>
-  <script src="js/pwa.js?v=20261103"></script>
+  <script src="js/app.js?v=20261137"></script>
+  <script src="js/login-fx.js?v=20261137"></script>
+  <script src="js/menu-fx.js?v=20261137"></script>
+  <script src="js/mobile.js?v=20261137"></script>
+  <script src="js/report_time.js?v=20261137"></script>
+  <script src="js/emp_lists.js?v=20261137"></script>
+  <script src="js/reports.js?v=20261137"></script>
+  <script src="js/updates.js?v=20261137"></script>
+  <script src="js/dashboard.js?v=20261137"></script>
+  <script src="js/schedule.js?v=20261137"></script>
+  <script src="js/employee_presence.js?v=20261137"></script>
+  <script src="js/user.js?v=20261137"></script>
+  <script src="js/employee_hours.js?v=20261137"></script>
+  <script src="js/options.js?v=20261137"></script>
+  <script src="js/logs.js?v=20261137"></script>
+  <script src="js/employee_portal.js?v=20261137"></script>
+  <script src="js/absences.js?v=20261137"></script>
+  <script src="js/push.js?v=20261137"></script>
+  <script src="js/zalew.js?v=20261137"></script>
+  <script src="js/password.js?v=20261137"></script>
+  <script src="js/pwa.js?v=20261137"></script>
 </body>
 </html>

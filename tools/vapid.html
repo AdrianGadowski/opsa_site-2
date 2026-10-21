@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Generator kluczy powiadomień</title>
+  <style>
+    :root { --primary: #08584B; --border: #E5E7EB; --muted: #6B7280; --danger: #D9383A; }
+    body { margin: 0; padding: 24px 16px; background: #F5F5F7; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; color: #1F2937; }
+    main { max-width: 760px; margin: 0 auto; background: #fff; border: 1px solid var(--border); border-radius: 14px; padding: 24px; }
+    h1 { margin: 0 0 6px; font-size: 1.3rem; color: var(--primary); }
+    p { line-height: 1.5; }
+    .muted { color: var(--muted); font-size: 0.9rem; }
+    button { height: 44px; padding: 0 20px; border: none; border-radius: 10px; background: var(--primary); color: #fff; font: inherit; font-weight: 700; cursor: pointer; }
+    .field { margin-top: 18px; }
+    .field label { display: block; font-weight: 700; margin-bottom: 6px; }
+    .field .hint { font-size: 0.85rem; color: var(--muted); margin-bottom: 6px; }
+    .row { display: flex; gap: 8px; }
+    textarea { flex: 1; min-height: 52px; padding: 10px; border: 1.5px solid #D9D9D9; border-radius: 8px; font: 0.85rem ui-monospace, Consolas, monospace; resize: vertical; word-break: break-all; }
+    .copy { background: #fff; color: var(--primary); border: 1.5px solid var(--primary); height: auto; padding: 0 14px; }
+    .secret label { color: var(--danger); }
+    #out { display: none; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Generator kluczy powiadomień (VAPID)</h1>
+  <p class="muted">Klucze powstają w tej przeglądarce i nigdzie nie są wysyłane. Wygeneruj je <b>raz</b>.</p>
+  <button type="button" id="gen">Wygeneruj klucze</button>
+
+  <div id="out">
+    <div class="field">
+      <label for="pub">1. Klucz publiczny</label>
+      <div class="hint">Jawny. Wklej go do rozmowy z Claude (trafi do kodu strony) oraz w Supabase jako sekret <code>VAPID_PUBLIC_KEY</code>.</div>
+      <div class="row"><textarea id="pub" readonly></textarea><button type="button" class="copy" data-copy="pub">Kopiuj</button></div>
+    </div>
+    <div class="field secret">
+      <label for="priv">2. Klucz prywatny — TAJNY</label>
+      <div class="hint">Tylko w Supabase jako sekret <code>VAPID_PRIVATE_KEY</code>. Nikomu go nie pokazuj i nie wklejaj do kodu.</div>
+      <div class="row"><textarea id="priv" readonly></textarea><button type="button" class="copy" data-copy="priv">Kopiuj</button></div>
+    </div>
+    <div class="field secret">
+      <label for="hook">3. Hasło wywołania funkcji — TAJNE</label>
+      <div class="hint">W Supabase jako sekret <code>PUSH_HOOK_SECRET</code> oraz w skrypcie sql/31 w miejscu <code>WKLEJ_TUTAJ_HASLO</code>.</div>
+      <div class="row"><textarea id="hook" readonly></textarea><button type="button" class="copy" data-copy="hook">Kopiuj</button></div>
+    </div>
+  </div>
+</main>
+<script>
+  const b64url = buf => btoa(String.fromCharCode(...new Uint8Array(buf)))
+    .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+
+  document.getElementById("gen").addEventListener("click", async () => {
+    const pair = await crypto.subtle.generateKey({ name: "ECDSA", namedCurve: "P-256" }, true, ["sign", "verify"]);
+    const pub = await crypto.subtle.exportKey("raw", pair.publicKey);   // 65 bajtów
+    const jwk = await crypto.subtle.exportKey("jwk", pair.privateKey);  // d = klucz prywatny
+    document.getElementById("pub").value = b64url(pub);
+    document.getElementById("priv").value = jwk.d;
+    document.getElementById("hook").value = b64url(crypto.getRandomValues(new Uint8Array(24)));
+    document.getElementById("out").style.display = "block";
+  });
+
+  document.querySelectorAll("[data-copy]").forEach(btn => btn.addEventListener("click", async () => {
+    const el = document.getElementById(btn.dataset.copy);
+    try { await navigator.clipboard.writeText(el.value); } catch (e) { el.select(); document.execCommand("copy"); }
+    btn.textContent = "Skopiowano";
+    setTimeout(() => { btn.textContent = "Kopiuj"; }, 1500);
+  }));
+</script>
+</body>
+</html>

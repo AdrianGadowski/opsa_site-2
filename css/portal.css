@@ -370,3 +370,65 @@
    ukryta zakładka (wyłączony moduł) nie zajmuje kolumny. */
 .login-tabs { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
 .login-tabs button { width: 100%; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+
+
+/* Portal pracownika: cały kafel "Przyszły tydzień" na żółto (jak zielony "Ten tydzień") */
+.ep-shift.next { background: linear-gradient(135deg, #FDDF63 0%, #FCD444 50%, #E8BE2E 100%); border-color: transparent; box-shadow: 0 8px 22px rgba(224, 188, 60, 0.3); }
+.ep-shift.next .ico { background: rgba(255, 255, 255, 0.4); color: #7A5C00; }
+.ep-shift.next .lbl { color: #5C4500; }
+.ep-shift.next .val { color: #3D2E00; }
+.ep-shift.next.empty .val { color: #5C4500; }
+
+/* ==========================================================
+   Portal pracownika: harmonogram dzień po dniu (pn–niedz)
+   Dzień = nagłówek (PN, WT…) + 1 albo 2 kratki zmian, jak w Harmonogramie:
+   zmiana (I/II/III) i pod nią godziny - u góry rozpoczęcie, na dole zakończenie.
+   ========================================================== */
+.ep-schedule .ep-shift { align-items: flex-start; }
+.ep-days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; margin-top: 10px; }
+.ep-day { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.ep-day .d { font-size: 0.66rem; font-weight: 700; text-transform: uppercase; text-align: center; color: var(--text-muted); }
+.ep-day.today .d { color: var(--text-dark); text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 2px; }
+.ep-slot {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 54px; padding: 5px 2px;
+  border-radius: 9px; border: 1.5px solid #E5E7EB; background: #fff; text-align: center; line-height: 1.15;
+  font-variant-numeric: tabular-nums;
+}
+.ep-slot .l { font-size: 0.92rem; font-weight: 800; }
+.ep-slot .t { font-size: 0.64rem; font-weight: 500; color: #4B5563; }
+.ep-slot .l + .t { margin-top: 3px; }
+.ep-slot.work { background: #E6F4EA; border-color: rgba(8, 88, 75, 0.35); color: var(--primary); }
+.ep-slot.absence { background: #FDECEC; border-color: rgba(217, 56, 58, 0.4); color: var(--danger); }
+.ep-slot.absence .l { font-size: 0.72rem; }
+.ep-slot.off { background: #F3F4F6; border-color: #E5E7EB; color: #6B7280; }
+.ep-slot.off .l { font-size: 0.72rem; }
+.ep-slot.none { border-style: dashed; color: #C4C8CE; }
+.ep-slot.none .l { font-weight: 500; }
+.ep-day.today .ep-slot { box-shadow: 0 0 0 2px var(--accent); }
+
+/* na ciemnozielonym kaflu "Ten tydzień" */
+.ep-shift.now .ep-day .d { color: rgba(255, 255, 255, 0.75); }
+.ep-shift.now .ep-day.today .d { color: #fff; }
+.ep-shift.now .ep-slot.work { background: #fff; border-color: #fff; }
+.ep-shift.now .ep-slot.absence { background: #FDECEC; border-color: #FDECEC; }
+.ep-shift.now .ep-slot.off { background: rgba(255, 255, 255, 0.85); border-color: transparent; }
+.ep-shift.now .ep-slot.none { background: transparent; border-color: rgba(255, 255, 255, 0.3); color: rgba(255, 255, 255, 0.5); }
+
+/* na żółtym kaflu "Przyszły tydzień" */
+.ep-shift.next .ep-day .d { color: #7A5C00; }
+.ep-shift.next .ep-day.today .d { color: #3D2E00; }
+.ep-shift.next .ep-slot.work { background: #fff; border-color: rgba(8, 88, 75, 0.35); }
+.ep-shift.next .ep-slot.off { background: rgba(255, 255, 255, 0.7); border-color: transparent; }
+.ep-shift.next .ep-slot.none { background: rgba(255, 255, 255, 0.35); border-color: rgba(122, 92, 0, 0.25); color: rgba(122, 92, 0, 0.45); }
+.ep-shift.next .ep-day.today .ep-slot { box-shadow: 0 0 0 2px var(--primary); }
+
+@media (max-width: 768px) {
+  .ep-days { gap: 4px; }
+  .ep-slot { min-height: 50px; padding: 4px 1px; }
+  .ep-slot .l { font-size: 0.82rem; }
+  .ep-slot .t { font-size: 0.6rem; }
+}
+
+/* Ikona kafla tygodnia: tło na całą wysokość kafla, ikona na środku */
+.ep-schedule .ep-shift { align-items: stretch; }
+.ep-schedule .ep-shift .ico { align-self: stretch; height: auto; min-height: 46px; width: 46px; display: flex; align-items: center; justify-content: center; }

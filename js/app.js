@@ -48,7 +48,7 @@ const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
 
 // Numer wydania doklejany do adresów plików, żeby przeglądarka nie używała starych kopii.
 // Zmieniaj przy każdej publikacji - tutaj i w index.html (?v=...).
-const APP_BUILD = "20261103";
+const APP_BUILD = "20261137";
 
 let currentUser = null;
 let cachedUsers = [];
@@ -65,7 +65,8 @@ const viewTitles = {
   updates: "Aktualizacje systemu",
   user: "Moje konto",
   options: "Opcje systemu",
-  logs: "Logi systemu"
+  logs: "Logi systemu",
+  absences: "Zgłoszenia nieobecności"
 };
 
 // Kliknięcie w awatar lub dane użytkownika w stopce menu otwiera "Moje konto"
@@ -151,6 +152,8 @@ function applyLoginTabs() {
 
 // Czy zalogowany użytkownik może otworzyć widok (decyduje uprawnienie)
 function canOpenView(viewKey) {
+  // zgłoszenia nieobecności: mistrzowie (rola "Mistrz") i administrator (absences.js)
+  if (viewKey === "absences") return typeof abCanReview === "function" && abCanReview();
   const info = permissionMap[viewKey];
   if (info && !hasPermission(info.column)) return false;
   return true;
@@ -655,6 +658,13 @@ function runLoadingSequence(progressBar, statusText, onComplete) {
 // ==========================================
 function initDashboardApp(startView) {
   document.getElementById("app-container").style.display = "flex";
+
+  // widok z adresu (np. kliknięte powiadomienie: ?view=absences) ma pierwszeństwo; adres wraca do czystego
+  const urlView = new URLSearchParams(location.search).get("view");
+  if (urlView) {
+    startView = urlView;
+    history.replaceState(null, "", location.pathname);
+  }
   
   const firstName = (currentUser.name || "").trim();
   const lastName = (currentUser.last_name || "").trim();
@@ -673,6 +683,8 @@ function initDashboardApp(startView) {
   }
 
   const firstAvailableView = applyNavVisibility();
+  if (typeof abStartBadge === "function") abStartBadge(); // dymek z liczbą zgłoszeń nieobecności
+  if (typeof pushSync === "function") pushSync();         // to urządzenie dostaje powiadomienia tej osoby
 
   // Po odświeżeniu strony wróć do ostatnio otwartego widoku, jeśli nadal jest dozwolony
   if (startView && viewTitles[startView] && canOpenView(startView)) {
@@ -761,6 +773,9 @@ async function onViewLoaded(viewName) {
     case 'updates':
       await initUpdatesView();
       break;
+    case 'absences':
+      await initAbsencesView();
+      break;
     case 'logs':
       await initLogsView();
       break;
@@ -780,7 +795,11 @@ function toggleModal(modalId, show) {
 // ==========================================
 function handleLogout() {
   // log musi wyjść, zanim sesja zostanie zamknięta
-  (currentUser ? logAction("Wylogowanie") : Promise.resolve()).finally(authSignOut);
+  // log i odłączenie urządzenia od powiadomień muszą wyjść, zanim sesja zostanie zamknięta
+  Promise.all([
+    currentUser ? logAction("Wylogowanie") : null,
+    typeof pushForget === "function" ? pushForget() : null
+  ]).finally(authSignOut);
   currentUser = null;
   clearSession();
   clearLoginError();
@@ -1308,13 +1327,14 @@ async function loadEmployeesList() {
         department:department_id ( department )
       `)
       .eq("active", true)
+      .order("first_name", { ascending: true })
       .order("last_name", { ascending: true });
 
     if (error) {
       console.error("Błąd pobierania bazy pracowników:", error);
       tbody.innerHTML = `
         <tr>
-          <td colspan="5" style="text-align: center; color: var(--danger); padding: 25px;">
+          <td colspan="6" style="text-align: center; color: var(--danger); padding: 25px;">
             Wystąpił błąd podczas pobierania pracowników: ${error.message}
           </td>
         </tr>
@@ -1324,10 +1344,12 @@ async function loadEmployeesList() {
 
     cachedEmployees = employees || [];
     renderEmployeesTable(cachedEmployees);
+    // obecność w bieżącym tygodniu: osobno, błąd nie psuje listy (employee_presence.js)
+    if (typeof prLoad === "function") prLoad();
 
   } catch (err) {
     console.error("Niespodziewany błąd pobierania pracowników:", err);
-    tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--danger); padding: 20px;">Błąd pobierania danych.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--danger); padding: 20px;">Błąd pobierania danych.</td></tr>`;
   }
 }
 
@@ -1338,7 +1360,7 @@ function renderEmployeesTable(list) {
   if (list.length === 0) {
     tbody.innerHTML = `
       <tr>
-        <td colspan="5" style="text-align: center; color: var(--text-muted); padding: 30px;">
+        <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 30px;">
           Brak aktywnych pracowników spełniających podane kryteria.
         </td>
       </tr>
@@ -1379,6 +1401,9 @@ function renderEmployeesTable(list) {
         </td>
         <td style="padding: 14px 18px; color: var(--text-muted); font-size: 0.88rem;">
           ${deptName}
+        </td>
+        <td class="pr-cell" data-emp="${Number(emp.id)}" style="padding: 10px 12px;">
+          ${typeof prCellHtml === "function" ? prCellHtml(emp.id) : ""}
         </td>
         <td style="padding: 14px 18px; text-align: center; white-space: nowrap;">
           <button class="link-btn" title="Podgląd godzin" style="font-size: 1rem; padding: 4px 8px; cursor: pointer; margin-right: 6px;" onclick="ehOpen(${emp.id})">

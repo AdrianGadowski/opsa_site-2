@@ -1,0 +1,173 @@
+/* ==========================================================
+   Zgłoszenia nieobecności (js/absences.js):
+   dymek z liczbą w menu, widok mistrza, okna, sekcja w portalu pracownika
+   ========================================================== */
+
+/* ---------- Dymek z liczbą zgłoszeń ---------- */
+.ab-bell {
+  position: relative; flex-shrink: 0; width: 34px; height: 34px; border-radius: 9px; border: none; cursor: pointer;
+  background: transparent; color: var(--text-muted); font-size: 1rem; display: inline-flex; align-items: center; justify-content: center;
+}
+.ab-bell:hover { background: rgba(8, 88, 75, 0.08); color: var(--primary); }
+.ab-bell.has { color: var(--primary); }
+.ab-bell.has i { animation: ab-ring 2.4s ease-in-out infinite; transform-origin: 50% 10%; }
+@keyframes ab-ring { 0%, 86%, 100% { transform: rotate(0); } 89% { transform: rotate(14deg); } 93% { transform: rotate(-12deg); } 97% { transform: rotate(6deg); } }
+@media (prefers-reduced-motion: reduce) { .ab-bell.has i { animation: none; } }
+.ab-badge {
+  min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: var(--danger); color: #fff;
+  font-size: 0.68rem; font-weight: 800; line-height: 18px; text-align: center; box-shadow: 0 0 0 2px #fff;
+}
+.ab-bell .ab-badge { position: absolute; top: -4px; right: -5px; }
+.menu-btn .ab-badge { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); box-shadow: none; }
+.sidebar .ab-bell { color: rgba(255, 255, 255, 0.7); }
+.sidebar .ab-bell:hover { background: rgba(255, 255, 255, 0.1); color: #fff; }
+.sidebar .ab-bell.has { color: var(--accent); }
+.sidebar .ab-bell .ab-badge { box-shadow: 0 0 0 2px #053D34; }
+.ab-badge-inline { display: inline-block; margin-left: 6px; box-shadow: none; }
+/* telefon: kropka na przycisku menu, gdy są zgłoszenia */
+.topbar-menu-btn { position: relative; }
+.topbar-menu-btn.ab-dot::after {
+  content: ""; position: absolute; top: 6px; right: 6px; width: 9px; height: 9px; border-radius: 50%;
+  background: var(--danger); box-shadow: 0 0 0 2px #fff;
+}
+
+/* ---------- Widok mistrza ---------- */
+.ab-hint { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; font-size: 0.88rem; color: var(--text-muted); }
+.ab-hint b { color: var(--text-dark); }
+.ab-tabs { display: flex; gap: 4px; padding: 10px 12px 0; border-bottom: 1px solid var(--border-color); flex-wrap: wrap; }
+.ab-tab {
+  border: none; background: none; padding: 10px 14px; font-family: inherit; font-size: 0.88rem; font-weight: 600; color: var(--text-muted);
+  cursor: pointer; border-bottom: 3px solid transparent; margin-bottom: -1px; display: inline-flex; align-items: center; gap: 7px;
+}
+.ab-tab:hover { color: var(--primary); }
+.ab-tab.on { color: var(--primary); border-bottom-color: var(--primary); }
+.ab-table td { padding: 12px 14px; vertical-align: middle; font-size: 0.88rem; }
+.ab-name { font-weight: 600; color: var(--primary); white-space: nowrap; }
+.ab-when { white-space: nowrap; font-weight: 600; }
+.ab-desc { margin-top: 3px; font-size: 0.78rem; color: var(--text-muted); }
+.ab-muted { color: var(--text-muted); font-size: 0.8rem; }
+.ab-empty { text-align: center; color: var(--text-muted); padding: 30px !important; }
+.ab-actions { white-space: nowrap; text-align: right; }
+.ab-btn {
+  height: 34px; padding: 0 12px; border-radius: 8px; font-family: inherit; font-size: 0.8rem; font-weight: 700; cursor: pointer;
+  border: 1.5px solid transparent; margin-left: 6px;
+}
+.ab-btn.ok { background: var(--primary); color: #fff; }
+.ab-btn.ok:hover { background: var(--primary-hover); }
+.ab-btn.no { background: #fff; color: var(--danger); border-color: rgba(217, 56, 58, 0.5); }
+.ab-btn.no:hover { background: #FDECEC; }
+
+.ab-status { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: 999px; font-size: 0.76rem; font-weight: 700; white-space: nowrap; }
+.ab-status.pending { background: rgba(252, 212, 68, 0.3); color: #7a5c00; }
+.ab-status.approved { background: rgba(16, 185, 129, 0.12); color: #0b7a57; }
+.ab-status.rejected { background: rgba(217, 56, 58, 0.1); color: var(--danger); }
+.ab-status.cancelled { background: #F3F4F6; color: #6B7280; }
+
+/* ---------- Okna ---------- */
+.ab-modal-box { max-width: 480px; width: 94%; position: relative; }
+.ab-quick { display: flex; gap: 6px; flex-wrap: wrap; margin: -4px 0 12px; }
+.ab-quick button {
+  border: 1.5px solid #D9D9D9; background: #fff; border-radius: 999px; padding: 5px 12px; font-family: inherit; font-size: 0.78rem;
+  font-weight: 600; color: #4B5563; cursor: pointer;
+}
+.ab-quick button:hover { border-color: var(--primary); color: var(--primary); }
+.ab-row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.ab-days { font-size: 0.8rem; color: var(--text-muted); margin: -6px 0 10px; }
+.ab-approvers { display: flex; gap: 8px; align-items: flex-start; padding: 10px 12px; border-radius: 8px; font-size: 0.84rem; line-height: 1.4;
+  background: rgba(8, 88, 75, 0.06); border: 1px solid rgba(8, 88, 75, 0.2); color: #08584B; margin-bottom: 12px; }
+.ab-approvers i { margin-top: 3px; }
+.ab-approvers.warn { background: rgba(252, 212, 68, 0.25); border-color: rgba(224, 188, 60, 0.6); color: #7a5c00; }
+.ab-summary { background: #F5F5F7; border-radius: 8px; padding: 12px 14px; font-size: 0.9rem; line-height: 1.5; margin-bottom: 10px; }
+.ab-info { font-size: 0.82rem; color: var(--text-muted); margin-bottom: 10px; }
+
+/* ---------- Portal pracownika ---------- */
+.ep-abs { margin-bottom: 16px; padding: 16px 18px; border-radius: 14px; background: #fff; border: 1px solid var(--border-color); box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04); }
+.ep-abs-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+.ep-abs-head h4 { margin: 0; font-size: 1rem; color: var(--text-dark); display: flex; align-items: center; gap: 8px; }
+.ep-abs-head h4 i { color: var(--danger); }
+.ep-abs-btn {
+  height: 38px; padding: 0 16px; border-radius: 10px; border: none; background: var(--primary); color: #fff; font-family: inherit;
+  font-size: 0.86rem; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 8px;
+}
+.ep-abs-btn:hover { background: var(--primary-hover); }
+.ep-abs-item { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 0; border-top: 1px solid #F0F0F0; }
+.ep-abs-item .when { font-weight: 700; font-size: 0.9rem; color: var(--text-dark); }
+.ep-abs-item .why { font-size: 0.82rem; color: var(--text-muted); margin-top: 2px; }
+.ep-abs-item .note { font-size: 0.8rem; color: #4B5563; margin-top: 4px; }
+.ep-abs-item .side { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; flex-shrink: 0; }
+.ep-abs-cancel { border: none; background: none; color: var(--danger); font-family: inherit; font-size: 0.78rem; font-weight: 600; cursor: pointer; padding: 2px 4px; }
+.ep-abs-cancel:hover { text-decoration: underline; }
+.ep-abs-cancel.armed { background: var(--danger); color: #fff; border-radius: 6px; padding: 4px 8px; text-decoration: none; }
+.ep-abs-empty { padding: 10px 0 2px; font-size: 0.86rem; color: var(--text-muted); border-top: 1px solid #F0F0F0; }
+
+@media (max-width: 768px) {
+  .ab-row2 { grid-template-columns: 1fr; }
+  .ab-actions { text-align: left; }
+  .ab-btn { margin: 4px 6px 0 0; }
+  .ep-abs-item { flex-direction: column; align-items: flex-start; }
+  .ep-abs-item .side { flex-direction: row; align-items: center; }
+  .ep-abs-btn { width: 100%; justify-content: center; }
+}
+
+/* Mistrzowie działu jeden pod drugim */
+.ab-approvers > div { flex: 1; min-width: 0; }
+.ab-approver-list { list-style: none; margin: 6px 0 0; padding: 0; }
+.ab-approver-list li { padding: 2px 0; font-weight: 600; }
+.ab-approver-list li::before { content: "•"; margin-right: 7px; opacity: 0.6; }
+
+/* Zakres nieobecności: cały dzień / I / II / III / godziny */
+.ab-span { display: flex; gap: 6px; flex-wrap: wrap; }
+.ab-span button {
+  height: 36px; min-width: 40px; padding: 0 12px; border-radius: 8px; border: 1.5px solid #D9D9D9; background: #fff;
+  font-family: inherit; font-size: 0.82rem; font-weight: 700; color: #4B5563; cursor: pointer;
+}
+.ab-span button:hover { border-color: var(--primary); color: var(--primary); }
+.ab-span button.on, .ab-span button.on:hover { background: var(--primary); border-color: var(--primary); color: #fff; }
+.ab-hours { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+.ab-time {
+  width: 86px; height: 38px; border-radius: 8px; border: 1.5px solid #D9D9D9; background: #fff; cursor: pointer;
+  font-family: inherit; font-size: 0.9rem; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--text-dark);
+}
+.ab-time.empty { color: var(--text-muted); font-weight: 500; }
+.ab-time:hover, .ab-time.open { border-color: var(--primary); }
+
+/* Portal: rozpatrzone zgłoszenia zwinięte pod przyciskiem, rozwijane z animacją */
+.ep-abs-more {
+  display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; margin-top: 10px; height: 40px;
+  border-radius: 10px; border: 1.5px solid #D9D9D9; background: #F9FAFB; cursor: pointer;
+  font-family: inherit; font-size: 0.86rem; font-weight: 700; color: var(--primary);
+  transition: background 0.2s, border-color 0.2s;
+}
+.ep-abs-more:hover { background: rgba(8, 88, 75, 0.06); border-color: var(--primary); }
+.ep-abs-more:focus-visible { outline: 3px solid rgba(8, 88, 75, 0.35); outline-offset: 2px; }
+.ep-abs-more .cnt { min-width: 22px; height: 20px; padding: 0 6px; border-radius: 999px; background: var(--primary); color: #fff; font-size: 0.72rem; line-height: 20px; }
+.ep-abs-more i { transition: transform 0.3s ease; }
+.ep-abs-more.open i { transform: rotate(180deg); }
+.ep-abs-done { display: grid; grid-template-rows: 0fr; opacity: 0; transition: grid-template-rows 0.35s ease, opacity 0.3s ease; }
+.ep-abs-done.open { grid-template-rows: 1fr; opacity: 1; }
+.ep-abs-done > .in { overflow: hidden; min-height: 0; }
+.ep-abs-done .ep-abs-item { opacity: 0.9; }
+@media (prefers-reduced-motion: reduce) {
+  .ep-abs-done, .ep-abs-more i { transition: none; }
+}
+
+/* ---------- Powiadomienia push (js/push.js) ---------- */
+.ab-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+.ab-top .ab-hint { margin-bottom: 0; flex: 1 1 300px; min-height: 38px; }
+.ab-push { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; max-width: 360px; }
+.push-btn {
+  height: 38px; padding: 0 14px; border-radius: 10px; border: 1.5px solid var(--primary); background: #fff; color: var(--primary);
+  font-family: inherit; font-size: 0.84rem; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; white-space: nowrap;
+}
+.push-btn:hover:not(:disabled) { background: rgba(8, 88, 75, 0.06); }
+.push-btn.on { background: var(--primary); color: #fff; }
+.push-btn.on:hover { background: var(--primary-hover); }
+.push-btn.blocked, .push-btn:disabled { border-color: #D9D9D9; color: var(--text-muted); cursor: not-allowed; background: #F9FAFB; }
+.push-hint { font-size: 0.78rem; line-height: 1.4; color: #7a5c00; background: rgba(252, 212, 68, 0.2); border: 1px solid rgba(224, 188, 60, 0.5); border-radius: 8px; padding: 7px 10px; }
+.ep-abs-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.ep-abs .push-hint { margin-bottom: 8px; }
+@media (max-width: 768px) {
+  .ab-push { align-items: stretch; max-width: none; width: 100%; }
+  .push-btn { justify-content: center; width: 100%; }
+  .ep-abs-actions { width: 100%; flex-direction: column; }
+}

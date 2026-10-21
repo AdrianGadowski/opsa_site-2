@@ -17,7 +17,13 @@
   .rt-banner.success { background-image: linear-gradient(rgba(16, 185, 129, 0.1), rgba(16, 185, 129, 0.1)); color: #0b7a57; border: 1px solid rgba(16, 185, 129, 0.35); }
   .rt-banner.warning { background-image: linear-gradient(rgba(252, 212, 68, 0.25), rgba(252, 212, 68, 0.25)); color: #7a5c00; border: 1px solid rgba(224, 188, 60, 0.6); }
 
-  .rt-table-wrap { max-height: calc(100vh - 430px); min-height: 260px; overflow: auto; }
+  /* Tabela nie ma własnego przewijania: przewija się cała strona, a pasek podsumowania
+     (.rt-footer) jest zawsze przyklejony do dołu ekranu i leży POD tabelą - po przewinięciu
+     do końca ostatni pracownik jest widoczny nad nim, na każdej wysokości monitora. */
+  .rt-table-wrap { overflow: visible; }
+  .rt-table-card { overflow: hidden; overflow: clip; } /* clip: zaokrąglone rogi bez psucia przyklejonego nagłówka */
+  /* klawisz Tab przewija tak, żeby pole nie chowało się pod paskiem podsumowania */
+  .content-area:has(.rt-footer) { scroll-padding-bottom: 120px; }
   .rt-table thead th { position: sticky; top: 0; z-index: 2; background: #F9FAFB; }
 
   .rt-table td { vertical-align: middle; padding: 10px 14px; }
@@ -38,9 +44,31 @@
     color: var(--text-dark);
     cursor: pointer;
   }
-  .rt-time:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(8, 88, 75, 0.1); }
-  .rt-row.is-error .rt-time:invalid,
-  .rt-row.is-error .rt-time.rt-bad { border-color: var(--danger); }
+  .rt-time { font-family: inherit; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .rt-time.empty { color: var(--text-muted); font-weight: 500; }
+  .rt-time:hover { border-color: var(--primary); }
+  .rt-time:focus, .rt-time.open { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(8, 88, 75, 0.1); }
+  .rt-row.is-error .rt-time.empty { border-color: var(--danger); }
+
+  /* Od, Do i Zmiana blisko siebie: kolumny tylko tak szerokie, jak ich zawartość */
+  .rt-table th.rt-c-time, .rt-table td.rt-c-time,
+  .rt-table th.rt-c-shift, .rt-table td.rt-c-shift { width: 1%; white-space: nowrap; padding-left: 5px; padding-right: 5px; }
+  .rt-table th.rt-c-shift, .rt-table td.rt-c-shift { padding-left: 12px; padding-right: 12px; }
+
+  /* Przyciski zmian I, II, III (jak w Harmonogramie) */
+  .rt-presets { display: inline-flex; gap: 4px; }
+  .rt-preset {
+    min-width: 32px; height: 32px; padding: 0 7px; border-radius: 7px; cursor: pointer;
+    border: 1.5px solid #D9D9D9; background: #fff; color: #4B5563; font-family: inherit; font-size: 0.78rem; font-weight: 700;
+  }
+  .rt-preset:hover:not(:disabled) { border-color: var(--primary); color: var(--primary); }
+  .rt-preset.part { border-color: var(--primary); color: var(--primary); background: rgba(8, 88, 75, 0.08); }
+  .rt-preset.on { background: var(--primary); border-color: var(--primary); color: #fff; font-weight: 800; }
+  /* wybrana zmiana pod kursorem: napis zostaje biały (bez tego zielony napis znikał na zielonym tle) */
+  .rt-preset.on:hover:not(:disabled) { color: #fff; background: var(--primary-hover); border-color: var(--primary-hover); }
+  .rt-preset:disabled { opacity: 0.35; cursor: not-allowed; }
+  .rt-preset:focus-visible { outline: 3px solid rgba(8, 88, 75, 0.35); outline-offset: 1px; }
+
 
   .rt-sum { font-weight: 700; color: var(--primary); white-space: nowrap; min-width: 70px; }
   .rt-sum.empty { color: var(--text-muted); font-weight: 500; }
@@ -123,6 +151,7 @@
   .rt-mini-btn.neutral { background: #E5E5EA; color: var(--text-dark); }
   .rt-mini-btn.neutral:hover { background: #D1D1D6; }
 
+
   @media (max-width: 900px) {
     .rt-filters { grid-template-columns: 1fr 1fr !important; }
   }
@@ -148,18 +177,20 @@
     /* 3. linia: Od, Do, Suma z podpisami nad polami */
     #main-content .rt-table tr.rt-row td:nth-child(4),
     #main-content .rt-table tr.rt-row td:nth-child(5) { flex: 1 1 34%; }
-    #main-content .rt-table tr.rt-row td:nth-child(6) { flex: 0 0 22%; text-align: center !important; }
+    #main-content .rt-table tr.rt-row td:nth-child(7) { flex: 0 0 22%; text-align: center !important; }
     #main-content .rt-table tr.rt-row td:nth-child(4)::before,
     #main-content .rt-table tr.rt-row td:nth-child(5)::before,
-    #main-content .rt-table tr.rt-row td:nth-child(6)::before {
+    #main-content .rt-table tr.rt-row td:nth-child(7)::before {
       content: attr(data-label); position: static; display: block; width: auto; margin-bottom: 3px;
     }
-    #main-content .rt-table tr.rt-row td:nth-child(6)::before { text-align: center; }
+    #main-content .rt-table tr.rt-row td:nth-child(7)::before { text-align: center; }
     .rt-time { width: 100%; padding: 10px 8px; font-size: 0.95rem; }
 
-    /* 4. linia: suwak nieobecności i czyszczenie wiersza */
-    #main-content .rt-table tr.rt-row td:nth-child(7) { flex: 1 1 60%; padding-top: 4px !important; }
-    #main-content .rt-table tr.rt-row td:nth-child(8) { flex: 0 0 auto; margin-left: auto; }
+    /* 4. linia: przyciski zmian I/II/III, suwak nieobecności i czyszczenie wiersza */
+    #main-content .rt-table tr.rt-row td:nth-child(6) { order: 1; flex: 0 0 auto; padding-top: 4px !important; }
+    #main-content .rt-table tr.rt-row td:nth-child(8) { order: 1; flex: 1 1 auto; padding-top: 4px !important; padding-left: 8px !important; }
+    #main-content .rt-table tr.rt-row td:nth-child(9) { order: 1; flex: 0 0 auto; margin-left: auto; }
+    .rt-preset { min-width: 38px; height: 38px; }
     .rt-clear { padding: 8px 12px; font-size: 1rem; }
 
     /* Dolny pasek: statystyki nad przyciskami */
@@ -192,7 +223,7 @@
 
 <!-- Filtry -->
 <div class="card" style="margin-bottom: 20px; padding: 16px 20px;">
-  <div class="rt-filters" style="display: grid; grid-template-columns: 2fr 1.2fr 1.2fr auto; gap: 14px; align-items: end;">
+  <div class="rt-filters" style="display: grid; grid-template-columns: 2fr 1.2fr 1.2fr 1.4fr auto; gap: 14px; align-items: end;">
     <div class="form-group" style="margin-bottom: 0;">
       <label for="rt-filter-search" style="font-size: 0.8rem; color: var(--text-muted);">Szukaj pracownika</label>
       <div style="position: relative;">
@@ -215,6 +246,18 @@
       </select>
     </div>
 
+    <div class="form-group" style="margin-bottom: 0;">
+      <label for="rt-filter-list" style="font-size: 0.8rem; color: var(--text-muted);">Moja lista</label>
+      <div class="rt-list-field">
+        <select id="rt-filter-list" class="form-control" onchange="rtApplyFilters()">
+          <option value="">Wszyscy pracownicy</option>
+        </select>
+        <button type="button" class="rt-list-btn" onclick="rtlOpen()" title="Moje listy pracowników: utwórz, zmień, usuń" aria-label="Zarządzaj moimi listami pracowników">
+          <i class="fa-solid fa-list-check"></i>
+        </button>
+      </div>
+    </div>
+
     <div>
       <button type="button" class="btn-secondary" style="height: 42px; padding: 0 16px; font-size: 0.85rem;" onclick="rtResetFilters()" title="Wyczyść filtry">
         <i class="fa-solid fa-rotate-left" style="margin-right: 6px;"></i> Reset
@@ -224,7 +267,7 @@
 </div>
 
 <!-- Tabela pracowników -->
-<div class="card" style="padding: 0; overflow: hidden; margin-bottom: 0;">
+<div class="card rt-table-card" style="padding: 0; margin-bottom: 0;">
   <div class="rt-table-wrap">
     <table class="users-table rt-table" style="width: 100%; border-collapse: collapse; text-align: left;">
       <thead>
@@ -232,8 +275,9 @@
           <th class="rt-name">Pracownik</th>
           <th>Firma</th>
           <th>Dział</th>
-          <th>Od</th>
-          <th>Do</th>
+          <th class="rt-c-time">Od</th>
+          <th class="rt-c-time">Do</th>
+          <th class="rt-c-shift">Zmiana</th>
           <th>Suma</th>
           <th>Nieobecność</th>
           <th style="width: 44px;"></th>
@@ -241,7 +285,7 @@
       </thead>
       <tbody id="rt-table-body">
         <tr>
-          <td colspan="8" style="text-align: center; padding: 30px; color: var(--text-muted);">
+          <td colspan="9" style="text-align: center; padding: 30px; color: var(--text-muted);">
             <i class="fa-solid fa-spinner fa-spin"></i> Ładowanie pracowników...
           </td>
         </tr>

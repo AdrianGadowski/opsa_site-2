@@ -2,6 +2,61 @@
   /* Telefon, Firma i Dział wyśrodkowane (nagłówki i komórki) */
   .emp-table th:nth-child(n+2):nth-child(-n+4),
   .emp-table td:nth-child(n+2):nth-child(-n+4) { text-align: center; }
+
+  /* Obecność w bieżącym tygodniu: kafelki pn–niedz (js/employee_presence.js) */
+  .emp-table th.pr-head, .emp-table td.pr-cell { text-align: center; }
+  .pr-head .range { display: block; font-weight: 500; font-size: 0.72rem; color: var(--text-muted); margin-top: 2px; }
+  .pr-week { display: inline-flex; gap: 4px; padding-bottom: 4px; }
+  .pr-day {
+    min-width: 38px; height: 28px; padding: 0 4px; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center;
+    font-size: 0.7rem; font-weight: 700; border: 1px solid transparent; cursor: default; box-sizing: border-box;
+  }
+  .pr-day.plan   { border-color: var(--primary); color: var(--primary); background: #fff; }
+  .pr-day.ok     { background: var(--primary); border-color: var(--primary); color: #fff; }
+  .pr-day.diff   { background: var(--accent); border-color: var(--accent-hover); color: #03241E; }
+  .pr-day.absent { background: var(--danger); border-color: var(--danger); color: #fff; }
+  .pr-day.none   { background: #E5E7EB; border-color: #E5E7EB; color: #6B7280; }
+  .pr-day.absplan { border-color: var(--danger); color: var(--danger); background: #fff; }
+  /* dzisiaj: cienka ciemna kreska pod kafelkiem zamiast grubej obwódki */
+  .pr-day.today  { position: relative; }
+  .pr-day.today::after { content: ""; position: absolute; left: 25%; right: 25%; bottom: -5px; height: 2px; border-radius: 2px; background: #1F2937; }
+  .pr-loading { color: var(--text-muted); font-size: 0.85rem; }
+
+  .pr-legend { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; padding: 10px 18px; border-bottom: 1px solid var(--border-color); font-size: 0.78rem; color: var(--text-muted); }
+  .pr-legend b { color: var(--text-dark); font-weight: 600; margin-right: 2px; }
+  .pr-legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .pr-legend .pr-day { min-width: 22px; height: 16px; padding: 0; border-radius: 4px; }
+  @media (max-width: 768px) {
+    .pr-week { flex-wrap: wrap; justify-content: flex-end; }
+    .pr-day { min-width: 34px; }
+  }
+
+  /* Okienko po najechaniu na kafelek dnia (js/employee_presence.js) */
+  .pr-day { cursor: help; }
+  .pr-day:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+  .pr-tip {
+    display: none; position: fixed; z-index: 1300; width: 260px; padding: 12px 14px; border-radius: 10px;
+    background: #fff; border: 1px solid var(--border-color); box-shadow: 0 12px 30px rgba(0, 0, 0, 0.16);
+    font-size: 0.82rem; color: var(--text-dark); pointer-events: none; text-align: center;
+  }
+  .pr-tip.open { display: block; }
+  .pr-tip .head { display: flex; flex-direction: column; align-items: center; gap: 2px; margin-bottom: 8px; }
+  .pr-tip .head b { font-size: 0.9rem; text-transform: capitalize; }
+  .pr-tip .head span { font-size: 0.78rem; color: var(--text-muted); }
+  .pr-tip .state { display: block; width: fit-content; margin: 0 auto 4px; padding: 3px 10px; border-radius: 999px; font-size: 0.74rem; font-weight: 700; text-align: center; }
+  .pr-tip .state.ok { background: var(--primary); color: #fff; }
+  .pr-tip .state.diff { background: var(--accent); color: #03241E; }
+  .pr-tip .state.absent { background: var(--danger); color: #fff; }
+  .pr-tip .state.plan { border: 1.5px solid var(--primary); color: var(--primary); }
+  .pr-tip .state.absplan { border: 1.5px solid var(--danger); color: var(--danger); }
+  .pr-tip .state.none { background: #E5E7EB; color: #4B5563; }
+  .pr-tip .sec { margin: 8px 0 4px; font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: #6B7280; }
+  .pr-tip .row { display: flex; align-items: center; justify-content: center; gap: 8px; flex-wrap: wrap; padding: 2px 0; font-variant-numeric: tabular-nums; }
+  .pr-tip .muted { color: var(--text-muted); font-size: 0.78rem; }
+  .pr-tip .tag { min-width: 84px; padding: 2px 7px; border-radius: 5px; font-size: 0.72rem; font-weight: 700; text-align: center; display: inline-flex; align-items: center; justify-content: center; }
+  .pr-tip .tag.work { background: rgba(8, 88, 75, 0.1); color: var(--primary); }
+  .pr-tip .tag.absence { background: rgba(217, 56, 58, 0.12); color: var(--danger); }
+  .pr-tip .tag.off { background: #F3F4F6; color: #6B7280; }
 </style>
 
 <!-- Karta nagłówka z przyciskiem dodawania -->
@@ -72,6 +127,15 @@
 
 <!-- Karta z tabelą pracowników -->
 <div class="card" style="padding: 0; overflow: hidden;">
+  <div class="pr-legend" aria-label="Legenda kolumny Obecność">
+    <b>Obecność (bieżący tydzień):</b>
+    <span><i class="pr-day plan"></i> zaplanowany</span>
+    <span><i class="pr-day ok"></i> obecny zgodnie z harmonogramem</span>
+    <span><i class="pr-day diff"></i> obecny inaczej niż w harmonogramie</span>
+    <span><i class="pr-day absent"></i> nieobecny</span>
+    <span><i class="pr-day absplan"></i> zgłoszona nieobecność</span>
+    <span><i class="pr-day none"></i> brak zaplanowanych godzin</span>
+  </div>
   <div style="overflow-x: auto;">
     <table class="users-table emp-table" style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.9rem;">
       <thead>
@@ -80,12 +144,13 @@
           <th style="padding: 14px 18px;">Telefon</th>
           <th style="padding: 14px 18px;">Firma</th>
           <th style="padding: 14px 18px;">Dział</th>
+          <th id="emp-presence-head" class="pr-head" style="padding: 10px 12px;">Obecność<span class="range" id="emp-presence-range"></span></th>
           <th style="padding: 14px 18px; text-align: center; width: 150px;">Akcje</th>
         </tr>
       </thead>
       <tbody id="employees-table-body">
         <tr>
-          <td colspan="5" style="text-align: center; padding: 30px; color: var(--text-muted);">
+          <td colspan="6" style="text-align: center; padding: 30px; color: var(--text-muted);">
             <i class="fa-solid fa-spinner fa-spin"></i> Ładowanie pracowników...
           </td>
         </tr>

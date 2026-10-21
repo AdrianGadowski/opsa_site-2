@@ -100,7 +100,7 @@ async function dbLoad() {
     const [rows, yearOnly] = await Promise.all([
       rpFetchAll(() => supabaseClient
         .from("work_reports")
-        .select("report_date, shift, department_id, first_name_id, number_report, total_hours, at_work")
+        .select("*") // "*": działa też przed dodaniem kolumny id_department (sql/24)
         .like("report_date", pattern)),
       month
         ? rpFetchAll(() => supabaseClient
@@ -154,7 +154,10 @@ function dbRender(rows, year, month) {
     dbAdd(all, "all", r);
     dbAdd(byTime, Number(month ? d : m), r);
     dbAdd(byShift, r.shift || "Brak zmiany", r);
-    dbAdd(byDept, dbDeptById[r.department_id] || "Brak działu", r);
+    // dział raportu, jak w kolumnie „Dział” na liście raportów (dział mistrza);
+    // bez kolumny id_department w bazie (przed sql/24) - dział pracownika
+    const deptId = "id_department" in r ? r.id_department : r.department_id;
+    dbAdd(byDept, (deptId != null && (dbDeptById[deptId] || "Dział #" + deptId)) || "Brak działu", r);
     dbAdd(byBiz, emp?.business?.business || "Brak firmy", r);
     dbAdd(byEmp, r.first_name_id, r);
     reports.add(r.number_report);

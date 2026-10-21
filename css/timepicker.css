@@ -1,0 +1,38 @@
+/* ==========================================================
+   Okienko wyboru godziny (kafelki) - wspólne dla Rozliczenia czasu
+   i edycji raportu. Logika: js/report_time.js (rtPickerOpen).
+   ========================================================== */
+
+.rt-picker {
+  display: none; position: fixed; z-index: 1200; width: 300px; max-height: calc(100vh - 16px); overflow-y: auto;
+  padding: 12px; background: #fff; border-radius: 10px; border: 1px solid var(--border-color);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.16);
+}
+.rt-picker.open { display: block; }
+.rt-pick-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; font-size: 0.85rem; color: var(--text-muted); }
+.rt-pick-head b { color: var(--primary); }
+.rt-pick-x { border: none; background: none; color: var(--text-muted); cursor: pointer; font-size: 1rem; padding: 2px 6px; border-radius: 6px; }
+.rt-pick-x:hover { background: #F0F0F0; color: var(--text-dark); }
+.rt-pick-lbl { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.04em; font-weight: 700; color: #6B7280; margin: 8px 0 6px; text-align: center; }
+.rt-pick-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.rt-pick-grid.top { grid-template-columns: repeat(3, 1fr); }
+.rt-chip {
+  padding: 8px 0; border-radius: 7px; border: 1.5px solid #E5E7EB; background: #fff; color: var(--text-dark);
+  font-family: inherit; font-size: 0.88rem; font-variant-numeric: tabular-nums; text-align: center; cursor: pointer;
+}
+.rt-chip:hover { border-color: var(--primary); background: rgba(8, 88, 75, 0.05); }
+.rt-chip:focus-visible { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(8, 88, 75, 0.18); }
+.rt-chip.top { padding: 11px 0; font-size: 1rem; font-weight: 700; color: var(--primary); background: rgba(8, 88, 75, 0.06); border-color: rgba(8, 88, 75, 0.25); }
+.rt-chip.on, .rt-chip.top.on { background: var(--primary); border-color: var(--primary); color: #fff; }
+.rt-pick-empty { padding: 14px 6px; text-align: center; font-size: 0.85rem; color: var(--text-muted); }
+.rt-pick-clear {
+  display: block; width: 100%; margin-top: 10px; padding: 8px; border-radius: 7px; border: none; background: #F3F4F6;
+  color: var(--danger); font-family: inherit; font-size: 0.82rem; font-weight: 600; cursor: pointer;
+}
+.rt-pick-clear:hover { background: #FDECEC; }
+@media (max-width: 768px) {
+  /* telefon: panel u dołu ekranu */
+  .rt-picker { left: 0 !important; right: 0; top: auto !important; bottom: 0; width: auto; max-height: 75vh; border-radius: 14px 14px 0 0; padding: 14px 16px 20px; }
+  .rt-chip { padding: 11px 0; font-size: 0.95rem; }
+  .rt-chip.top { padding: 14px 0; }
+}

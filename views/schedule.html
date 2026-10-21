@@ -1,5 +1,5 @@
 <style>
-  /* ===== Harmonogram pracy ===== */
+  /* ===== Harmonogram pracy: siatka pracownicy × dni ===== */
   .sh-banner {
     display: none; align-items: center; gap: 10px; padding: 12px 16px; border-radius: 10px; margin-bottom: 20px;
     font-size: 0.9rem; font-weight: 500;
@@ -11,51 +11,103 @@
   /* Wybór tygodnia w zielonym nagłówku */
   .sh-weekpick { display: flex; align-items: center; gap: 6px; }
   .sh-weekpick button {
-    width: 42px; height: 44px; border-radius: 12px; cursor: pointer; font-size: 0.9rem;
+    height: 44px; min-width: 42px; padding: 0 12px; border-radius: 12px; cursor: pointer; font-size: 0.9rem; font-family: inherit;
     border: 1px solid rgba(255, 255, 255, 0.25); background: rgba(255, 255, 255, 0.12); color: #fff;
   }
   .sh-weekpick button:hover:not(:disabled) { background: rgba(255, 255, 255, 0.22); }
   .sh-weekpick button:disabled { opacity: 0.4; cursor: default; }
   .sh-weekpick button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
-
-  .sh-table td { vertical-align: middle; padding: 10px 14px; }
-  .sh-table th, .sh-table td { text-align: center; }
-  .sh-table th:first-child, .sh-table td.sh-name { text-align: left; }
-  .sh-name { font-weight: 600; color: var(--primary); white-space: nowrap; }
-  .sh-biz { background: rgba(8, 88, 75, 0.06); color: var(--primary); padding: 4px 9px; border-radius: 4px; font-size: 0.82rem; font-weight: 600; border: 1px solid rgba(8, 88, 75, 0.15); white-space: nowrap; }
-  .sh-table tr.is-set { background: rgba(16, 185, 129, 0.05); }
-
-  /* Poprzednie tygodnie (informacyjnie) */
-  .sh-history { display: flex; flex-direction: column; align-items: center; gap: 4px; }
-  .sh-chip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 9px; border-radius: 999px; background: #F1F3F5; color: #4B5563; font-size: 0.78rem; white-space: nowrap; }
-  .sh-chip b { font-weight: 700; color: #6B7280; font-size: 0.7rem; }
-  .sh-chip.none { background: transparent; color: #B0B5BC; }
-
-  /* Ustawianie godzin */
-  .sh-edit { display: inline-flex; align-items: center; justify-content: center; gap: 6px; flex-wrap: wrap; }
-  .sh-time {
-    width: 86px; padding: 7px 8px; border-radius: 6px; border: 1.5px solid #D9D9D9; background: #fff;
-    font-family: inherit; font-size: 0.88rem; text-align: center; color: var(--text-dark); cursor: pointer;
+  .sh-week-label {
+    min-width: 230px; height: 44px; display: inline-flex; align-items: center; justify-content: center; padding: 0 14px;
+    border-radius: 12px; background: rgba(255, 255, 255, 0.95); color: var(--primary); font-weight: 700; font-size: 0.92rem; white-space: nowrap;
   }
-  .sh-time:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(8, 88, 75, 0.1); }
-  .sh-presets { display: inline-flex; gap: 4px; margin-left: 4px; }
-  .sh-preset {
-    min-width: 30px; height: 30px; padding: 0 7px; border-radius: 7px; cursor: pointer;
-    border: 1.5px solid #D9D9D9; background: #fff; color: #4B5563; font-family: inherit; font-size: 0.76rem; font-weight: 700;
-  }
-  .sh-preset:hover { border-color: var(--primary); color: var(--primary); }
-  .sh-preset.on { background: var(--accent); border-color: var(--accent-hover); color: #03241E; }
-  .sh-preset:focus-visible, .sh-clear:focus-visible { outline: 3px solid rgba(8, 88, 75, 0.35); outline-offset: 1px; }
-  .sh-clear { padding: 6px 8px; color: var(--text-muted); }
-  .sh-raw { margin-top: 5px; font-size: 0.74rem; color: #B45309; }
-
-  .sh-status { min-width: 120px; font-size: 0.78rem; color: var(--text-muted); white-space: nowrap; }
-  .sh-status.saved { color: #0b7a57; font-weight: 600; }
-  .sh-status.error { color: var(--danger); font-weight: 600; white-space: normal; }
-  .sh-status.hint { color: #B45309; }
 
   .sh-toolbar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; padding: 12px 20px; border-bottom: 1px solid var(--border-color); }
   .sh-toolbar .info { font-size: 0.86rem; color: var(--text-muted); }
+  .sh-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 0.76rem; color: var(--text-muted); }
+  .sh-legend span { display: inline-flex; align-items: center; gap: 5px; }
+  .sh-legend i { width: 16px; height: 12px; border-radius: 3px; display: inline-block; border: 1.5px solid transparent; }
+
+  /* Tabela */
+  .sh-table { user-select: none; }
+  .sh-table td { vertical-align: middle; padding: 6px 8px; }
+  .sh-table th, .sh-table td { text-align: center; }
+  .sh-table th:first-child, .sh-table td.sh-name { text-align: left; }
+  .sh-name { white-space: nowrap; }
+  .sh-name-btn { border: none; background: none; padding: 4px 2px; font-family: inherit; font-size: 0.9rem; font-weight: 600; color: var(--primary); cursor: pointer; text-align: left; }
+  .sh-name-btn:hover { text-decoration: underline; }
+  .sh-biz { background: rgba(8, 88, 75, 0.06); color: var(--primary); padding: 4px 9px; border-radius: 4px; font-size: 0.8rem; font-weight: 600; border: 1px solid rgba(8, 88, 75, 0.15); white-space: nowrap; }
+  .sh-dept { color: var(--text-muted); font-size: 0.85rem; }
+
+  .sh-day-th { padding: 6px 4px !important; }
+  .sh-col-btn { border: none; background: none; cursor: pointer; font-family: inherit; color: #4B5563; display: inline-flex; flex-direction: column; align-items: center; padding: 2px 6px; border-radius: 6px; }
+  .sh-col-btn b { font-size: 0.8rem; }
+  .sh-col-btn span { font-size: 0.7rem; font-weight: 500; color: var(--text-muted); }
+  .sh-col-btn:hover { background: rgba(8, 88, 75, 0.08); color: var(--primary); }
+  .sh-day-th.today .sh-col-btn { background: var(--primary); color: #fff; }
+  .sh-day-th.today .sh-col-btn span { color: rgba(255, 255, 255, 0.85); }
+  .sh-day-td { padding: 4px 3px !important; }
+  .sh-day-td.we, .sh-day-th.we { background: rgba(0, 0, 0, 0.025); }
+
+  /* Kratka dnia */
+  .sh-cell {
+    width: 76px; height: 40px; border-radius: 8px; border: 1.5px solid #E5E7EB; background: #fff; cursor: pointer;
+    font-family: inherit; display: inline-flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
+    line-height: 1.1; padding: 2px; position: relative;
+  }
+  .sh-cell .m { font-size: 0.86rem; font-weight: 800; }
+  .sh-cell .s { font-size: 0.66rem; font-weight: 500; max-width: 70px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sh-cell.empty { color: #C4C8CE; border-style: dashed; }
+  .sh-cell.empty .m { font-weight: 500; font-size: 1rem; }
+  /* dwie kratki w dniu: u góry 1. zmiana, pod nią 2. zmiana (pusta - mniejsza i bledsza) */
+  .sh-pair { display: inline-flex; flex-direction: column; gap: 4px; }
+  .sh-cell.slot2.empty { height: 24px; opacity: 0.55; }
+  .sh-cell.slot2.empty .m { font-size: 0.8rem; }
+  .sh-cell.slot2.empty:hover, .sh-cell.slot2.empty.sel { opacity: 1; }
+  .sh-cell.empty.off2 { height: 24px; border: none; background: transparent; cursor: default; }
+  .sh-cell.work { background: rgba(8, 88, 75, 0.08); border-color: rgba(8, 88, 75, 0.35); color: var(--primary); }
+  .sh-cell.work .s { color: #3F6F66; }
+  .sh-cell.off { background: #F3F4F6; border-color: #E5E7EB; color: #6B7280; }
+  .sh-cell.absence { background: rgba(217, 56, 58, 0.1); border-color: rgba(217, 56, 58, 0.45); color: var(--danger); }
+  .sh-cell:hover { border-color: var(--primary); }
+  .sh-cell:focus-visible { outline: 3px solid rgba(8, 88, 75, 0.35); outline-offset: 1px; }
+  .sh-cell.sel { box-shadow: 0 0 0 3px var(--accent), 0 0 0 4px var(--accent-hover); border-color: var(--accent-hover); }
+  .sh-cell.sel::after { content: "✓"; position: absolute; top: -7px; right: -7px; width: 16px; height: 16px; border-radius: 50%; background: var(--accent-hover); color: #03241E; font-size: 0.62rem; font-weight: 800; display: flex; align-items: center; justify-content: center; }
+
+  .sh-tools { white-space: nowrap; }
+  .sh-tool { border: 1.5px solid #D9D9D9; background: #fff; border-radius: 7px; padding: 6px 9px; font-family: inherit; font-size: 0.74rem; font-weight: 700; color: #4B5563; cursor: pointer; }
+  .sh-tool:hover:not(:disabled) { border-color: var(--primary); color: var(--primary); }
+  .sh-tool:disabled { opacity: 0.35; cursor: not-allowed; }
+
+  /* Pasek akcji: zawsze u dołu ekranu */
+  .sh-actions {
+    position: sticky; bottom: 0; z-index: 5; margin-top: 16px; padding: 12px 16px;
+    display: flex; align-items: center; flex-wrap: wrap; gap: 10px 14px;
+    background: #fff; border-radius: 10px; border: 1px solid var(--border-color); box-shadow: 0 -4px 14px rgba(0, 0, 0, 0.06);
+  }
+  .sh-actions .count { font-size: 0.86rem; color: var(--text-muted); min-width: 200px; }
+  .sh-actions .count strong { color: var(--primary); font-size: 1rem; }
+  .sh-actions .grp { display: inline-flex; align-items: center; gap: 6px; }
+  .sh-actions .sep { width: 1px; height: 28px; background: var(--border-color); }
+  .sh-act {
+    height: 36px; min-width: 38px; padding: 0 12px; border-radius: 8px; border: 1.5px solid #D9D9D9; background: #fff; cursor: pointer;
+    font-family: inherit; font-size: 0.82rem; font-weight: 700; color: #374151; white-space: nowrap;
+  }
+  .sh-act:hover:not(:disabled) { border-color: var(--primary); color: var(--primary); }
+  .sh-act:disabled { opacity: 0.4; cursor: not-allowed; }
+  .sh-act.shift { color: var(--primary); }
+  .sh-act.off:hover:not(:disabled) { border-color: #6B7280; color: #374151; }
+  .sh-act.absence { color: var(--danger); }
+  .sh-act.absence:hover:not(:disabled) { border-color: var(--danger); color: var(--danger); }
+  .sh-act.clear { color: var(--text-muted); }
+  .sh-act-time {
+    width: 74px; height: 36px; border-radius: 8px; border: 1.5px solid #D9D9D9; background: #fff; cursor: pointer;
+    font-family: inherit; font-size: 0.85rem; font-weight: 600; color: var(--text-dark); font-variant-numeric: tabular-nums;
+  }
+  .sh-act-time.empty { color: var(--text-muted); font-weight: 500; }
+  .sh-act-time:hover, .sh-act-time.open { border-color: var(--primary); }
+  .sh-act-note { width: 130px; height: 36px; padding: 0 10px; border-radius: 8px; border: 1.5px solid #D9D9D9; font-family: inherit; font-size: 0.82rem; }
+  .sh-act-note:focus { outline: none; border-color: var(--primary); }
 
   @media (max-width: 900px) {
     .sh-filters { grid-template-columns: 1fr 1fr !important; }
@@ -63,17 +115,23 @@
   @media (max-width: 768px) {
     .sh-filters > :first-child { grid-column: 1 / -1; }
     .sh-weekpick { width: 100%; }
-    .sh-weekpick select { flex: 1; min-width: 0; }
+    .sh-week-label { flex: 1; min-width: 0; font-size: 0.82rem; }
     .sh-toolbar { padding: 12px; }
     .sh-toolbar button { width: 100%; }
-    /* na karcie: historia w jednej linii, pole godzin na całą szerokość pod podpisem */
-    .sh-history { flex-direction: row; flex-wrap: wrap; justify-content: flex-end; }
-    #main-content .sh-table tbody td:nth-child(5) { padding-left: 0 !important; padding-top: 26px !important; text-align: left !important; }
-    .sh-edit { justify-content: flex-start; }
-    .sh-time { width: 92px; padding: 9px 8px; }
-    .sh-preset { min-width: 36px; height: 36px; }
-    .sh-status { min-width: 0; }
-    #main-content .sh-table tbody tr.is-set { background: #F3FBF7; }
+    /* karta pracownika: dni w jednej siatce */
+    #main-content .sh-table tbody tr { display: flex; flex-wrap: wrap; gap: 6px; padding: 12px; align-items: center; }
+    #main-content .sh-table tbody td { padding: 0 !important; text-align: left !important; }
+    #main-content .sh-table tbody td::before { content: none !important; }
+    #main-content .sh-table tbody td.sh-name { flex: 1 1 auto; }
+    #main-content .sh-table tbody td.sh-dept { flex: 0 0 100%; }
+    #main-content .sh-table tbody td.sh-day-td { flex: 0 0 calc((100% - 36px) / 7); background: none; }
+    #main-content .sh-table tbody td.sh-tools { flex: 0 0 100%; }
+    .sh-pair { display: flex; width: 100%; }
+    .sh-cell { width: 100%; height: 44px; }
+    .sh-cell .s { max-width: 100%; }
+    .sh-actions { gap: 8px; padding: 10px; }
+    .sh-actions .sep { display: none; }
+    .sh-actions .count { min-width: 0; flex: 1 1 100%; }
   }
 </style>
 
@@ -81,13 +139,14 @@
   <div>
     <div class="eyebrow">Planowanie</div>
     <h3>Harmonogram pracy</h3>
-    <p>Ustal godziny pracy każdego pracownika na wybrany tydzień. Zmiany zapisują się od razu, a pracownik widzi je na swojej stronie.</p>
+    <p>Zaplanuj każdy dzień tygodnia: zmianę, własne godziny, wolne albo zgłoszoną nieobecność. Każdy dzień ma dwie kratki: u góry 1. zmiana, pod nią 2. zmiana. Zaznacz kilka kratek naraz i ustaw je jednym kliknięciem. Zmiany zapisują się od razu.</p>
   </div>
   <div class="page-hero-actions">
     <div class="sh-weekpick">
-      <button type="button" id="sh-prev" onclick="shStepWeek(-1)" title="Poprzedni tydzień" aria-label="Poprzedni tydzień"><i class="fa-solid fa-chevron-left"></i></button>
-      <select id="sh-week" class="form-control" aria-label="Tydzień" onchange="shOnWeekChange()"></select>
-      <button type="button" id="sh-next" onclick="shStepWeek(1)" title="Następny tydzień" aria-label="Następny tydzień"><i class="fa-solid fa-chevron-right"></i></button>
+      <button type="button" onclick="shStepWeek(-1)" title="Poprzedni tydzień" aria-label="Poprzedni tydzień"><i class="fa-solid fa-chevron-left"></i></button>
+      <span class="sh-week-label" id="sh-week-label">—</span>
+      <button type="button" onclick="shStepWeek(1)" title="Następny tydzień" aria-label="Następny tydzień"><i class="fa-solid fa-chevron-right"></i></button>
+      <button type="button" id="sh-today" onclick="shGoToday()" title="Wróć do bieżącego tygodnia">Dziś</button>
     </div>
   </div>
 </div>
@@ -96,7 +155,7 @@
 
 <!-- Filtry -->
 <div class="card" style="margin-bottom: 20px; padding: 16px 20px;">
-  <div class="sh-filters" style="display: grid; grid-template-columns: 2fr 1.2fr 1.2fr auto; gap: 14px; align-items: end;">
+  <div class="sh-filters" style="display: grid; grid-template-columns: 2fr 1.2fr 1.2fr 1.4fr auto; gap: 14px; align-items: end;">
     <div class="form-group" style="margin-bottom: 0;">
       <label for="sh-filter-search" style="font-size: 0.8rem; color: var(--text-muted);">Szukaj pracownika</label>
       <div style="position: relative;">
@@ -119,6 +178,18 @@
       </select>
     </div>
 
+    <div class="form-group" style="margin-bottom: 0;">
+      <label for="sh-filter-list" style="font-size: 0.8rem; color: var(--text-muted);">Moja lista</label>
+      <div class="rt-list-field">
+        <select id="sh-filter-list" class="form-control" onchange="shRenderTable()">
+          <option value="">Wszyscy pracownicy</option>
+        </select>
+        <button type="button" class="rt-list-btn" onclick="rtlOpen()" title="Moje listy pracowników: utwórz, zmień, usuń" aria-label="Zarządzaj moimi listami pracowników">
+          <i class="fa-solid fa-list-check"></i>
+        </button>
+      </div>
+    </div>
+
     <div>
       <button type="button" class="btn-secondary" style="height: 42px; padding: 0 16px; font-size: 0.85rem;" onclick="shResetFilters()" title="Wyczyść filtry">
         <i class="fa-solid fa-rotate-left" style="margin-right: 6px;"></i> Reset
@@ -127,12 +198,20 @@
   </div>
 </div>
 
-<!-- Tabela pracowników -->
-<div class="card" style="padding: 0; overflow: hidden;">
+<!-- Siatka tygodnia -->
+<div class="card" style="padding: 0; overflow: hidden; margin-bottom: 0;">
   <div class="sh-toolbar">
-    <span class="info" id="sh-info"></span>
+    <div>
+      <div class="info" id="sh-info"></div>
+      <div class="sh-legend" style="margin-top: 6px;">
+        <span><i style="background: rgba(8,88,75,0.08); border-color: rgba(8,88,75,0.35);"></i> praca</span>
+        <span><i style="background: #F3F4F6; border-color: #E5E7EB;"></i> wolne</span>
+        <span><i style="background: rgba(217,56,58,0.1); border-color: rgba(217,56,58,0.45);"></i> zgłoszona nieobecność</span>
+        <span><i style="border: 1.5px dashed #C4C8CE;"></i> nie zaplanowano</span>
+      </div>
+    </div>
     <button type="button" id="sh-copy-btn" class="btn-secondary" style="width: auto; padding: 9px 16px; font-size: 0.85rem;" onclick="shCopyPrevious()"
-            title="Pracownikom bez godzin w tym tygodniu wpisuje godziny z tygodnia poprzedniego. Niczego nie nadpisuje.">
+            title="Puste dni widocznych pracowników uzupełnia wpisami z tych samych dni poprzedniego tygodnia. Niczego nie nadpisuje.">
       <i class="fa-solid fa-copy" style="margin-right: 8px;"></i> Uzupełnij puste z poprzedniego tygodnia
     </button>
   </div>
@@ -140,22 +219,46 @@
   <div style="overflow-x: auto;">
     <table class="users-table sh-table" style="width: 100%; border-collapse: collapse;">
       <thead>
-        <tr>
-          <th>Pracownik</th>
-          <th>Firma</th>
-          <th>Dział</th>
-          <th>Ostatnie 3 tygodnie</th>
-          <th id="sh-col-current">Godziny pracy</th>
-          <th></th>
+        <tr id="sh-head-row">
+          <th>Pracownik</th><th>Firma</th><th>Dział</th>
         </tr>
       </thead>
       <tbody id="sh-table-body">
         <tr>
-          <td colspan="6" style="text-align: center; padding: 30px; color: var(--text-muted);">
+          <td colspan="11" style="text-align: center; padding: 30px; color: var(--text-muted);">
             <i class="fa-solid fa-spinner fa-spin"></i> Ładowanie harmonogramu...
           </td>
         </tr>
       </tbody>
     </table>
   </div>
+</div>
+
+<!-- Pasek akcji dla zaznaczonych dni -->
+<div class="sh-actions" id="sh-actions">
+  <span class="count" id="sh-sel-count"></span>
+
+  <span class="grp" role="group" aria-label="Zmiana">
+    <button type="button" class="sh-act shift" data-needs-sel onclick="shAction('I')" title="Zmiana I: 06:30–14:30">I</button>
+    <button type="button" class="sh-act shift" data-needs-sel onclick="shAction('II')" title="Zmiana II: 14:30–22:30">II</button>
+    <button type="button" class="sh-act shift" data-needs-sel onclick="shAction('III')" title="Zmiana III: 22:30–06:30">III</button>
+  </span>
+  <span class="sep" aria-hidden="true"></span>
+
+  <span class="grp" role="group" aria-label="Własne godziny">
+    <button type="button" id="sh-act-from" class="rt-time sh-act-time empty" data-value="" aria-label="Od" aria-haspopup="dialog" aria-expanded="false" onclick="shOpenCustomTime('from')">--:--</button>
+    <span aria-hidden="true">–</span>
+    <button type="button" id="sh-act-to" class="rt-time sh-act-time empty" data-value="" aria-label="Do" aria-haspopup="dialog" aria-expanded="false" onclick="shOpenCustomTime('to')">--:--</button>
+    <button type="button" id="sh-act-custom" class="sh-act" onclick="shAction('custom')" title="Ustaw wybrane godziny w zaznaczonych dniach">Ustaw</button>
+  </span>
+  <span class="sep" aria-hidden="true"></span>
+
+  <button type="button" class="sh-act off" data-needs-sel onclick="shAction('off')">Wolne</button>
+  <span class="grp">
+    <button type="button" class="sh-act absence" data-needs-sel onclick="shAction('absence')">Nieobecność</button>
+    <input type="text" id="sh-act-note" class="sh-act-note" maxlength="80" placeholder="powód (opcj.)" aria-label="Powód nieobecności, np. urlop, L4" />
+  </span>
+  <span class="sep" aria-hidden="true"></span>
+  <button type="button" class="sh-act clear" data-needs-sel onclick="shAction('clear')" title="Usuń wpisy z zaznaczonych dni"><i class="fa-solid fa-eraser"></i> Wyczyść</button>
+
 </div>

@@ -192,51 +192,89 @@ function epOpen() {
   if (overlay) overlay.style.display = "none";
 
   epLoadSchedule();
+  if (typeof abPortalLoad === "function") abPortalLoad(); // zgłoszenia nieobecności (absences.js)
+  if (typeof pushSync === "function") pushSync();          // powiadomienia push (push.js)
   epLoad();
 }
 
-// Kafelki z godzinami pracy z harmonogramu: bieżący i przyszły tydzień
+// Harmonogram pracownika dzień po dniu (schedule_days): bieżący i przyszły tydzień
 async function epLoadSchedule() {
   const el = document.getElementById("ep-schedule");
   if (!el || !epEmployee) return;
   const empId = epEmployee.id;
 
-  const current = shCurrentWeek();
-  const next = shShiftWeek(current.year, current.week, 1);
+  const monday = shMondayOf(new Date());
   const weeks = [
-    { ...current, title: "Ten tydzień", cls: "now" },
-    { ...next, title: "Przyszły tydzień", cls: "next" }
+    { days: shBuildDays(monday), title: "Ten tydzień", cls: "now" },
+    { days: shBuildDays(new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + 7)), title: "Przyszły tydzień", cls: "next" }
   ];
 
-  const render = (values, failed) => {
+  // Jeden wpis harmonogramu: { cls, label, from, to, title }
+  const entryInfo = e => {
+    if (e.kind === "off") return { cls: "off", label: "Wolne", title: "wolne" };
+    if (e.kind === "absence") {
+      return {
+        cls: "absence", label: "Nieob.", from: e.time_from, to: e.time_to,
+        title: `zgłoszona nieobecność${e.note ? " (" + e.note + ")" : ""}${e.time_from ? ", godz. " + e.time_from + "–" + e.time_to : ""}`
+      };
+    }
+    const preset = SH_PRESETS.find(p => p.from === e.time_from && p.to === e.time_to);
+    const shift = preset ? preset.label : shShiftLabel(e.time_from);
+    return {
+      cls: "work", label: shift || "", from: e.time_from, to: e.time_to,
+      title: `${shift ? "zmiana " + shift + (preset ? "" : ", inne godziny") + ": " : ""}${e.time_from}–${e.time_to}`
+    };
+  };
+
+  // Dzień: nagłówek + osobna kratka dla każdej zmiany (jak w Harmonogramie).
+  // W kratce zmiana (I/II/III), a pod nią godziny: u góry rozpoczęcie, na dole zakończenie.
+  const dayHtml = (d, i, plan) => {
+    const list = (plan[d.iso] || []).map(entryInfo);
+    const slots = list.length
+      ? list.map(x => `<div class="ep-slot ${x.cls}" title="${rtEsc(`${SH_DAY_SHORT[i]} ${d.pl}: ${x.title}`)}">
+          ${x.label ? `<span class="l">${rtEsc(x.label)}</span>` : ""}${x.from && x.to ? `<span class="t">${x.from}</span><span class="t">${x.to}</span>` : ""}
+        </div>`).join("")
+      : `<div class="ep-slot none" title="${rtEsc(`${SH_DAY_SHORT[i]} ${d.pl}: nic nie zaplanowano`)}"><span class="l">—</span></div>`;
+    return `<div class="ep-day${d.today ? " today" : ""}"><span class="d">${SH_DAY_SHORT[i]}</span>${slots}</div>`;
+  };
+
+  const render = (plan, failed) => {
     el.innerHTML = weeks.map(w => {
-      const text = shDisplay(values[shWeekColumn(w.week)]);
-      const value = failed ? "Nie udało się pobrać" : (text || "Nie ustalono");
+      const any = w.days.some(d => plan[d.iso]);
+      const range = `${w.days[0].pl}–${w.days[6].pl}`;
       return `
-        <div class="ep-shift ${w.cls} ${text && !failed ? "" : "empty"}">
+        <div class="ep-shift ${w.cls} ${any && !failed ? "" : "empty"}">
           <span class="ico"><i class="fa-solid ${w.cls === "now" ? "fa-business-time" : "fa-calendar-plus"}"></i></span>
-          <div>
-            <div class="lbl">${w.title} • tydzień ${w.week} (${shWeekLabel(w.year, w.week)})</div>
-            <div class="val">${rtEsc(value)}</div>
+          <div style="flex: 1; min-width: 0;">
+            <div class="lbl">${w.title} • ${range}</div>
+            ${failed
+              ? `<div class="val">Nie udało się pobrać</div>`
+              : `<div class="ep-days">${w.days.map((d, i) => dayHtml(d, i, plan)).join("")}</div>`}
           </div>
         </div>`;
     }).join("");
   };
 
   const { data, error } = await supabaseClient
-    .from("employees")
-    .select(weeks.map(w => shWeekColumn(w.week)).join(", "))
-    .eq("id", empId)
-    .maybeSingle();
+    .from("schedule_days")
+    .select("*")
+    .eq("employee_id", empId)
+    .gte("day", weeks[0].days[0].iso)
+    .lte("day", weeks[1].days[6].iso);
   if (!epEmployee || epEmployee.id !== empId) return; // w międzyczasie wylogowano
 
   if (error) console.error("Błąd pobierania harmonogramu pracownika:", error);
-  render(data || {}, !!error);
+  const plan = {};
+  (data || []).sort((a, b) => (a.slot || 1) - (b.slot || 1)).forEach(r => { (plan[r.day] || (plan[r.day] = [])).push(r); });
+  render(plan, !!error);
 }
 
 function epLogout() {
   // log musi wyjść, zanim sesja zostanie zamknięta
-  (epEmployee ? logAction("Wylogowanie") : Promise.resolve()).finally(authSignOut);
+  Promise.all([
+    epEmployee ? logAction("Wylogowanie") : null,
+    typeof pushForget === "function" ? pushForget() : null
+  ]).finally(authSignOut);
   epEmployee = null;
   epLoadToken++;
   clearSession();

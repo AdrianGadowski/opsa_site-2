@@ -75,6 +75,12 @@
     font-family: inherit; font-size: 0.86rem; text-align: center; color: var(--text-dark); cursor: pointer;
   }
   .rp-row-time:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(8, 88, 75, 0.1); }
+  /* Pola godzin otwierają okienko z kafelkami (css/timepicker.css), jak w Rozliczeniu czasu */
+  .rp-row-time, .rp-add-time { font-weight: 600; font-variant-numeric: tabular-nums; }
+  .rp-add-time { text-align: center; cursor: pointer; font-family: inherit; }
+  .rp-row-time.empty, .rp-add-time.empty { color: var(--text-muted); font-weight: 500; }
+  .rp-row-time:hover, .rp-add-time:hover { border-color: var(--primary); }
+  .rp-row-time.open, .rp-add-time.open { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(8, 88, 75, 0.1); }
 
   .rp-pick-btn { text-align: left; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .rp-pick-btn.empty { color: var(--text-muted); }
@@ -166,7 +172,7 @@
     <div class="form-group" style="margin-bottom: 0;">
       <label for="rp-filter-search" style="font-size: 0.8rem; color: var(--text-muted);">Szukaj raportu</label>
       <div style="position: relative;">
-        <input type="text" id="rp-filter-search" class="form-control" placeholder="Kto utworzył lub data raportu, np. 10.10.2026..." oninput="rpOnSearch()" style="padding-left: 36px;" autocomplete="off" />
+        <input type="text" id="rp-filter-search" class="form-control" placeholder="Kto utworzył, dział lub data raportu, np. 10.10.2026..." oninput="rpOnSearch()" style="padding-left: 36px;" autocomplete="off" />
         <i class="fa-solid fa-magnifying-glass" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 0.9rem;"></i>
       </div>
     </div>
@@ -195,6 +201,7 @@
           <th class="rp-c">Data raportu</th>
           <th class="rp-c">Zmiana</th>
           <th class="rp-c">Utworzył</th>
+          <th class="rp-c">Dział</th>
           <th class="rp-c">Pracowników</th>
           <th class="rp-c rp-col-ok">Godz. obecne</th>
           <th class="rp-c rp-col-absent">Godz. nieobecne</th>
@@ -250,11 +257,11 @@
       </div>
       <div class="form-group">
         <label for="rp-add-from">Od</label>
-        <select id="rp-add-from" class="form-control" onchange="rpSyncAddTimes()"></select>
+        <button type="button" id="rp-add-from" class="form-control rt-time rp-add-time empty" data-value="" aria-haspopup="dialog" aria-expanded="false" onclick="rpOpenAddTime('from')">--:--</button>
       </div>
       <div class="form-group">
         <label for="rp-add-to">Do</label>
-        <select id="rp-add-to" class="form-control" onchange="rpSyncAddTimes()"></select>
+        <button type="button" id="rp-add-to" class="form-control rt-time rp-add-time empty" data-value="" aria-haspopup="dialog" aria-expanded="false" onclick="rpOpenAddTime('to')">--:--</button>
       </div>
       <label class="rp-switch">
         <input type="checkbox" id="rp-add-absent" aria-label="Nieobecność" />

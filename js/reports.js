@@ -11,6 +11,7 @@ const RP_PAGE = 1000;        // limit wierszy na jedno zapytanie w Supabase
 
 let rpReports = [];          // raporty z wybranego okresu
 let rpUsersById = {};
+let rpDeptById = {};         // słownik działów: id -> nazwa
 let rpEmployees = [];
 let rpEmpById = {};
 let rpCurrent = null;        // { number, edit } — raport otwarty w oknie
@@ -103,7 +104,7 @@ async function initReportsView() {
   }
 
   try {
-    const [users, employees] = await Promise.all([
+    const [users, employees, depts] = await Promise.all([
       rpFetchAll(() => supabaseClient.from("users").select("id, name, last_name")),
       rpFetchAll(() => supabaseClient
         .from("employees")
@@ -111,14 +112,17 @@ async function initReportsView() {
           id, first_name, last_name, active, department_id,
           business:business_id ( business ),
           department:department_id ( department )
-        `))
+        `)),
+      rpFetchAll(() => supabaseClient.from("department").select("id, department"))
     ]);
 
     rpUsersById = {};
     users.forEach(u => { rpUsersById[u.id] = u; });
+    rpDeptById = {};
+    depts.forEach(d => { rpDeptById[d.id] = d.department || "Dział #" + d.id; });
 
     rpEmployees = employees.sort((a, b) =>
-      `${a.last_name || ""} ${a.first_name || ""}`.localeCompare(`${b.last_name || ""} ${b.first_name || ""}`, "pl")
+      `${a.first_name || ""} ${a.last_name || ""}`.localeCompare(`${b.first_name || ""} ${b.last_name || ""}`, "pl")
     );
     rpEmpById = {};
     rpEmployees.forEach(e => { rpEmpById[e.id] = e; });
@@ -141,6 +145,7 @@ function rpGroup(rows) {
         date: r.report_date,
         shift: r.shift,
         creatorId: r.add_first_name_id,
+        departmentId: r.id_department ?? null,
         created: r.add_data,
         rows: [],
         empIds: new Set(),
@@ -191,7 +196,7 @@ async function rpLoad() {
   try {
     const rows = await rpFetchAll(() => supabaseClient
       .from("work_reports")
-      .select("id, report_date, shift, department_id, first_name_id, add_first_name_id, number_report, add_data, start_time, end_time, total_hours, at_work")
+      .select("*") // "*": działa też przed dodaniem kolumny id_department (sql/24)
       .like("report_date", pattern));
     // Zablokowane miesiące: przy nich nie ma edycji ani usuwania
     let lockedKeys = new Set();
@@ -211,7 +216,7 @@ async function rpLoad() {
     if (token !== rpLoadToken) return;
     console.error("Błąd pobierania raportów:", err);
     rpReports = [];
-    tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;color:var(--danger);padding:25px;">
+    tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;color:var(--danger);padding:25px;">
       Nie udało się pobrać raportów: ${rtEsc(err.message || err)}</td></tr>`;
   }
 }
@@ -242,8 +247,15 @@ function rpVisibleReports() {
     const u = rpUsersById[r.creatorId] || {};
     const n1 = `${u.name || ""} ${u.last_name || ""}`.toLowerCase();
     const n2 = `${u.last_name || ""} ${u.name || ""}`.toLowerCase();
-    return n1.includes(q) || n2.includes(q);
+    const dept = (r.departmentId != null ? rpDeptName(r.departmentId) : "").toLowerCase();
+    return n1.includes(q) || n2.includes(q) || dept.includes(q);
   });
+}
+
+// Dział raportu (dział mistrza, który go utworzył)
+function rpDeptName(id) {
+  if (id === null || id === undefined) return "-";
+  return rpDeptById[id] || "Dział #" + id;
 }
 
 // Pełna data spoza wybranego roku/miesiąca przełącza filtry na ten okres
@@ -279,7 +291,7 @@ function rpRenderTable() {
   }
 
   if (list.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;color:var(--text-muted);padding:30px;">
+    tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;color:var(--text-muted);padding:30px;">
       ${rpReports.length === 0 ? "Brak raportów w wybranym okresie." : "Brak raportów spełniających podane kryteria."}</td></tr>`;
     return;
   }
@@ -294,6 +306,7 @@ function rpRenderTable() {
         <td class="rp-c" style="font-weight: 600;">${rtEsc(r.date)}</td>
         <td class="rp-c">${rtEsc(r.shift || "-")}</td>
         <td class="rp-c">${rtEsc(rpUserName(r.creatorId))}</td>
+        <td class="rp-c">${rtEsc(rpDeptName(r.departmentId))}</td>
         <td class="rp-c">${r.empIds.size}</td>
         <td class="rp-c rp-hours-ok">${rtFmtHours(r.present)}</td>
         <td class="rp-c rp-hours-absent">${rtFmtHours(r.absent)}</td>
@@ -470,6 +483,7 @@ function rpCloseDetail() {
   rpRowEdits = {};
   rpDateEdit = null;
   rpClosePicker();
+  rtPickClose(false);
   toggleModal("modal-rp-detail", false);
 }
 
@@ -507,7 +521,7 @@ function rpRenderDetail(resetForm) {
   const rows = [...rep.rows].sort((a, b) => {
     const ea = rpEmpById[a.first_name_id] || {};
     const eb = rpEmpById[b.first_name_id] || {};
-    return `${ea.last_name || ""} ${ea.first_name || ""}`.localeCompare(`${eb.last_name || ""} ${eb.first_name || ""}`, "pl") ||
+    return `${ea.first_name || ""} ${ea.last_name || ""}`.localeCompare(`${eb.first_name || ""} ${eb.last_name || ""}`, "pl") ||
       String(a.start_time || "").localeCompare(String(b.start_time || ""));
   });
 
@@ -525,10 +539,10 @@ function rpRenderDetail(resetForm) {
         <td>${rtEsc(emp?.business?.business || "-")}</td>
         <td>${rtEsc(emp?.department?.department || "-")}</td>
         <td>${edit
-          ? `<select class="rp-row-time" id="rp-row-from-${id}" aria-label="Od" onchange="rpOnRowTime(${id})">${rpShiftTimeOptions(rep.shift, "from", v.from, v.to, false)}</select>`
+          ? rpTimeBtnHtml(`rp-row-from-${id}`, "from", v.from, "rp-row-time", `rpOpenRowTime(${id}, 'from')`)
           : rtEsc(r.start_time || "-")}</td>
         <td>${edit
-          ? `<select class="rp-row-time" id="rp-row-to-${id}" aria-label="Do" onchange="rpOnRowTime(${id})">${rpShiftTimeOptions(rep.shift, "to", v.from, v.to, false)}</select>`
+          ? rpTimeBtnHtml(`rp-row-to-${id}`, "to", v.to, "rp-row-time", `rpOpenRowTime(${id}, 'to')`)
           : rtEsc(r.end_time || "-")}</td>
         <td id="rp-row-sum-${id}" style="font-weight: 700; color: var(--primary); white-space: nowrap;">${hours === null ? "—" : rtFmtHours(hours)}</td>
         <td>${edit
@@ -557,11 +571,9 @@ function rpRenderDetail(resetForm) {
   rpSyncAddEmp();
 
   if (resetForm) {
-    document.getElementById("rp-add-from").innerHTML = "";
-    document.getElementById("rp-add-to").innerHTML = "";
+    rpResetAddTimes();
     document.getElementById("rp-add-absent").checked = false;
   }
-  rpSyncAddTimes();
 }
 
 // ---------- Zmiana daty raportu ----------
@@ -629,17 +641,14 @@ async function rpValidateDateChange(rep, iso) {
   return newDate;
 }
 
-// Opcje godzin ograniczone do zmiany raportu; "do" musi być późniejsze niż "od".
-// which: "from" | "to"; withEmpty: czy dodać pozycję "--:--".
-function rpShiftTimeOptions(shift, which, from, to, withEmpty) {
+// Godziny do wyboru ograniczone do zmiany raportu; "do" musi być późniejsze niż "od".
+// Zwraca { top, rest }: najczęstsze (początek, połowa i koniec zmiany) i pozostałe.
+function rpShiftTimeChoices(shift, which, from, to) {
   const selected = which === "from" ? from : to;
-  const opt = t => `<option value="${t}"${t === selected ? " selected" : ""}>${t}</option>`;
-  const empty = withEmpty ? `<option value="">--:--</option>` : "";
-
   const idx = RT_SHIFT_NAMES.indexOf(shift);
   if (idx < 0) {
     // raport z nieznaną zmianą — bez ograniczeń
-    return empty + RT_ALL_TIMES.map(opt).join("");
+    return { top: RT_TOP_TIMES.slice(), rest: RT_OTHER_TIMES.slice() };
   }
 
   const start = RT_SHIFT_BASE + idx * RT_SHIFT_LEN;
@@ -651,32 +660,91 @@ function rpShiftTimeOptions(shift, which, from, to, withEmpty) {
     return isTo ? k >= 1 && k <= slots : k <= slots - 1;
   };
 
-  // Godzina drugiego pola zawęża listę tylko wtedy, gdy sama mieści się w zmianie
+  // Godzina drugiego pola zawęża wybór tylko wtedy, gdy sama mieści się w zmianie
   const min = which === "to" ? (inShift(from, false) ? slot(from) + 1 : 1) : 0;
   const max = which === "from" ? (inShift(to, true) ? slot(to) - 1 : slots - 1) : slots;
 
-  let html = empty;
-  let found = false;
+  const top = [], rest = [];
   for (let k = min; k <= max; k++) {
     const t = RT_ALL_TIMES[((start + k * 30) % 1440) / 30];
-    if (t === selected) found = true;
-    html += opt(t);
+    (k % 8 === 0 ? top : rest).push(t);
   }
-  // Zapisana wcześniej godzina spoza zmiany zostaje widoczna, dopóki nie zostanie zmieniona
-  if (selected && !found) html = opt(selected) + html;
-  return html;
+  // Zapisana wcześniej godzina spoza zmiany zostaje do wyboru, dopóki nie zostanie zmieniona
+  if (selected && !top.includes(selected) && !rest.includes(selected)) rest.unshift(selected);
+  return { top, rest };
 }
 
-function rpSyncAddTimes() {
-  const rep = rpCurrent && rpFindReport(rpCurrent.number);
-  const fromSel = document.getElementById("rp-add-from");
-  const toSel = document.getElementById("rp-add-to");
-  if (!rep || !fromSel || !toSel) return;
+// Pole godziny (przycisk z okienkiem wyboru); wartość w data-value
+function rpTimeBtnHtml(id, which, value, cls, onclick) {
+  return `<button type="button" class="rt-time ${cls}${value ? "" : " empty"}" id="${id}" data-value="${rtEsc(value || "")}"
+    aria-label="${which === "from" ? "Od" : "Do"}" aria-haspopup="dialog" aria-expanded="false"
+    onclick="${onclick}">${rtEsc(value || "--:--")}</button>`;
+}
 
-  const from = fromSel.value;
-  const to = toSel.value;
-  fromSel.innerHTML = rpShiftTimeOptions(rep.shift, "from", from, to, true);
-  toSel.innerHTML = rpShiftTimeOptions(rep.shift, "to", from, to, true);
+function rpTimeVal(id) {
+  return document.getElementById(id)?.dataset.value || "";
+}
+
+function rpSetTimeVal(id, value) {
+  const btn = document.getElementById(id);
+  if (!btn) return;
+  btn.dataset.value = value || "";
+  btn.textContent = value || "--:--";
+  btn.classList.toggle("empty", !value);
+}
+
+// Wiersz edytowanego raportu: okienko wyboru "Od"/"Do"
+function rpOpenRowTime(recordId, which) {
+  const found = rpFindRow(recordId);
+  if (!found) return;
+  const btnId = `rp-row-${which}-${recordId}`;
+  const from = rpTimeVal(`rp-row-from-${recordId}`);
+  const to = rpTimeVal(`rp-row-to-${recordId}`);
+  const { top, rest } = rpShiftTimeChoices(found.rep.shift, which, from, to);
+  rtPickerOpen(document.getElementById(btnId), {
+    key: `rp|${recordId}|${which}`,
+    label: which === "from" ? "Od" : "Do",
+    name: rpEmpName(found.row.first_name_id),
+    top, rest,
+    value: which === "from" ? from : to,
+    clearable: false,          // zapisany wiersz musi mieć obie godziny
+    emptyText: `Brak godzin do wyboru — zmień godzinę „${which === "from" ? "Do" : "Od"}”.`,
+    onPick: value => {
+      rpSetTimeVal(btnId, value);
+      rpOnRowTime(recordId);
+      document.getElementById(btnId)?.focus();
+    }
+  });
+}
+
+// Formularz "Dodaj pracownika": okienko wyboru "Od"/"Do"
+function rpOpenAddTime(which) {
+  const rep = rpCurrent && rpFindReport(rpCurrent.number);
+  if (!rep) return;
+  const btnId = `rp-add-${which}`;
+  const from = rpTimeVal("rp-add-from");
+  const to = rpTimeVal("rp-add-to");
+  const { top, rest } = rpShiftTimeChoices(rep.shift, which, from, to);
+  const emp = rpEmpById[rpAddEmpId];
+  rtPickerOpen(document.getElementById(btnId), {
+    key: `rp-add|${which}`,
+    label: which === "from" ? "Od" : "Do",
+    name: emp ? rpEmpName(emp.id) : "",
+    top, rest,
+    value: which === "from" ? from : to,
+    emptyText: `Brak godzin do wyboru — zmień godzinę „${which === "from" ? "Do" : "Od"}”.`,
+    onPick: value => {
+      rpSetTimeVal(btnId, value);
+      // po wybraniu "Od" od razu wybór "Do" (jeśli jeszcze puste)
+      if (which === "from" && value && !rpTimeVal("rp-add-to")) rpOpenAddTime("to");
+      else document.getElementById(btnId)?.focus();
+    }
+  });
+}
+
+function rpResetAddTimes() {
+  rpSetTimeVal("rp-add-from", "");
+  rpSetTimeVal("rp-add-to", "");
 }
 
 // ---------- Zmiana godzin i statusu pracowników w raporcie ----------
@@ -718,11 +786,9 @@ function rpOnRowTime(recordId) {
   const toSel = document.getElementById(`rp-row-to-${recordId}`);
   if (!found || !fromSel || !toSel) return;
 
-  const from = fromSel.value;
-  const to = toSel.value;
+  const from = fromSel.dataset.value || "";
+  const to = toSel.dataset.value || "";
   const absent = !!document.getElementById(`rp-row-absent-${recordId}`)?.checked;
-  fromSel.innerHTML = rpShiftTimeOptions(found.rep.shift, "from", from, to, false);
-  toSel.innerHTML = rpShiftTimeOptions(found.rep.shift, "to", from, to, false);
 
   const hours = rtDuration(from, to);
   const sum = document.getElementById(`rp-row-sum-${recordId}`);
@@ -917,7 +983,7 @@ function rpRenderPicker() {
 
   list.innerHTML = found.map(e => `
     <button type="button" class="rp-picker-item" onclick="rpPickEmployee(${Number(e.id)})">
-      <span class="name">${rtEsc(`${e.last_name || ""} ${e.first_name || ""}`.trim())}</span>
+      <span class="name">${rtEsc(`${e.first_name || ""} ${e.last_name || ""}`.trim())}</span>
       <span class="sub">${rtEsc(e.business?.business || "-")} • ${rtEsc(e.department?.department || "-")}</span>
     </button>`).join("");
 }
@@ -935,8 +1001,8 @@ async function rpAddEmployee() {
   const rep = rpCurrent && rpFindReport(rpCurrent.number);
   if (!rep || rpBusy || !canModifyReport(rep.creatorId)) return;
 
-  const from = document.getElementById("rp-add-from").value;
-  const to = document.getElementById("rp-add-to").value;
+  const from = rpTimeVal("rp-add-from");
+  const to = rpTimeVal("rp-add-to");
   const absent = document.getElementById("rp-add-absent").checked;
   const emp = rpEmpById[rpAddEmpId];
   const hours = rtDuration(from, to);

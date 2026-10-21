@@ -112,15 +112,10 @@ function rtSlot(time) {
 
 // Bez wykrytej zmiany: wszystkie godziny. Po wykryciu: tylko godziny tej zmiany,
 // przy czym "do" musi być późniejsze niż "od" w tym samym wierszu.
-function rtTimeOptions(which, d) {
-  const selected = d[which];
-  const opt = t => `<option value="${t}"${t === selected ? " selected" : ""}>${t}</option>`;
-  const empty = `<option value="">--:--</option>`;
-
+// Zwraca { top, rest }: najczęstsze godziny (wyróżnione) i pozostałe.
+function rtTimeChoices(which, d) {
   if (!rtShift) {
-    return empty +
-      `<optgroup label="Początki zmian">${RT_TOP_TIMES.map(opt).join("")}</optgroup>` +
-      `<optgroup label="Pozostałe godziny">${RT_OTHER_TIMES.map(opt).join("")}</optgroup>`;
+    return { top: RT_TOP_TIMES.slice(), rest: RT_OTHER_TIMES.slice() };
   }
 
   const start = rtShiftStart();
@@ -128,17 +123,256 @@ function rtTimeOptions(which, d) {
   const min = which === "to" ? (d.from ? rtSlot(d.from) + 1 : 1) : 0;
   const max = which === "from" ? (d.to ? rtSlot(d.to) - 1 : slots - 1) : slots;
 
-  // Na górze listy pełne połówki zmiany (co 4 h od jej początku, np. 10:30 i 14:30), niżej reszta
-  let top = "", rest = "";
+  // Najczęstsze: pełne połówki zmiany (co 4 h od jej początku, np. 06:30, 10:30, 14:30)
+  const top = [], rest = [];
   for (let k = min; k <= max; k++) {
-    const html = opt(RT_ALL_TIMES[((start + k * 30) % 1440) / 30]);
-    if (k % 8 === 0) top += html;
-    else rest += html;
+    const t = RT_ALL_TIMES[((start + k * 30) % 1440) / 30];
+    (k % 8 === 0 ? top : rest).push(t);
   }
-  return empty +
-    (top ? `<optgroup label="Najczęstsze">${top}</optgroup>` : "") +
-    (rest ? `<optgroup label="Pozostałe godziny">${rest}</optgroup>` : "");
+  return { top, rest };
 }
+
+// ---------- Przyciski zmian I, II, III (jak w Harmonogramie) ----------
+// Jedno kliknięcie wpisuje pełną zmianę: I 06:30–14:30, II 14:30–22:30, III 22:30–06:30.
+const RT_PRESETS = RT_SHIFT_NAMES.map((name, i) => ({
+  label: ["I", "II", "III"][i],
+  name,
+  from: RT_ALL_TIMES[((RT_SHIFT_BASE + i * RT_SHIFT_LEN) % 1440) / 30],
+  to: RT_ALL_TIMES[((RT_SHIFT_BASE + (i + 1) * RT_SHIFT_LEN) % 1440) / 30]
+}));
+
+// Zmiana wynikająca z pozostałych wierszy (raport dotyczy jednej zmiany)
+function rtShiftOfOthers(id) {
+  for (const [key, d] of Object.entries(rtDraft)) {
+    if (String(key) === String(id)) continue;
+    if (d.from) return rtShiftOf(d.from, "from");
+    if (d.to) return rtShiftOf(d.to, "to");
+  }
+  return null;
+}
+
+function rtPresetsHtml(id, d) {
+  const rowShift = d.from ? rtShiftOf(d.from, "from") : (d.to ? rtShiftOf(d.to, "to") : null);
+  const others = rtShiftOfOthers(id);
+  return RT_PRESETS.map((p, i) => {
+    const full = d.from === p.from && d.to === p.to;
+    const part = !full && rowShift === p.name;
+    const blocked = others && others !== p.name;
+    const title = blocked
+      ? `Raport dotyczy zmiany ${others.replace("Zmiana ", "")} — wyczyść pozostałe wiersze, aby wybrać inną zmianę`
+      : full ? `${p.name}: ${p.from}–${p.to} (kliknij, aby wyczyścić)` : `${p.name}: ${p.from}–${p.to}`;
+    return `<button type="button" class="rt-preset${full ? " on" : ""}${part ? " part" : ""}"
+      title="${title}" aria-pressed="${full}" ${blocked ? "disabled" : ""}
+      onclick="rtOnPreset(${id}, ${i})">${p.label}</button>`;
+  }).join("");
+}
+
+// Odświeża przyciski zmian we wszystkich wierszach. Wybór godzin w jednym wierszu
+// blokuje pozostałe zmiany także w wierszach wypełnionych wcześniej.
+function rtRefreshPresets() {
+  document.querySelectorAll(".rt-presets[id^='rt-shift-']").forEach(el => {
+    const id = el.id.slice("rt-shift-".length);
+    el.innerHTML = rtPresetsHtml(Number(id), rtDraft[id] || { from: "", to: "" });
+  });
+}
+
+function rtOnPreset(id, index) {
+  const p = RT_PRESETS[index];
+  const d = rtGetDraft(id);
+  if (d.from === p.from && d.to === p.to) {
+    d.from = d.to = "";          // ponowne kliknięcie wybranej zmiany czyści godziny
+  } else {
+    d.from = p.from;
+    d.to = p.to;
+  }
+  rtPickClose(false);
+  rtCleanupDraft(id);
+  if (rtShiftChanged()) rtRenderTable();
+  else rtSyncRow(id);
+  rtUpdateStats();
+  document.querySelectorAll(`#rt-shift-${id} .rt-preset`)[index]?.focus();
+}
+
+// Pole godziny: przycisk otwierający okienko wyboru (zamiast zwykłej listy rozwijanej)
+function rtTimeBtnHtml(id, which, d) {
+  const v = d[which] || "";
+  return `<button type="button" class="rt-time${v ? "" : " empty"}" id="rt-${which}-${id}"
+    aria-label="${which === "from" ? "Od" : "Do"}" aria-haspopup="dialog" aria-expanded="false"
+    onclick="rtPickOpen(${id}, '${which}')">${v || "--:--"}</button>`;
+}
+
+function rtSetTimeBtn(id, which, value) {
+  const btn = document.getElementById(`rt-${which}-${id}`);
+  if (!btn) return;
+  btn.textContent = value || "--:--";
+  btn.classList.toggle("empty", !value);
+}
+
+// ---------- Okienko wyboru godziny (wspólne: Rozliczenie czasu i edycja raportu) ----------
+// Kafelki z godzinami: na górze najczęstsze, niżej pozostałe. Klawiatura: strzałki, Enter, Esc.
+// Pole godziny to przycisk z klasą "rt-time"; style okienka: css/timepicker.css.
+let rtPick = null;           // { key, btnId, onPick } otwartego okienka
+
+function rtPickEl() {
+  let el = document.getElementById("rt-picker");
+  if (!el) {
+    el = document.createElement("div");
+    el.id = "rt-picker";
+    el.className = "rt-picker";
+    el.setAttribute("role", "dialog");
+    el.addEventListener("keydown", rtPickKey);
+    // Tab poza okienko zamyka je. Tylko gdy fokus trafia do konkretnego elementu
+    // (Safari przy kliknięciu nie ustawia fokusu - kliknięcia poza obsługuje "mousedown").
+    el.addEventListener("focusout", e => {
+      const to = e.relatedTarget;
+      if (rtPick && to && !el.contains(to) && !(to.closest && to.closest(".rt-time"))) {
+        rtPickClose(false);
+      }
+    });
+    document.body.appendChild(el);
+  }
+  return el;
+}
+
+// Otwiera okienko przy przycisku btn.
+// cfg: { key, label ("Od"/"Do"), name, top: [], rest: [], value, emptyText, onPick(value) }
+function rtPickerOpen(btn, cfg) {
+  if (!btn) return;
+  // ponowne kliknięcie tego samego pola zamyka okienko
+  if (rtPick && rtPick.key === cfg.key) {
+    rtPickClose(true);
+    return;
+  }
+  rtPickClose(false);
+
+  const { top, rest, value } = cfg;
+  const chip = (t, cls) =>
+    `<button type="button" class="rt-chip${cls}${t === value ? " on" : ""}" onclick="rtPickSet('${t}')">${t}</button>`;
+
+  const el = rtPickEl();
+  el.setAttribute("aria-label", `Godzina ${cfg.label.toLowerCase()}${cfg.name ? ": " + cfg.name : ""}`);
+  el.innerHTML = `
+    <div class="rt-pick-head">
+      <span><b>${rtEsc(cfg.label)}</b>${cfg.name ? ` — ${rtEsc(cfg.name)}` : ""}</span>
+      <button type="button" class="rt-pick-x" onclick="rtPickClose(true)" aria-label="Zamknij"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    ${top.length ? `<div class="rt-pick-lbl">Najczęstsze</div>
+      <div class="rt-pick-grid top">${top.map(t => chip(t, " top")).join("")}</div>` : ""}
+    ${rest.length ? `<div class="rt-pick-lbl">Pozostałe godziny</div>
+      <div class="rt-pick-grid">${rest.map(t => chip(t, "")).join("")}</div>` : ""}
+    ${!top.length && !rest.length ? `<div class="rt-pick-empty">${rtEsc(cfg.emptyText || "Brak godzin do wyboru.")}</div>` : ""}
+    ${value && cfg.clearable !== false ? `<button type="button" class="rt-pick-clear" onclick="rtPickSet('')"><i class="fa-solid fa-eraser"></i> Wyczyść</button>` : ""}`;
+
+  rtPick = { key: cfg.key, btnId: btn.id, onPick: cfg.onPick };
+  btn.classList.add("open");
+  btn.setAttribute("aria-expanded", "true");
+  el.classList.add("open");
+  rtPickPlace(btn, el);
+  (el.querySelector(".rt-chip.on") || el.querySelector(".rt-chip") || el.querySelector(".rt-pick-x")).focus();
+}
+
+// Rozliczenie czasu: okienko dla pola "Od"/"Do" pracownika
+function rtPickOpen(id, which) {
+  const d = rtDraft[id] || { from: "", to: "", absent: false };
+  const { top, rest } = rtTimeChoices(which, d);
+  const emp = rtEmpById[id];
+  rtPickerOpen(document.getElementById(`rt-${which}-${id}`), {
+    key: `rt|${id}|${which}`,
+    label: which === "from" ? "Od" : "Do",
+    name: emp ? `${emp.first_name || ""} ${emp.last_name || ""}`.trim() : "",
+    top, rest,
+    value: d[which],
+    emptyText: `Brak godzin do wyboru — zmień godzinę „${which === "from" ? "Do" : "Od"}”.`,
+    onPick: value => {
+      rtOnTime(id, which, value);
+      // po wybraniu "Od" od razu wybór "Do" (jeśli jeszcze puste)
+      if (which === "from" && value && !(rtDraft[id] && rtDraft[id].to)) {
+        rtPickOpen(id, "to");
+      } else {
+        document.getElementById(`rt-${which}-${id}`)?.focus();
+      }
+    }
+  });
+}
+
+// Okienko pod polem (albo nad nim, gdy brak miejsca); na telefonie - panel u dołu ekranu (CSS)
+function rtPickPlace(btn, el) {
+  el.style.left = el.style.top = "";
+  if (window.matchMedia("(max-width: 768px)").matches) return;
+  const r = btn.getBoundingClientRect();
+  const w = el.offsetWidth, h = el.offsetHeight;
+  const left = Math.min(Math.max(8, r.left + r.width / 2 - w / 2), window.innerWidth - w - 8);
+  let top = r.bottom + 6;
+  if (top + h > window.innerHeight - 8) {
+    top = r.top - h - 6 >= 8 ? r.top - h - 6 : Math.max(8, window.innerHeight - h - 8);
+  }
+  el.style.left = `${left}px`;
+  el.style.top = `${top}px`;
+}
+
+function rtPickClose(focusBack) {
+  if (!rtPick) return;
+  const { btnId } = rtPick;
+  rtPick = null;
+  document.getElementById("rt-picker")?.classList.remove("open");
+  const btn = document.getElementById(btnId);
+  if (btn) {
+    btn.classList.remove("open");
+    btn.setAttribute("aria-expanded", "false");
+    if (focusBack) btn.focus();
+  }
+}
+
+function rtPickSet(value) {
+  if (!rtPick) return;
+  const { onPick } = rtPick;
+  rtPickClose(false);
+  onPick(value);
+}
+
+function rtPickKey(e) {
+  if (e.key === "Escape") {
+    e.preventDefault();
+    e.stopPropagation();
+    rtPickClose(true);
+    return;
+  }
+  const chips = [...document.querySelectorAll("#rt-picker .rt-chip")];
+  const i = chips.indexOf(document.activeElement);
+  if (i < 0 || !["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(e.key)) return;
+  e.preventDefault();
+
+  let next = null;
+  if (e.key === "ArrowLeft") next = chips[i - 1];
+  else if (e.key === "ArrowRight") next = chips[i + 1];
+  else {
+    // góra / dół: najbliższy kafelek w sąsiednim rzędzie
+    const cur = chips[i].getBoundingClientRect();
+    const down = e.key === "ArrowDown";
+    const rows = chips
+      .map(c => ({ c, r: c.getBoundingClientRect() }))
+      .filter(x => down ? x.r.top > cur.top + 2 : x.r.top < cur.top - 2);
+    if (rows.length) {
+      const rowTop = down ? Math.min(...rows.map(x => x.r.top)) : Math.max(...rows.map(x => x.r.top));
+      const cx = cur.left + cur.width / 2;
+      next = rows
+        .filter(x => Math.abs(x.r.top - rowTop) < 2)
+        .sort((a, b) => Math.abs(a.r.left + a.r.width / 2 - cx) - Math.abs(b.r.left + b.r.width / 2 - cx))[0].c;
+    }
+  }
+  if (next) next.focus();
+}
+
+// Klik poza okienkiem, przewinięcie strony albo zmiana rozmiaru okna zamyka okienko
+document.addEventListener("mousedown", e => {
+  if (!rtPick) return;
+  if (e.target.closest("#rt-picker") || e.target.closest(".rt-time")) return;
+  rtPickClose(false);
+});
+document.addEventListener("scroll", e => {
+  if (rtPick && !(e.target.closest && e.target.closest("#rt-picker"))) rtPickClose(false);
+}, true);
+window.addEventListener("resize", () => rtPickClose(false));
 
 function rtRowState(d) {
   if (!d) return { hours: null, filled: false, incomplete: false };
@@ -160,6 +394,7 @@ function rtShowBanner(type, text) {
 
 // ---------- Inicjalizacja ----------
 async function initReportTimeView() {
+  rtPickClose(false);
   rtDraft = {};
   rtShowErrors = false;
   rtConflicts = {};
@@ -184,7 +419,7 @@ async function initReportTimeView() {
     if (empRes.error) throw empRes.error;
 
     rtEmployees = (empRes.data || []).sort((a, b) =>
-      `${a.last_name || ""} ${a.first_name || ""}`.localeCompare(`${b.last_name || ""} ${b.first_name || ""}`, "pl")
+      `${a.first_name || ""} ${a.last_name || ""}`.localeCompare(`${b.first_name || ""} ${b.last_name || ""}`, "pl")
     );
     rtEmpById = {};
     rtEmployees.forEach(e => { rtEmpById[e.id] = e; });
@@ -206,10 +441,12 @@ async function initReportTimeView() {
 
     rtRenderTable();
     rtUpdateStats();
+    // prywatne listy pracowników: osobno, błąd (np. brak tabel) nie psuje widoku
+    rtlLoad();
   } catch (err) {
     console.error("Błąd ładowania widoku rozliczania czasu:", err);
     if (tbody) {
-      tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;color:var(--danger);padding:25px;">
+      tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;color:var(--danger);padding:25px;">
         Nie udało się pobrać pracowników: ${rtEsc(err.message || err)}</td></tr>`;
     }
   }
@@ -220,13 +457,15 @@ function rtVisibleEmployees() {
   const q = (document.getElementById("rt-filter-search")?.value || "").toLowerCase().trim();
   const biz = document.getElementById("rt-filter-business")?.value;
   const dept = document.getElementById("rt-filter-dept")?.value;
+  const listSet = typeof rtlFilterSet === "function" ? rtlFilterSet() : null; // prywatna lista (emp_lists.js)
 
   return rtEmployees.filter(e => {
     const n1 = `${e.first_name || ""} ${e.last_name || ""}`.toLowerCase();
     const n2 = `${e.last_name || ""} ${e.first_name || ""}`.toLowerCase();
     return (!q || n1.includes(q) || n2.includes(q)) &&
       (!biz || String(e.business_id) === String(biz)) &&
-      (!dept || String(e.department_id) === String(dept));
+      (!dept || String(e.department_id) === String(dept)) &&
+      (!listSet || listSet.has(Number(e.id)));
   });
 }
 
@@ -255,15 +494,14 @@ function rtRowHtml(emp) {
         </span>
       </td>
       <td style="color: var(--text-muted); font-size: 0.88rem;">${rtEsc(emp.department?.department || "-")}</td>
-      <td>
-        <select class="rt-time" id="rt-from-${id}" aria-label="Od" onchange="rtOnTime(${id}, 'from', this.value)">
-          ${rtTimeOptions("from", d)}
-        </select>
+      <td class="rt-c-time">
+        ${rtTimeBtnHtml(id, "from", d)}
       </td>
-      <td>
-        <select class="rt-time" id="rt-to-${id}" aria-label="Do" onchange="rtOnTime(${id}, 'to', this.value)">
-          ${rtTimeOptions("to", d)}
-        </select>
+      <td class="rt-c-time">
+        ${rtTimeBtnHtml(id, "to", d)}
+      </td>
+      <td class="rt-c-shift">
+        <div class="rt-presets" id="rt-shift-${id}" role="group" aria-label="Zmiana">${rtPresetsHtml(id, d)}</div>
       </td>
       <td class="rt-sum ${st.filled ? "" : "empty"}" id="rt-sum-${id}">${st.filled ? rtFmtHours(st.hours) : "—"}</td>
       <td>
@@ -288,7 +526,7 @@ function rtRenderTable() {
   const list = rtVisibleEmployees();
 
   if (list.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:30px;">
+    tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;color:var(--text-muted);padding:30px;">
       Brak pracowników spełniających podane kryteria.</td></tr>`;
     return;
   }
@@ -304,6 +542,8 @@ function rtResetFilters() {
   if (s) s.value = "";
   if (b) b.value = "";
   if (d) d.value = "";
+  const l = document.getElementById("rt-filter-list");
+  if (l) l.value = "";
   rtRenderTable();
 }
 
@@ -327,11 +567,10 @@ function rtSyncRow(id) {
 
   tr.className = rtRowClass(id);
 
-  const opts = d || { from: "", to: "" };
-  const fromSel = document.getElementById(`rt-from-${id}`);
-  const toSel = document.getElementById(`rt-to-${id}`);
-  if (fromSel) fromSel.innerHTML = rtTimeOptions("from", opts);
-  if (toSel) toSel.innerHTML = rtTimeOptions("to", opts);
+  rtSetTimeBtn(id, "from", d ? d.from : "");
+  rtSetTimeBtn(id, "to", d ? d.to : "");
+  const presets = document.getElementById(`rt-shift-${id}`);
+  if (presets) presets.innerHTML = rtPresetsHtml(id, d || { from: "", to: "" });
 
   const sum = document.getElementById(`rt-sum-${id}`);
   if (sum) {
@@ -402,6 +641,7 @@ function rtFilledEntries() {
 }
 
 function rtUpdateStats() {
+  rtRefreshPresets();
   const entries = rtFilledEntries();
   const total = entries.reduce((s, e) => s + e.hours, 0);
   const absent = entries.filter(e => e.absent).length;
