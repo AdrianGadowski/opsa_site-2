@@ -252,3 +252,8 @@
   #auth-overlay.lv2 .lt-indicator { transition: none; }
   #auth-overlay.lv2 .lt-indicator::after { animation: none; }
 }
+
+/* Telefon: napis w dwóch liniach (ODLEWNIE nad POLSKIE), dopasowany do szerokości ekranu - nic nie jest ucięte */
+@media (max-width: 600px) {
+  .lv2-giant { flex-direction: column; gap: 0; font-size: 15vw; line-height: 0.9; bottom: 62px; }
+}
