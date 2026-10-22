@@ -53,8 +53,8 @@
 /* wielki napis w dwóch liniach, nad płynnym żeliwem */
 .lv2-giant {
   position: fixed; left: 50%; bottom: 70px; transform: translateX(-50%); z-index: 1;
-  display: flex; flex-direction: column; align-items: center; white-space: nowrap; font-weight: 900;
-  font-size: clamp(4rem, 12vw, 11rem); letter-spacing: -0.03em; line-height: 0.88; color: transparent;
+  display: flex; flex-direction: row; gap: 0.25em; align-items: center; white-space: nowrap; font-weight: 900;   /* zawsze w jednej linii */
+  font-size: clamp(2rem, 8vw, 10rem); letter-spacing: -0.03em; line-height: 1; color: transparent;   /* 8vw - cały napis mieści się w szerokości ekranu */
   -webkit-text-stroke: 1.5px rgba(255, 255, 255, 0.08); user-select: none; pointer-events: none;
 }
 .lv2-giant span:last-child { -webkit-text-stroke-color: rgba(252, 212, 68, 0.12); }
@@ -223,10 +223,6 @@
 #auth-overlay.lv2 .foundry-gear { display: block; position: fixed; z-index: 0; color: rgba(252, 212, 68, 0.045); }
 #auth-overlay.lv2 .foundry-gear.gear-c { color: rgba(255, 255, 255, 0.035); }
 
-/* Mniejsze ekrany: napis ODLEWNIE POLSKIE w jednej linii, niżej - nie chowa się za zegarem i kartą */
-@media (max-width: 1280px), (max-height: 820px) {
-  .lv2-giant { flex-direction: row; gap: 0.25em; font-size: clamp(2.6rem, 8vw, 7rem); bottom: 64px; line-height: 1; }
-}
 
 /* ---------- Zakładki logowania: pływające zaznaczenie (js/login-v2.js), jak wskaźnik w menu ---------- */
 #auth-overlay.lv2 .login-tabs { position: relative; }
@@ -253,7 +249,100 @@
   #auth-overlay.lv2 .lt-indicator::after { animation: none; }
 }
 
-/* Telefon: napis w dwóch liniach (ODLEWNIE nad POLSKIE), dopasowany do szerokości ekranu - nic nie jest ucięte */
-@media (max-width: 600px) {
-  .lv2-giant { flex-direction: column; gap: 0; font-size: 15vw; line-height: 0.9; bottom: 62px; }
+
+/* ---------- Kafelki zmian w 3D ----------
+   Lekko pochylone "klawisze" z grubością (ciemniejsza krawędź pod spodem), połyskiem u góry i cieniem;
+   bieżąca zmiana uniesiona wyżej. Po najechaniu kafelek przechyla się za kursorem (js/login-v2.js). */
+.lv2-left .timeline { perspective: 900px; }
+.lv2-left .seg {
+  --rx: 0deg; --ry: 0deg; --lift: 0px;
+  transform-style: preserve-3d; transform-origin: 50% 100%;
+  transform: translateY(var(--lift)) rotateX(calc(12deg + var(--rx))) rotateY(var(--ry));
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.03));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.14),
+    0 6px 0 rgba(0, 0, 0, 0.38),
+    0 16px 26px rgba(0, 0, 0, 0.35);
+  transition: transform 0.35s cubic-bezier(0.34, 1.4, 0.64, 1), background 0.3s, border-color 0.3s, box-shadow 0.3s;
+  will-change: transform;
+}
+.lv2-left .seg:hover { --lift: -4px; }
+.lv2-left .seg.on {
+  --lift: -8px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--tab) 82%, #fff) 0%, var(--tab) 55%, color-mix(in srgb, var(--tab) 80%, #000) 100%);
+  animation: lv2Seg3dPulse 2.4s ease-in-out infinite;
+}
+#auth-overlay.lv2.mode-employee .seg.on { background: linear-gradient(180deg, #DDB03A 0%, #C9970F 55%, #A87C08 100%); }
+/* grubość "klawisza" w kolorze modułu + puls poświaty */
+@keyframes lv2Seg3dPulse {
+  0%, 100% {
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), 0 7px 0 color-mix(in srgb, var(--tab) 55%, #000),
+      0 20px 34px rgba(0, 0, 0, 0.4), 0 0 0 0 var(--tab-glow);
+  }
+  50% {
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), 0 7px 0 color-mix(in srgb, var(--tab) 55%, #000),
+      0 20px 34px rgba(0, 0, 0, 0.4), 0 0 0 12px transparent;
+  }
+}
+/* napis lekko "nad" powierzchnią kafelka */
+.lv2-left .seg b, .lv2-left .seg span:not(.ending-tag) { display: inline-block; transform: translateZ(18px); }
+.lv2-left .seg b { display: block; }
+.lv2-left .seg .ending-tag { transform: translateZ(30px); }
+@media (prefers-reduced-motion: reduce) {
+  .lv2-left .seg { transition: none; }
+  .lv2-left .seg.on { animation: none; }
+}
+
+/* ---------- Karta logowania w 3D (jak kafelki zmian) ----------
+   Grubość karty (krawędź w ciemniejszym kolorze modułu), lekkie przechylenie za kursorem
+   i połysk światła podążający za myszą (js/login-v2.js). Przechylenie jest małe, żeby nie przeszkadzało w pisaniu. */
+.lv2-side { perspective: 1200px; }
+#auth-overlay.lv2 .unified-auth-card {
+  --rx: 0deg; --ry: 0deg; --mx: 50%; --my: 0%;
+  animation-fill-mode: backwards;                 /* po animacji wejścia transform jest wolny dla efektu 3D */
+  transform-style: preserve-3d;
+  transform: none;                                /* bez przechylania - tylko grubość, cień i połysk */
+  transition: transform 0.4s cubic-bezier(0.34, 1.3, 0.64, 1), border-color 0.3s, box-shadow 0.3s;
+  box-shadow:
+    0 10px 0 color-mix(in srgb, var(--tab) 45%, #000),
+    0 40px 90px rgba(0, 0, 0, 0.65),
+    0 0 0 1px rgba(255, 255, 255, 0.06),
+    0 0 60px var(--tab-glow),
+    inset 0 1px 0 rgba(255, 255, 255, 0.22);
+}
+#auth-overlay.lv2 .unified-auth-card.tilting { transition: transform 0.12s ease-out, border-color 0.3s, box-shadow 0.3s; }
+/* połysk światła w miejscu kursora */
+#auth-overlay.lv2 .unified-auth-card::after {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; z-index: 5;
+  background: radial-gradient(420px circle at var(--mx) var(--my), rgba(255, 255, 255, 0.09), transparent 60%);
+  opacity: 0; transition: opacity 0.4s;
+}
+#auth-overlay.lv2 .unified-auth-card.tilting::after { opacity: 1; }
+@media (prefers-reduced-motion: reduce), (hover: none) {
+  #auth-overlay.lv2 .unified-auth-card { transform: none; }
+  #auth-overlay.lv2 .unified-auth-card::after { display: none; }
+}
+
+/* ---------- "Nie pamiętasz hasła?" (z lewej) i "Pozostań zalogowany" (z prawej) w jednym rzędzie ---------- */
+#auth-overlay.lv2 .login-opts { display: flex; flex-direction: row-reverse; justify-content: space-between; align-items: center; gap: 10px; width: 100%; margin-top: 10px; }   /* "Pozostań zalogowany" z lewej, "Nie pamiętasz hasła?" z prawej */
+#auth-overlay.lv2 .login-opts .login-forgot { margin: 0; padding: 0; font-size: 0.82rem; font-weight: 600; color: var(--tab-light); white-space: nowrap; }
+#auth-overlay.lv2 .login-opts .login-forgot:hover { text-decoration: underline; }
+#auth-overlay.lv2 .login-opts .login-remember { width: auto; margin: 0; gap: 9px; white-space: nowrap; font-size: 0.82rem; color: rgba(255, 255, 255, 0.8); }
+
+/* własny checkbox w kolorze modułu (zamiast systemowego) */
+#auth-overlay.lv2 .login-remember input {
+  appearance: none; -webkit-appearance: none; flex-shrink: 0; width: 18px; height: 18px; margin: 0; cursor: pointer;
+  border-radius: 5px; border: 1.5px solid rgba(255, 255, 255, 0.35); background: rgba(0, 0, 0, 0.22);
+  display: inline-grid; place-items: center; transition: background 0.2s, border-color 0.2s, box-shadow 0.2s;
+}
+#auth-overlay.lv2 .login-remember input::after {
+  content: ""; width: 9px; height: 5px; margin-top: -2px; border-left: 2.5px solid var(--tab-ink); border-bottom: 2.5px solid var(--tab-ink);
+  transform: rotate(-45deg) scale(0); transition: transform 0.18s cubic-bezier(0.34, 1.6, 0.64, 1);
+}
+#auth-overlay.lv2 .login-remember input:checked { background: var(--tab); border-color: var(--tab-light); box-shadow: 0 0 10px var(--tab-glow); }
+#auth-overlay.lv2 .login-remember input:checked::after { transform: rotate(-45deg) scale(1); }
+#auth-overlay.lv2 .login-remember input:hover { border-color: var(--tab-light); }
+#auth-overlay.lv2 .login-remember input:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--tab-glow); }
+@media (max-width: 360px) {
+  #auth-overlay.lv2 .login-opts { flex-direction: column; align-items: flex-start; }
 }

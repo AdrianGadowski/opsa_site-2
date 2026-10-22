@@ -20,16 +20,16 @@
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
 
-  <link rel="stylesheet" href="css/style.css?v=20261177" />
-  <link rel="stylesheet" href="css/login.css?v=20261177" />
-  <link rel="stylesheet" href="css/menu.css?v=20261177" />
-  <link rel="stylesheet" href="css/mobile.css?v=20261177" />
-  <link rel="stylesheet" href="css/portal.css?v=20261177" />
-  <link rel="stylesheet" href="css/timepicker.css?v=20261177" />
-  <link rel="stylesheet" href="css/emp_lists.css?v=20261177" />
-  <link rel="stylesheet" href="css/absences.css?v=20261177" />
-  <link rel="stylesheet" href="css/messages.css?v=20261177" />
-  <link rel="stylesheet" href="css/login-v2.css?v=20261177" />
+  <link rel="stylesheet" href="css/style.css?v=20261184" />
+  <link rel="stylesheet" href="css/login.css?v=20261184" />
+  <link rel="stylesheet" href="css/menu.css?v=20261184" />
+  <link rel="stylesheet" href="css/mobile.css?v=20261184" />
+  <link rel="stylesheet" href="css/portal.css?v=20261184" />
+  <link rel="stylesheet" href="css/timepicker.css?v=20261184" />
+  <link rel="stylesheet" href="css/emp_lists.css?v=20261184" />
+  <link rel="stylesheet" href="css/absences.css?v=20261184" />
+  <link rel="stylesheet" href="css/messages.css?v=20261184" />
+  <link rel="stylesheet" href="css/login-v2.css?v=20261184" />
 </head>
 <body>
 
@@ -153,20 +153,24 @@
 
           <div class="form-group" style="width: 100%; margin-bottom: 12px;">
             <label for="login-input">Login</label>
-            <input type="text" id="login-input" class="form-control" placeholder="Wprowadź login" autocomplete="username" />
+            <input type="text" id="login-input" class="form-control" placeholder="Wprowadź login" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" />
           </div>
 
           <div class="form-group" style="width: 100%; margin-bottom: 4px;">
             <label for="password-input">Hasło</label>
             <div class="login-pass">
-              <input type="password" id="password-input" class="form-control" placeholder="Wprowadź hasło" autocomplete="current-password" />
+              <input type="password" id="password-input" class="form-control" placeholder="Wprowadź hasło" autocomplete="new-password" />
               <button type="button" id="login-pass-toggle" aria-label="Pokaż hasło" title="Pokaż hasło"><i class="fa-solid fa-eye"></i></button>
             </div>
           </div>
 
-          <label class="login-remember">
-            <input type="checkbox" id="login-remember" /> Zapamiętaj mnie na tym urządzeniu
-          </label>
+          <!-- Pozostań zalogowany (z lewej) i Nie pamiętasz hasła? (z prawej) w jednym rzędzie -->
+          <div class="login-opts">
+            <button type="button" class="link-btn login-forgot" onclick="toggleModal('modal-forgot-password', true)">Nie pamiętasz hasła?</button>
+            <label class="login-remember">
+              <input type="checkbox" id="login-remember" /> Pozostań zalogowany
+            </label>
+          </div>
 
           <div class="error-slot">
             <span id="login-error-msg" role="alert">Zły login lub hasło</span>
@@ -174,7 +178,6 @@
           </div>
 
           <button id="btn-login" class="btn-primary" onclick="handleLogin()">Zaloguj się</button>
-          <button class="link-btn" onclick="toggleModal('modal-forgot-password', true)">Nie pamiętasz hasła?</button>
           <button type="button" id="btn-install-app" class="login-install" style="display: none;"><i class="fa-solid fa-download"></i> Zainstaluj aplikację</button>
           <div id="install-ios-hint" class="login-install-hint" style="display: none;">Aby dodać aplikację do ekranu głównego: przycisk <strong>Udostępnij</strong>, potem <strong>Do ekranu początkowego</strong>.</div>
         </div>
@@ -827,28 +830,28 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="js/app.js?v=20261177"></script>
-  <script src="js/login-fx.js?v=20261177"></script>
-  <script src="js/login-v2.js?v=20261177"></script>
-  <script src="js/menu-fx.js?v=20261177"></script>
-  <script src="js/mobile.js?v=20261177"></script>
-  <script src="js/report_time.js?v=20261177"></script>
-  <script src="js/emp_lists.js?v=20261177"></script>
-  <script src="js/reports.js?v=20261177"></script>
-  <script src="js/updates.js?v=20261177"></script>
-  <script src="js/dashboard.js?v=20261177"></script>
-  <script src="js/schedule.js?v=20261177"></script>
-  <script src="js/employee_presence.js?v=20261177"></script>
-  <script src="js/user.js?v=20261177"></script>
-  <script src="js/employee_hours.js?v=20261177"></script>
-  <script src="js/options.js?v=20261177"></script>
-  <script src="js/logs.js?v=20261177"></script>
-  <script src="js/employee_portal.js?v=20261177"></script>
-  <script src="js/absences.js?v=20261177"></script>
-  <script src="js/push.js?v=20261177"></script>
-  <script src="js/messages.js?v=20261177"></script>
-  <script src="js/zalew.js?v=20261177"></script>
-  <script src="js/password.js?v=20261177"></script>
-  <script src="js/pwa.js?v=20261177"></script>
+  <script src="js/app.js?v=20261184"></script>
+  <script src="js/login-fx.js?v=20261184"></script>
+  <script src="js/login-v2.js?v=20261184"></script>
+  <script src="js/menu-fx.js?v=20261184"></script>
+  <script src="js/mobile.js?v=20261184"></script>
+  <script src="js/report_time.js?v=20261184"></script>
+  <script src="js/emp_lists.js?v=20261184"></script>
+  <script src="js/reports.js?v=20261184"></script>
+  <script src="js/updates.js?v=20261184"></script>
+  <script src="js/dashboard.js?v=20261184"></script>
+  <script src="js/schedule.js?v=20261184"></script>
+  <script src="js/employee_presence.js?v=20261184"></script>
+  <script src="js/user.js?v=20261184"></script>
+  <script src="js/employee_hours.js?v=20261184"></script>
+  <script src="js/options.js?v=20261184"></script>
+  <script src="js/logs.js?v=20261184"></script>
+  <script src="js/employee_portal.js?v=20261184"></script>
+  <script src="js/absences.js?v=20261184"></script>
+  <script src="js/push.js?v=20261184"></script>
+  <script src="js/messages.js?v=20261184"></script>
+  <script src="js/zalew.js?v=20261184"></script>
+  <script src="js/password.js?v=20261184"></script>
+  <script src="js/pwa.js?v=20261184"></script>
 </body>
 </html>

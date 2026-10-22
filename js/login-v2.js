@@ -149,3 +149,43 @@
   requestAnimationFrame(() => place(true));
   document.fonts?.ready.then(() => place(true));
 })();
+
+// ==========================================
+// KAFELKI ZMIAN 3D: po najechaniu kafelek przechyla się za kursorem
+// ==========================================
+(() => {
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  document.querySelectorAll("#auth-overlay.lv2 .lv2-left .seg").forEach(seg => {
+    seg.addEventListener("mousemove", e => {
+      const r = seg.getBoundingClientRect();
+      const x = (e.clientX - r.left) / r.width - 0.5;    // -0.5 .. 0.5
+      const y = (e.clientY - r.top) / r.height - 0.5;
+      seg.style.setProperty("--ry", `${(x * 16).toFixed(1)}deg`);
+      seg.style.setProperty("--rx", `${(-y * 12 - 6).toFixed(1)}deg`);
+    });
+    seg.addEventListener("mouseleave", () => {
+      seg.style.removeProperty("--ry");
+      seg.style.removeProperty("--rx");
+    });
+  });
+})();
+
+// ==========================================
+// KARTA LOGOWANIA 3D: połysk światła podążający za kursorem (karta się nie przechyla)
+// (tylko mysz; na dotyku i przy ograniczonych animacjach - bez ruchu)
+// ==========================================
+(() => {
+  const card = document.querySelector("#auth-overlay.lv2 .unified-auth-card");
+  if (!card || window.matchMedia("(prefers-reduced-motion: reduce), (hover: none)").matches) return;
+  card.addEventListener("mousemove", e => {
+    const r = card.getBoundingClientRect();
+    const x = (e.clientX - r.left) / r.width;      // 0..1
+    const y = (e.clientY - r.top) / r.height;
+    card.classList.add("tilting");
+    card.style.setProperty("--mx", `${(x * 100).toFixed(1)}%`);
+    card.style.setProperty("--my", `${(y * 100).toFixed(1)}%`);
+  });
+  card.addEventListener("mouseleave", () => {
+    card.classList.remove("tilting");
+  });
+})();
