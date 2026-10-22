@@ -54,6 +54,9 @@
   font-weight: 800;
   letter-spacing: -0.01em;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  /* wyśrodkowane, ciemniejsze tło jak w stopce z danymi użytkownika */
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.22);
 }
 
 .sidebar-header > i {
@@ -65,8 +68,14 @@
   border-radius: 11px;
   font-size: 17px;
   color: #FCD444;
-  background: rgba(252, 212, 68, 0.14);
-  border: 1px solid rgba(252, 212, 68, 0.4);
+  /* szklany kafelek: półprzezroczysty, rozmyty, z jasną obwódką i odblaskiem u góry */
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.28) 0%, rgba(255, 255, 255, 0.06) 48%, rgba(255, 255, 255, 0.02) 52%, rgba(255, 255, 255, 0.1) 100%),
+    rgba(252, 212, 68, 0.16);
+  -webkit-backdrop-filter: blur(8px) saturate(160%);
+  backdrop-filter: blur(8px) saturate(160%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), inset 0 -1px 0 rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.3);
   animation: emberPulse 3.2s ease-in-out infinite;
 }
 /* obracający się pierścień żaru wokół ikony - jak przy logo na ekranie logowania */
@@ -81,8 +90,8 @@
 }
 @keyframes shRing { to { --sh-ring: 360deg; } }
 @keyframes emberPulse {
-  0%, 100% { box-shadow: 0 0 0 rgba(245, 158, 11, 0); }
-  50%      { box-shadow: 0 0 18px rgba(245, 158, 11, 0.4); }
+  0%, 100% { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), inset 0 -1px 0 rgba(0, 0, 0, 0.25), 0 0 0 rgba(245, 158, 11, 0); }
+  50%      { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), inset 0 -1px 0 rgba(0, 0, 0, 0.25), 0 0 18px rgba(245, 158, 11, 0.4); }
 }
 
 /* Etykiety (JS opakowuje tekst w .menu-label) */
@@ -242,6 +251,17 @@
   overflow: hidden;
   background: rgba(0, 0, 0, 0.22);
   border-top: 1px solid rgba(255, 255, 255, 0.08);
+  /* dwa wiersze: u góry awatar i dane, pod spodem komunikaty, dzwonek i wylogowanie */
+  flex-direction: column;
+  align-items: stretch;
+}
+.sidebar .user-row { display: flex; align-items: center; justify-content: center; gap: 10px; min-width: 0; }
+/* awatar z danymi wyśrodkowany jako całość; imię i ranga/dział wyśrodkowane względem siebie */
+.sidebar .user-row .user-info-wrapper { flex: 0 1 auto; align-items: center; text-align: center; }
+.sidebar .user-row .user-meta { justify-content: center; }
+.sidebar .user-actions {
+  display: flex; align-items: center; justify-content: space-around; gap: 6px;
+  padding-top: 8px; border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .user-avatar {
@@ -266,6 +286,18 @@
 .sidebar .user-info-wrapper:hover { opacity: 0.8; }
 .sidebar .user-avatar { transition: transform 0.2s; }
 .sidebar .user-avatar:hover { transform: scale(1.06); }
+/* szklany awatar - jak ikona w nagłówku menu */
+.sidebar .user-avatar {
+  color: #FCD444;
+  text-shadow: 0 1px 6px rgba(245, 158, 11, 0.45);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.28) 0%, rgba(255, 255, 255, 0.06) 48%, rgba(255, 255, 255, 0.02) 52%, rgba(255, 255, 255, 0.1) 100%),
+    rgba(252, 212, 68, 0.16);
+  -webkit-backdrop-filter: blur(8px) saturate(160%);
+  backdrop-filter: blur(8px) saturate(160%);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), inset 0 -1px 0 rgba(0, 0, 0, 0.25), 0 4px 14px rgba(245, 158, 11, 0.22);
+}
 
 .sidebar .user-fullname { color: #FFFFFF; }
 .sidebar .user-meta { color: rgba(255, 255, 255, 0.6); }
@@ -287,12 +319,13 @@
 }
 .sidebar .user-footer .link-btn:focus-visible { outline: 2px solid #FCD444; }
 
-/* Zwinięty panel: tylko awatar i wylogowanie w pionie */
+/* Zwinięty panel: awatar, a pod nim ikony w pionie */
 .sidebar.collapsed .user-footer {
-  flex-direction: column;
   justify-content: center;
+  align-items: center;
   padding: 12px 0;
 }
+.sidebar.collapsed .user-actions { flex-direction: column; }
 .sidebar.collapsed .user-info-wrapper { display: none; }
 
 /* ---------- Ograniczenie ruchu ---------- */

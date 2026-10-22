@@ -156,7 +156,6 @@
 /* ---------- Powiadomienia push (js/push.js) ---------- */
 .ab-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
 .ab-top .ab-hint { margin-bottom: 0; flex: 1 1 300px; min-height: 38px; }
-.ab-push { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; max-width: 360px; }
 .push-btn {
   height: 38px; padding: 0 14px; border-radius: 10px; border: 1.5px solid var(--primary); background: #fff; color: var(--primary);
   font-family: inherit; font-size: 0.84rem; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; white-space: nowrap;
@@ -169,7 +168,6 @@
 .ep-abs-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .ep-abs .push-hint { margin-bottom: 8px; }
 @media (max-width: 768px) {
-  .ab-push { align-items: stretch; max-width: none; width: 100%; }
   .push-btn { justify-content: center; width: 100%; }
   .ep-abs-actions { width: 100%; flex-direction: column; }
 }

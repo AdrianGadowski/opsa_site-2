@@ -86,22 +86,7 @@ async function initReportsView() {
   rpReports = [];
 
   const now = new Date();
-  const yearSel = document.getElementById("rp-filter-year");
-  const monthSel = document.getElementById("rp-filter-month");
-
-  if (yearSel) {
-    const y = now.getFullYear();
-    yearSel.innerHTML = Array.from({ length: RP_YEARS_BACK + 1 }, (_, i) =>
-      `<option value="${y - i}">${y - i}</option>`).join("");
-  }
-  if (monthSel) {
-    const current = String(now.getMonth() + 1).padStart(2, "0");
-    monthSel.innerHTML = `<option value="">Wszystkie miesiące</option>` +
-      RP_MONTHS.map((name, i) => {
-        const v = String(i + 1).padStart(2, "0");
-        return `<option value="${v}"${v === current ? " selected" : ""}>${name}</option>`;
-      }).join("");
-  }
+  rpSetPeriod(now.getFullYear(), now.getMonth() + 1);
 
   try {
     const [users, employees, depts] = await Promise.all([
@@ -184,6 +169,49 @@ function rpLabel(rep) {
   return `${rep.seq} (${rep.number})`;
 }
 
+// ---------- Wybór miesiąca: strzałki ‹ › jak na pulpicie ----------
+// Okres trzymają ukryte pola rp-filter-year ("2026") i rp-filter-month ("01".."12").
+// Styczeń ‹ = grudzień poprzedniego roku, grudzień › = styczeń następnego. Nie da się wyjść poza bieżący miesiąc.
+
+function rpPeriod() {
+  const now = new Date();
+  return {
+    year: Number(document.getElementById("rp-filter-year")?.value) || now.getFullYear(),
+    month: Number(document.getElementById("rp-filter-month")?.value) || now.getMonth() + 1
+  };
+}
+
+function rpSetPeriod(year, month) {
+  const y = document.getElementById("rp-filter-year");
+  const m = document.getElementById("rp-filter-month");
+  if (y) y.value = String(year);
+  if (m) m.value = String(month).padStart(2, "0");
+  rpSyncPeriodArrows();
+}
+
+function rpPeriodInFuture(year, month) {
+  const now = new Date();
+  return year > now.getFullYear() || (year === now.getFullYear() && month > now.getMonth() + 1);
+}
+
+function rpStepPeriod(delta) {
+  let { year, month } = rpPeriod();
+  month += delta;
+  if (month < 1) { month = 12; year--; }
+  if (month > 12) { month = 1; year++; }
+  if (rpPeriodInFuture(year, month)) return;
+  rpSetPeriod(year, month);
+  rpLoad();
+}
+
+function rpSyncPeriodArrows() {
+  const { year, month } = rpPeriod();
+  const text = document.getElementById("rp-period-text");
+  if (text) text.textContent = `${RP_MONTHS[month - 1]} ${year}`;
+  const next = document.getElementById("rp-next");
+  if (next) next.disabled = rpPeriodInFuture(month === 12 ? year + 1 : year, month === 12 ? 1 : month + 1);
+}
+
 async function rpLoad() {
   const tbody = document.getElementById("rp-table-body");
   if (!tbody) return;
@@ -262,16 +290,10 @@ function rpDeptName(id) {
 function rpOnSearch() {
   const q = (document.getElementById("rp-filter-search")?.value || "").trim();
   const m = (rpParseDateQuery(q) || "").match(/^\d{2}\.(\d{2})\.(\d{4})$/);
-  const yearSel = document.getElementById("rp-filter-year");
-  const monthSel = document.getElementById("rp-filter-month");
+  const { year, month } = rpPeriod();
 
-  if (m && yearSel && monthSel && Number(m[1]) >= 1 && Number(m[1]) <= 12 &&
-      (yearSel.value !== m[2] || (monthSel.value && monthSel.value !== m[1]))) {
-    if (![...yearSel.options].some(o => o.value === m[2])) {
-      yearSel.insertAdjacentHTML("beforeend", `<option value="${m[2]}">${m[2]}</option>`);
-    }
-    yearSel.value = m[2];
-    monthSel.value = m[1];
+  if (m && Number(m[1]) >= 1 && Number(m[1]) <= 12 && (year !== Number(m[2]) || month !== Number(m[1]))) {
+    rpSetPeriod(Number(m[2]), Number(m[1]));
     rpLoad();
     return;
   }
@@ -878,13 +900,7 @@ async function rpSaveAll() {
 
       // Lista pokazuje wybrany rok i miesiąc - przełącz ją na okres nowej daty, żeby raport nie zniknął
       const [newYear, newMonth] = dateIso.split("-");
-      const yearSel = document.getElementById("rp-filter-year");
-      const monthSel = document.getElementById("rp-filter-month");
-      if (yearSel && ![...yearSel.options].some(o => o.value === newYear)) {
-        yearSel.insertAdjacentHTML("beforeend", `<option value="${rtEsc(newYear)}">${rtEsc(newYear)}</option>`);
-      }
-      if (yearSel) yearSel.value = newYear;
-      if (monthSel && monthSel.value) monthSel.value = newMonth;
+      rpSetPeriod(Number(newYear), Number(newMonth));
     }
 
     // 4. Zapis godzin i statusów

@@ -20,16 +20,16 @@
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
 
-  <link rel="stylesheet" href="css/style.css?v=20261184" />
-  <link rel="stylesheet" href="css/login.css?v=20261184" />
-  <link rel="stylesheet" href="css/menu.css?v=20261184" />
-  <link rel="stylesheet" href="css/mobile.css?v=20261184" />
-  <link rel="stylesheet" href="css/portal.css?v=20261184" />
-  <link rel="stylesheet" href="css/timepicker.css?v=20261184" />
-  <link rel="stylesheet" href="css/emp_lists.css?v=20261184" />
-  <link rel="stylesheet" href="css/absences.css?v=20261184" />
-  <link rel="stylesheet" href="css/messages.css?v=20261184" />
-  <link rel="stylesheet" href="css/login-v2.css?v=20261184" />
+  <link rel="stylesheet" href="css/style.css?v=20261204" />
+  <link rel="stylesheet" href="css/login.css?v=20261204" />
+  <link rel="stylesheet" href="css/menu.css?v=20261204" />
+  <link rel="stylesheet" href="css/mobile.css?v=20261204" />
+  <link rel="stylesheet" href="css/portal.css?v=20261204" />
+  <link rel="stylesheet" href="css/timepicker.css?v=20261204" />
+  <link rel="stylesheet" href="css/emp_lists.css?v=20261204" />
+  <link rel="stylesheet" href="css/absences.css?v=20261204" />
+  <link rel="stylesheet" href="css/messages.css?v=20261204" />
+  <link rel="stylesheet" href="css/login-v2.css?v=20261204" />
 </head>
 <body>
 
@@ -77,6 +77,9 @@
     <!-- ===== Nowy wygląd (css/login-v2.css, js/login-v2.js) ===== -->
     <!-- Wielki napis w tle -->
     <div class="lv2-giant" aria-hidden="true"><span>ODLEWNIE</span><span>POLSKIE</span></div>
+    <!-- Rozgrzany dół napisu: rozmyta poświata metalu na literach i falujące, gorące powietrze -->
+    <div class="lv2-giant lv2-giant-glow" aria-hidden="true"><span>ODLEWNIE</span><span>POLSKIE</span></div>
+    <div class="lv2-haze" aria-hidden="true"></div>
 
     <!-- Subtelna suwnica z kadzią przejeżdżająca u góry -->
     <div class="lv2-crane" aria-hidden="true">
@@ -153,12 +156,16 @@
 
           <div class="form-group" style="width: 100%; margin-bottom: 12px;">
             <label for="login-input">Login</label>
-            <input type="text" id="login-input" class="form-control" placeholder="Wprowadź login" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" />
+            <div class="login-field">
+              <span class="lf-ic" aria-hidden="true"><i class="fa-solid fa-user"></i></span>
+              <input type="text" id="login-input" class="form-control" placeholder="Wprowadź login" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" />
+            </div>
           </div>
 
           <div class="form-group" style="width: 100%; margin-bottom: 4px;">
             <label for="password-input">Hasło</label>
-            <div class="login-pass">
+            <div class="login-pass login-field">
+              <span class="lf-ic" aria-hidden="true"><i class="fa-solid fa-lock"></i></span>
               <input type="password" id="password-input" class="form-control" placeholder="Wprowadź hasło" autocomplete="new-password" />
               <button type="button" id="login-pass-toggle" aria-label="Pokaż hasło" title="Pokaż hasło"><i class="fa-solid fa-eye"></i></button>
             </div>
@@ -278,6 +285,8 @@
       </ul>
 
       <div class="user-footer">
+        <!-- górny wiersz: awatar (js/menu-fx.js) i dane użytkownika -->
+        <div class="user-row">
         <div class="user-info-wrapper" title="Moje konto">
           <span id="current-user-name" class="user-fullname">Użytkownik</span>
           <div class="user-meta">
@@ -286,6 +295,9 @@
             <span id="current-user-dept" class="user-dept">Dział</span>
           </div>
         </div>
+        </div>
+        <!-- dolny wiersz: komunikaty, powiadomienia, wylogowanie -->
+        <div class="user-actions">
         <!-- Moje komunikaty (skrzynka) - js/messages.js -->
         <button type="button" class="ab-bell msg-env" data-msg-env style="display: none;" onclick="msgOpenInbox()" title="Komunikaty" aria-label="Komunikaty">
           <i class="fa-solid fa-envelope"></i><span class="ab-badge msg-badge" style="display: none;"></span>
@@ -295,6 +307,7 @@
           <i class="fa-solid fa-bell"></i><span class="ab-badge" style="display: none;"></span>
         </button>
         <button class="link-btn" onclick="handleLogout()" title="Wyloguj" aria-label="Wyloguj"><i class="fa-solid fa-right-from-bracket"></i></button>
+        </div>
       </div>
     </aside>
 
@@ -830,28 +843,28 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="js/app.js?v=20261184"></script>
-  <script src="js/login-fx.js?v=20261184"></script>
-  <script src="js/login-v2.js?v=20261184"></script>
-  <script src="js/menu-fx.js?v=20261184"></script>
-  <script src="js/mobile.js?v=20261184"></script>
-  <script src="js/report_time.js?v=20261184"></script>
-  <script src="js/emp_lists.js?v=20261184"></script>
-  <script src="js/reports.js?v=20261184"></script>
-  <script src="js/updates.js?v=20261184"></script>
-  <script src="js/dashboard.js?v=20261184"></script>
-  <script src="js/schedule.js?v=20261184"></script>
-  <script src="js/employee_presence.js?v=20261184"></script>
-  <script src="js/user.js?v=20261184"></script>
-  <script src="js/employee_hours.js?v=20261184"></script>
-  <script src="js/options.js?v=20261184"></script>
-  <script src="js/logs.js?v=20261184"></script>
-  <script src="js/employee_portal.js?v=20261184"></script>
-  <script src="js/absences.js?v=20261184"></script>
-  <script src="js/push.js?v=20261184"></script>
-  <script src="js/messages.js?v=20261184"></script>
-  <script src="js/zalew.js?v=20261184"></script>
-  <script src="js/password.js?v=20261184"></script>
-  <script src="js/pwa.js?v=20261184"></script>
+  <script src="js/app.js?v=20261204"></script>
+  <script src="js/login-fx.js?v=20261204"></script>
+  <script src="js/login-v2.js?v=20261204"></script>
+  <script src="js/menu-fx.js?v=20261204"></script>
+  <script src="js/mobile.js?v=20261204"></script>
+  <script src="js/report_time.js?v=20261204"></script>
+  <script src="js/emp_lists.js?v=20261204"></script>
+  <script src="js/reports.js?v=20261204"></script>
+  <script src="js/updates.js?v=20261204"></script>
+  <script src="js/dashboard.js?v=20261204"></script>
+  <script src="js/schedule.js?v=20261204"></script>
+  <script src="js/employee_presence.js?v=20261204"></script>
+  <script src="js/user.js?v=20261204"></script>
+  <script src="js/employee_hours.js?v=20261204"></script>
+  <script src="js/options.js?v=20261204"></script>
+  <script src="js/logs.js?v=20261204"></script>
+  <script src="js/employee_portal.js?v=20261204"></script>
+  <script src="js/absences.js?v=20261204"></script>
+  <script src="js/push.js?v=20261204"></script>
+  <script src="js/messages.js?v=20261204"></script>
+  <script src="js/zalew.js?v=20261204"></script>
+  <script src="js/password.js?v=20261204"></script>
+  <script src="js/pwa.js?v=20261204"></script>
 </body>
 </html>

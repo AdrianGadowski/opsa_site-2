@@ -125,6 +125,25 @@
   .rp-switch input:checked ~ .lbl-off { display: none; }
   .rp-switch input:checked ~ .lbl-on { display: inline; }
 
+  /* Wybór miesiąca w zielonym nagłówku: strzałki ‹ › jak na pulpicie */
+  .rp-periodpick { display: flex; align-items: center; gap: 6px; }
+  .rp-periodpick button {
+    width: 42px; height: 44px; flex-shrink: 0; border-radius: 12px; cursor: pointer; font-size: 0.9rem;
+    display: inline-flex; align-items: center; justify-content: center;
+    border: 1px solid rgba(255, 255, 255, 0.25); background: rgba(255, 255, 255, 0.12); color: #fff;
+  }
+  .rp-periodpick button:hover:not(:disabled) { background: rgba(255, 255, 255, 0.22); }
+  .rp-periodpick button:disabled { opacity: 0.4; cursor: default; }
+  .rp-periodpick button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+  .rp-period-label {
+    width: 200px; height: 44px; display: inline-flex; align-items: center; justify-content: center; padding: 0 10px; box-sizing: border-box;
+    border-radius: 12px; background: rgba(255, 255, 255, 0.95); color: var(--primary); font-weight: 700; font-size: 0.95rem; white-space: nowrap;
+  }
+  @media (max-width: 768px) {
+    .rp-periodpick { width: 100%; }
+    .rp-period-label { flex: 1; width: auto; min-width: 0; font-size: 0.88rem; }
+  }
+
   @media (max-width: 900px) {
     .rp-filters { grid-template-columns: 1fr 1fr !important; }
     .rp-add { grid-template-columns: 1fr 1fr; }
@@ -162,29 +181,28 @@
     <h3>Lista raportów</h3>
     <p>Archiwum zatwierdzonych raportów czasu pracy. Raport można podejrzeć, edytować (dodać lub usunąć pracownika) albo usunąć w całości.</p>
   </div>
+  <div class="page-hero-actions">
+    <div class="rp-periodpick">
+      <button type="button" id="rp-prev" onclick="rpStepPeriod(-1)" title="Poprzedni miesiąc" aria-label="Poprzedni miesiąc"><i class="fa-solid fa-chevron-left"></i></button>
+      <input type="hidden" id="rp-filter-year" />
+      <input type="hidden" id="rp-filter-month" />
+      <span class="rp-period-label" id="rp-period-text" aria-live="polite">—</span>
+      <button type="button" id="rp-next" onclick="rpStepPeriod(1)" title="Następny miesiąc" aria-label="Następny miesiąc"><i class="fa-solid fa-chevron-right"></i></button>
+    </div>
+  </div>
 </div>
 
 <div id="rp-banner" class="rp-banner" role="status"></div>
 
 <!-- Filtry -->
 <div class="card" style="margin-bottom: 20px; padding: 16px 20px;">
-  <div class="rp-filters" style="display: grid; grid-template-columns: 2fr 140px 200px auto; gap: 14px; align-items: end;">
+  <div class="rp-filters" style="display: grid; grid-template-columns: 1fr auto; gap: 14px; align-items: end;">
     <div class="form-group" style="margin-bottom: 0;">
       <label for="rp-filter-search" style="font-size: 0.8rem; color: var(--text-muted);">Szukaj raportu</label>
       <div style="position: relative;">
         <input type="text" id="rp-filter-search" class="form-control" placeholder="Kto utworzył, dział lub data raportu, np. 10.10.2026..." oninput="rpOnSearch()" style="padding-left: 36px;" autocomplete="off" />
         <i class="fa-solid fa-magnifying-glass" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 0.9rem;"></i>
       </div>
-    </div>
-
-    <div class="form-group" style="margin-bottom: 0;">
-      <label for="rp-filter-year" style="font-size: 0.8rem; color: var(--text-muted);">Rok</label>
-      <select id="rp-filter-year" class="form-control" onchange="rpLoad()"></select>
-    </div>
-
-    <div class="form-group" style="margin-bottom: 0;">
-      <label for="rp-filter-month" style="font-size: 0.8rem; color: var(--text-muted);">Miesiąc</label>
-      <select id="rp-filter-month" class="form-control" onchange="rpLoad()"></select>
     </div>
 
     <div id="rp-filter-info" style="font-size: 0.85rem; color: var(--text-muted); padding-bottom: 12px; text-align: right; white-space: nowrap;"></div>

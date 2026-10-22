@@ -121,7 +121,7 @@
     const avatar = document.createElement("div");
     avatar.className = "user-avatar";
     avatar.setAttribute("aria-hidden", "true");
-    footer.prepend(avatar);
+    (footer.querySelector(".user-row") || footer).prepend(avatar);
 
     const updateAvatar = () => {
       const parts = (nameEl.textContent || "").trim().split(/\s+/).filter(Boolean);

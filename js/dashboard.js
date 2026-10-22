@@ -5,7 +5,6 @@
 // ==========================================
 
 const DB_TOP = 6;            // ile pozycji w listach działów, firm i pracowników
-const DB_SHIFTS = ["Zmiana I", "Zmiana II", "Zmiana III"];
 
 let dbEmpById = {};
 let dbDeptById = {};
@@ -210,7 +209,6 @@ function dbAdd(map, key, row) {
 function dbRender(rows, year, month) {
   const total = { present: 0, absent: 0 };
   const byTime = new Map();    // dzień miesiąca albo numer miesiąca
-  const byShift = new Map();
   const byDept = new Map();
   const byBiz = new Map();
   const byEmp = new Map();
@@ -224,7 +222,6 @@ function dbRender(rows, year, month) {
 
     dbAdd(all, "all", r);
     dbAdd(byTime, Number(month ? d : m), r);
-    dbAdd(byShift, r.shift || "Brak zmiany", r);
     // dział raportu, jak w kolumnie „Dział” na liście raportów (dział mistrza);
     // bez kolumny id_department w bazie (przed sql/24) - dział pracownika
     const deptId = "id_department" in r ? r.id_department : r.department_id;
@@ -246,12 +243,6 @@ function dbRender(rows, year, month) {
     .map(([label, v]) => ({ label, ...v }))
     .sort((a, b) => (b.present + b.absent) - (a.present + a.absent));
 
-  // Zmiany w stałej kolejności I, II, III; nietypowe nazwy na końcu
-  const shifts = sortByTotal(byShift).sort((a, b) => {
-    const ia = DB_SHIFTS.indexOf(a.label), ib = DB_SHIFTS.indexOf(b.label);
-    return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
-  });
-  dbRenderBars("db-shifts", shifts, "both");
   dbRenderBars("db-depts", dbFold(sortByTotal(byDept)), "both");
   dbRenderBars("db-biz", dbFold(sortByTotal(byBiz)), "both");
 
