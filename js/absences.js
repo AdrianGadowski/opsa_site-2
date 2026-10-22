@@ -340,7 +340,7 @@ function abSetBadge(count) {
     // kolor dzwonka = stan powiadomień (push.js); liczba = zgłoszenia do rozpatrzenia
     bell.dataset.count = String(n);
   }
-  document.querySelectorAll(".ab-badge").forEach(b => {
+  document.querySelectorAll(".ab-badge:not(.msg-badge)").forEach(b => {
     b.textContent = text;
     b.style.display = n > 0 ? "" : "none";
   });

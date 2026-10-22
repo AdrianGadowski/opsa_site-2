@@ -97,12 +97,44 @@ function dbSyncPeriodArrows() {
   }
 }
 
+// ---------- Zakładki: Ewidencja czasu pracy / Zalew ----------
+// Wybrana zakładka jest pamiętana w tej przeglądarce. Zakładka Zalew znika, gdy moduł Zalew jest wyłączony.
+const DB_TAB_KEY = "opsaDashboardTab";
+
+function dbTabSaved() {
+  try { return localStorage.getItem(DB_TAB_KEY) === "zalew" ? "zalew" : "time"; } catch (e) { return "time"; }
+}
+
+function dbSetTab(tab) {
+  const zalewBtn = document.getElementById("db-tab-zalew");
+  if (tab === "zalew" && zalewBtn && zalewBtn.hidden) tab = "time";
+  document.querySelectorAll(".db-tab").forEach(b => {
+    const on = b.dataset.dtab === tab;
+    b.classList.toggle("on", on);
+    b.setAttribute("aria-selected", String(on));
+  });
+  document.querySelectorAll(".db-pane").forEach(p => { p.hidden = p.dataset.pane !== tab; });
+  try { localStorage.setItem(DB_TAB_KEY, tab); } catch (e) { /* bez zapamiętania */ }
+}
+
+function dbSyncZalewTab(enabled) {
+  const btn = document.getElementById("db-tab-zalew");
+  if (!btn) return;
+  btn.hidden = !enabled;
+  // bez Zalewu zostaje jedna zakładka - cały pasek wyboru jest wtedy zbędny
+  const bar = document.querySelector(".db-tabs");
+  if (bar) bar.hidden = !enabled;
+  const active = document.querySelector(".db-tab.on");
+  if (!enabled && active && active.dataset.dtab === "zalew") dbSetTab("time");
+}
+
 // ---------- Inicjalizacja ----------
 async function initDashboardView() {
   const now = new Date();
   dbSetPeriod(now.getFullYear(), now.getMonth() + 1);
 
   dbSyncPeriodArrows();
+  dbSetTab(dbTabSaved());
   dbInitTooltip();
 
   try {
@@ -545,10 +577,12 @@ async function dbLoadZalew(year, month, token) {
   // Ustawienia modułów pobierane od nowa, żeby zmiana w Opcjach działała bez przelogowania.
   const panel = document.getElementById("db-zalew-panel");
   if (panel) panel.style.display = moduleEnabled("zalew") ? "" : "none"; // od razu, bez mignięcia
+  dbSyncZalewTab(moduleEnabled("zalew"));
   await loadModules();
   if (token !== dbLoadToken) return;
   const zalewOn = moduleEnabled("zalew");
   if (panel) panel.style.display = zalewOn ? "" : "none";
+  dbSyncZalewTab(zalewOn);
   if (!zalewOn) {
     el.innerHTML = "";
     return;

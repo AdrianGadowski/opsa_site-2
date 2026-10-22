@@ -69,6 +69,17 @@
   border: 1px solid rgba(252, 212, 68, 0.4);
   animation: emberPulse 3.2s ease-in-out infinite;
 }
+/* obracający się pierścień żaru wokół ikony - jak przy logo na ekranie logowania */
+@property --sh-ring { syntax: "<angle>"; initial-value: 0deg; inherits: false; }
+.sidebar-header > i { position: relative; }
+.sidebar-header > i::after {
+  content: ""; position: absolute; inset: -5px; border-radius: 15px; padding: 2px;
+  background: conic-gradient(from var(--sh-ring), transparent 0%, transparent 55%, rgba(245, 158, 11, 0.9) 85%, #FCD444 100%);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0); -webkit-mask-composite: xor;
+  mask: linear-gradient(#fff 0 0) content-box exclude, linear-gradient(#fff 0 0); mask-composite: exclude;
+  animation: shRing 2.8s linear infinite; pointer-events: none;
+}
+@keyframes shRing { to { --sh-ring: 360deg; } }
 @keyframes emberPulse {
   0%, 100% { box-shadow: 0 0 0 rgba(245, 158, 11, 0); }
   50%      { box-shadow: 0 0 18px rgba(245, 158, 11, 0.4); }
@@ -289,6 +300,7 @@
   .sidebar,
   .sidebar::after,
   .sidebar-header > i,
+  .sidebar-header > i::after,
   .sidebar .menu-item,
   .menu-indicator,
   .menu-indicator::after,

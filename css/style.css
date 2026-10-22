@@ -527,3 +527,28 @@ input[type="checkbox"] {
 #modal-user-form label {
   color: var(--text-dark) !important;
 }
+/* Okienko obecności (Baza pracowników, js/employee_presence.js). Element jest w <body>, a nie w widoku,
+   więc styl musi być globalny - inaczej po przejściu do innego modułu okienko pokazywało się jako tekst z boku. */
+.pr-tip {
+  display: none; position: fixed; z-index: 1300; width: 260px; padding: 12px 14px; border-radius: 10px;
+  background: #fff; border: 1px solid var(--border-color); box-shadow: 0 12px 30px rgba(0, 0, 0, 0.16);
+  font-size: 0.82rem; color: var(--text-dark); pointer-events: none; text-align: center;
+}
+.pr-tip.open { display: block; }
+.pr-tip .head { display: flex; flex-direction: column; align-items: center; gap: 2px; margin-bottom: 8px; }
+.pr-tip .head b { font-size: 0.9rem; text-transform: capitalize; }
+.pr-tip .head span { font-size: 0.78rem; color: var(--text-muted); }
+.pr-tip .state { display: block; width: fit-content; margin: 0 auto 4px; padding: 3px 10px; border-radius: 999px; font-size: 0.74rem; font-weight: 700; text-align: center; }
+.pr-tip .state.ok { background: var(--primary); color: #fff; }
+.pr-tip .state.diff { background: var(--accent); color: #03241E; }
+.pr-tip .state.absent { background: var(--danger); color: #fff; }
+.pr-tip .state.plan { border: 1.5px solid var(--primary); color: var(--primary); }
+.pr-tip .state.absplan { border: 1.5px solid var(--danger); color: var(--danger); }
+.pr-tip .state.none { background: #E5E7EB; color: #4B5563; }
+.pr-tip .sec { margin: 8px 0 4px; font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: #6B7280; }
+.pr-tip .row { display: flex; align-items: center; justify-content: center; gap: 8px; flex-wrap: wrap; padding: 2px 0; font-variant-numeric: tabular-nums; }
+.pr-tip .muted { color: var(--text-muted); font-size: 0.78rem; }
+.pr-tip .tag { min-width: 84px; padding: 2px 7px; border-radius: 5px; font-size: 0.72rem; font-weight: 700; text-align: center; display: inline-flex; align-items: center; justify-content: center; }
+.pr-tip .tag.work { background: rgba(8, 88, 75, 0.1); color: var(--primary); }
+.pr-tip .tag.absence { background: rgba(217, 56, 58, 0.12); color: var(--danger); }
+.pr-tip .tag.off { background: #F3F4F6; color: #6B7280; }

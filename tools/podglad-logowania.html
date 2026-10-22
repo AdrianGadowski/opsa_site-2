@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Podgląd ekranu logowania</title>
+  <!-- PODGLĄD (makieta) - trzy warianty nowego ekranu logowania; nic tu nie loguje. Prawdziwy ekran: index.html -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <style>
+    :root { --primary: #08584B; --primary-d: #053D34; --deep: #03241E; --accent: #FCD444; --molten: #FF7A1A; --danger: #D9383A; }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; min-height: 100%; }
+    body { font-family: 'Montserrat', sans-serif; color: #1F2937; background: var(--deep); }
+    .variant { display: none; min-height: 100vh; }
+    body[data-v="a"] .v-a, body[data-v="n"] .v-n, body[data-v="c"] .v-c { display: block; }
+
+    /* Przełącznik wariantów (tylko w podglądzie) */
+    .switch { position: fixed; top: 14px; left: 50%; transform: translateX(-50%); z-index: 50; display: flex; flex-wrap: wrap; justify-content: center; gap: 4px; padding: 4px; max-width: 96vw;
+      border-radius: 16px; background: rgba(0, 0, 0, 0.72); backdrop-filter: blur(6px); }
+    .switch button { border: none; background: none; color: #fff; font: inherit; font-size: 0.8rem; font-weight: 700; padding: 8px 14px; border-radius: 999px; cursor: pointer; }
+    .switch button.on { background: var(--accent); color: var(--deep); }
+
+    /* Wspólne elementy formularza */
+    .tabs { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 4px; padding: 4px; margin-bottom: 18px; border-radius: 12px; }
+    .tabs button { height: 40px; border: none; border-radius: 9px; background: transparent; font: inherit; font-size: 0.8rem; font-weight: 700; cursor: pointer;
+      display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+    .lbl { display: block; font-size: 0.74rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; margin-bottom: 7px; }
+    .inp { position: relative; margin-bottom: 14px; }
+    .inp i { position: absolute; left: 15px; top: 50%; transform: translateY(-50%); }
+    .inp input { width: 100%; height: 50px; padding: 0 14px 0 44px; border-radius: 12px; font: inherit; font-size: 0.95rem; }
+    .inp input:focus { outline: none; }
+    .opts { display: flex; justify-content: space-between; align-items: center; margin: 2px 0 20px; font-size: 0.82rem; }
+    .opts label { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+    .opts a { font-weight: 600; text-decoration: none; }
+    .go { width: 100%; height: 52px; border: none; border-radius: 12px; font: inherit; font-weight: 800; font-size: 0.98rem; cursor: pointer;
+      display: inline-flex; align-items: center; justify-content: center; gap: 10px; letter-spacing: 0.02em; }
+
+    /* =========================================================
+       WARIANT A - "Hala nocą": cała strona ciemna, żar pieca na horyzoncie,
+       perspektywiczna posadzka, szklana karta
+       ========================================================= */
+    .v-a { position: relative; overflow: hidden;
+      background: radial-gradient(1100px 420px at 50% 100%, rgba(255, 122, 26, 0.55), transparent 65%),
+                  radial-gradient(700px 300px at 50% 105%, rgba(252, 212, 68, 0.55), transparent 60%),
+                  linear-gradient(180deg, #021914 0%, #03241E 45%, #0A2A22 100%); }
+    .v-a .floor { position: absolute; left: -50%; right: -50%; bottom: -10%; height: 55%;
+      background-image: linear-gradient(rgba(252, 212, 68, 0.22) 1px, transparent 1px), linear-gradient(90deg, rgba(252, 212, 68, 0.22) 1px, transparent 1px);
+      background-size: 70px 70px; transform: perspective(500px) rotateX(62deg); transform-origin: bottom;
+      mask-image: linear-gradient(to top, #000 10%, transparent 85%); -webkit-mask-image: linear-gradient(to top, #000 10%, transparent 85%);
+      animation: a-floor 6s linear infinite; }
+    @keyframes a-floor { to { background-position: 0 70px, 0 0; } }
+    .v-a canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+    .v-a .giant { position: absolute; left: 50%; top: 9%; transform: translateX(-50%); white-space: nowrap; font-weight: 900;
+      font-size: clamp(4rem, 13vw, 12rem); letter-spacing: -0.03em; color: transparent; -webkit-text-stroke: 1.5px rgba(255, 255, 255, 0.08); user-select: none; }
+    .v-a .top { position: relative; z-index: 2; display: flex; justify-content: space-between; align-items: center; padding: 26px 40px; color: #fff; }
+    .v-a .brand { display: flex; align-items: center; gap: 12px; font-weight: 800; font-size: 1.1rem; }
+    .v-a .brand i { width: 42px; height: 42px; border-radius: 12px; display: grid; place-items: center; background: linear-gradient(135deg, var(--accent), var(--molten)); color: var(--deep); }
+    .v-a .now { text-align: right; }
+    .v-a .now b { display: block; font-size: 1.6rem; font-variant-numeric: tabular-nums; }
+    .v-a .now span { font-size: 0.78rem; color: rgba(255, 255, 255, 0.65); }
+    .v-a .center { position: relative; z-index: 2; display: grid; place-items: center; min-height: calc(100vh - 110px); padding: 20px 16px 60px; }
+    .v-a .card { width: 100%; max-width: 430px; padding: 34px 32px 28px; border-radius: 24px; color: #fff;
+      background: rgba(10, 36, 31, 0.55); border: 1px solid rgba(255, 255, 255, 0.14);
+      backdrop-filter: blur(18px) saturate(140%); -webkit-backdrop-filter: blur(18px) saturate(140%);
+      box-shadow: 0 40px 90px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.12); }
+    .v-a h2 { margin: 0 0 4px; font-size: 1.7rem; font-weight: 800; }
+    .v-a h2 span { background: linear-gradient(90deg, var(--accent), var(--molten)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+    .v-a .sub { margin: 0 0 22px; color: rgba(255, 255, 255, 0.65); font-size: 0.88rem; }
+    .v-a .tabs { background: rgba(0, 0, 0, 0.28); }
+    .v-a .tabs button { color: rgba(255, 255, 255, 0.7); }
+    .v-a .tabs button.on { background: linear-gradient(135deg, var(--accent), #F7B733); color: var(--deep); box-shadow: 0 4px 14px rgba(252, 212, 68, 0.35); }
+    .v-a .lbl { color: rgba(255, 255, 255, 0.6); }
+    .v-a .inp i { color: rgba(255, 255, 255, 0.45); }
+    .v-a .inp input { border: 1px solid rgba(255, 255, 255, 0.16); background: rgba(255, 255, 255, 0.06); color: #fff; }
+    .v-a .inp input::placeholder { color: rgba(255, 255, 255, 0.4); }
+    .v-a .inp input:focus { border-color: var(--accent); box-shadow: 0 0 0 4px rgba(252, 212, 68, 0.18); }
+    .v-a .opts { color: rgba(255, 255, 255, 0.75); }
+    .v-a .opts a { color: var(--accent); }
+    .v-a .go { background: linear-gradient(135deg, var(--accent), var(--molten)); color: var(--deep); box-shadow: 0 10px 30px rgba(255, 122, 26, 0.35); }
+    .v-a .shift { display: flex; align-items: center; gap: 10px; margin-top: 20px; padding-top: 16px; border-top: 1px solid rgba(255, 255, 255, 0.1); font-size: 0.78rem; color: rgba(255, 255, 255, 0.7); }
+    .v-a .shift .dot { width: 8px; height: 8px; border-radius: 50%; background: #3BE08F; box-shadow: 0 0 10px #3BE08F; }
+
+    /* =========================================================
+       WARIANT C - "Zmiana": jasny, nowoczesny; duży zegar i oś dnia z trzema zmianami,
+       karta z akcentem w kolorze zakładki
+       ========================================================= */
+    .v-c { background: #EEF2F0; }
+    .v-c .wrap { display: grid; grid-template-columns: 1.2fr 1fr; min-height: 100vh; }
+    .v-c .left { padding: 44px 56px; display: flex; flex-direction: column; justify-content: space-between;
+      background: linear-gradient(135deg, rgba(8, 88, 75, 0.06) 25%, transparent 25%) 0 0 / 28px 28px, #EEF2F0; }
+    .v-c .brand { display: flex; align-items: center; gap: 12px; font-weight: 800; font-size: 1.1rem; color: var(--deep); }
+    .v-c .brand i { width: 42px; height: 42px; border-radius: 12px; display: grid; place-items: center; background: var(--primary); color: var(--accent); }
+    .v-c .big { font-size: clamp(5rem, 11vw, 9.5rem); font-weight: 900; line-height: 0.9; letter-spacing: -0.04em; color: var(--deep); font-variant-numeric: tabular-nums; }
+    .v-c .date { margin: 10px 0 34px; font-size: 1.05rem; font-weight: 600; color: #4B5563; text-transform: capitalize; }
+    .v-c .timeline { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; max-width: 560px; }
+    .v-c .seg { position: relative; padding: 14px 16px; border-radius: 14px; background: #fff; border: 1.5px solid #DDE3E0; }
+    .v-c .seg b { display: block; font-size: 1.3rem; font-weight: 900; color: #9CA3AF; }
+    .v-c .seg span { font-size: 0.78rem; color: #9CA3AF; font-weight: 600; }
+    .v-c .seg.on { background: var(--primary); border-color: var(--primary); box-shadow: 0 14px 30px rgba(8, 88, 75, 0.28); }
+    .v-c .seg.on b { color: var(--accent); }
+    .v-c .seg.on span { color: rgba(255, 255, 255, 0.85); }
+    .v-c .seg .bar { position: absolute; left: 16px; right: 16px; bottom: 8px; height: 4px; border-radius: 999px; background: rgba(255, 255, 255, 0.2); overflow: hidden; display: none; }
+    .v-c .seg.on .bar { display: block; }
+    .v-c .seg .bar i { display: block; height: 100%; background: var(--accent); }
+    .v-c .hint { margin-top: 14px; font-size: 0.84rem; color: #4B5563; }
+    .v-c .side { display: grid; place-items: center; padding: 40px 24px; }
+    .v-c .card { width: 100%; max-width: 420px; padding: 34px 32px 28px; border-radius: 26px; background: #fff;
+      box-shadow: 0 40px 80px rgba(3, 36, 30, 0.14); border-top: 6px solid var(--tab, var(--primary)); }
+    .v-c h2 { margin: 0 0 4px; font-size: 1.6rem; font-weight: 900; color: var(--deep); }
+    .v-c .sub { margin: 0 0 22px; color: #6B7280; font-size: 0.9rem; }
+    .v-c .tabs { background: #F1F4F3; }
+    .v-c .tabs button { color: #5B6470; }
+    .v-c .tabs button.on { background: var(--tab, var(--primary)); color: var(--tab-ink, #fff); }
+    .v-c .lbl { color: #6B7280; }
+    .v-c .inp i { color: #9CA3AF; }
+    .v-c .inp input { border: none; background: #F3F5F4; }
+    .v-c .inp input:focus { background: #fff; box-shadow: 0 0 0 2px var(--tab, var(--primary)); }
+    .v-c .opts { color: #4B5563; }
+    .v-c .opts a { color: var(--primary); }
+    .v-c .go { background: var(--tab, var(--primary)); color: var(--tab-ink, #fff); }
+    body.t-user .v-c { --tab: #08584B; --tab-ink: #fff; }
+    body.t-employee .v-c { --tab: #FCD444; --tab-ink: #03241E; }
+    body.t-zalew .v-c { --tab: #E5552B; --tab-ink: #fff; }
+
+    /* =========================================================
+       POŁĄCZENIE - ciemne tło z poświatą i wielkim napisem (A) + zegar i kafelki zmian (C)
+       ========================================================= */
+    .v-n { position: relative; overflow: hidden; color: #fff;
+      background: radial-gradient(900px 380px at 30% 100%, rgba(252, 212, 68, 0.22), transparent 65%),
+                  radial-gradient(800px 500px at 85% 10%, rgba(11, 107, 91, 0.45), transparent 60%),
+                  linear-gradient(180deg, #021914 0%, #03241E 50%, #062F27 100%); }
+    /* Wielki napis "ODLEWNIE / POLSKIE" w dwóch liniach, nad płynnym żeliwem */
+    .v-n .giant { position: absolute; left: 50%; bottom: 70px; transform: translateX(-50%); z-index: 1;
+      display: flex; flex-direction: column; align-items: center; white-space: nowrap; font-weight: 900;
+      font-size: clamp(4rem, 12vw, 11rem); letter-spacing: -0.03em; line-height: 0.88; color: transparent;
+      -webkit-text-stroke: 1.5px rgba(255, 255, 255, 0.08); user-select: none; pointer-events: none; }
+    .v-n .giant span:last-child { -webkit-text-stroke-color: rgba(252, 212, 68, 0.12); }
+    /* Poświata od dołu + płynne żeliwo (fale jak na dotychczasowym ekranie logowania) */
+    .v-n::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 45%; z-index: 0; pointer-events: none;
+      background: radial-gradient(70% 100% at 50% 100%, rgba(245, 158, 11, 0.38), rgba(252, 212, 68, 0.1) 45%, transparent 75%);
+      animation: n-heat 5s ease-in-out infinite; }
+    @keyframes n-heat { 0%, 100% { opacity: 0.75; } 50% { opacity: 1; } }
+    .v-n .n-floor { position: absolute; left: 0; right: 0; bottom: 0; height: 90px; overflow: hidden; z-index: 1; pointer-events: none;
+      filter: drop-shadow(0 -8px 22px rgba(245, 158, 11, 0.55)); }
+    .v-n .n-wave { position: absolute; left: 0; bottom: 0; width: 200%; height: 100%; }
+    .v-n .n-wave svg { display: block; width: 100%; height: 100%; }
+    .v-n .n-wave.back { opacity: 0.5; height: 108%; animation: n-wave 26s linear infinite reverse; }
+    .v-n .n-wave.front { animation: n-wave 15s linear infinite; }
+    @keyframes n-wave { to { transform: translateX(-50%); } }
+    .v-n .n-sparks { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1; pointer-events: none; }
+    @media (prefers-reduced-motion: reduce) { .v-n .n-wave, .v-n::after { animation: none; } }
+    .v-n .top { position: relative; z-index: 2; display: flex; justify-content: space-between; align-items: center; padding: 26px 48px; }
+    .v-n .brand { display: flex; align-items: center; gap: 12px; font-weight: 800; font-size: 1.1rem; }
+    /* ikona z obracającym się pierścieniem żaru - jak na dotychczasowym ekranie logowania */
+    .v-n .brand .mark { position: relative; width: 42px; height: 42px; border-radius: 12px; display: grid; place-items: center; background: var(--accent); color: var(--deep); }
+    .v-n .brand .mark::before { content: ""; position: absolute; inset: -6px; border-radius: 16px; padding: 2.5px;
+      background: conic-gradient(from var(--ring-angle), transparent 0%, transparent 55%, var(--ring-a, rgba(245, 158, 11, 0.9)) 85%, var(--ring-b, #FCD444) 100%);
+      -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0); -webkit-mask-composite: xor;
+      mask: linear-gradient(#fff 0 0) content-box exclude, linear-gradient(#fff 0 0); mask-composite: exclude;
+      animation: ringSpin 2.8s linear infinite; pointer-events: none; }
+    @property --ring-angle { syntax: "<angle>"; initial-value: 0deg; inherits: false; }
+    @keyframes ringSpin { to { --ring-angle: 360deg; } }
+    @media (prefers-reduced-motion: reduce) { .v-n .brand .mark::before { animation: none; } }
+    /* Logo zmienia się z modułem: ikona (użytkownik / pracownik / zalew), kolor i podpis pod nazwą */
+    .v-n .brand .mark { background: var(--tab, var(--accent)); color: var(--tab-ink, var(--deep)); overflow: visible;
+      box-shadow: 0 0 22px var(--tab-glow, transparent); transition: background 0.4s, color 0.4s, box-shadow 0.4s; }
+    .v-n .brand .mark .ic { position: absolute; font-size: 1.05rem; opacity: 0; transform: scale(0.3) rotate(-120deg);
+      transition: opacity 0.35s ease, transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1); }
+    body.t-user .v-n .mark .ic-user, body.t-employee .v-n .mark .ic-employee, body.t-zalew .v-n .mark .ic-zalew { opacity: 1; transform: none; }
+    .v-n .brand .name { display: flex; flex-direction: column; line-height: 1.15; }
+    .v-n .brand .name small { position: relative; height: 1.1em; font-size: 0.72rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; }
+    .v-n .brand .name small span { position: absolute; left: 0; top: 0; white-space: nowrap; color: var(--tab-light, var(--tab, var(--accent)));
+      opacity: 0; transform: translateY(6px); transition: opacity 0.3s, transform 0.3s; }
+    body.t-user .v-n .name .m-user, body.t-employee .v-n .name .m-employee, body.t-zalew .v-n .name .m-zalew { opacity: 1; transform: none; }
+    .v-n .ver { font-size: 0.78rem; color: rgba(255, 255, 255, 0.5); }
+    .v-n .wrap { position: relative; z-index: 2; display: grid; grid-template-columns: 1.15fr 1fr; align-items: center; gap: 40px;
+      min-height: calc(100vh - 94px); padding: 10px 48px 120px; }
+    .v-n .eyebrow { font-size: 0.78rem; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent); margin-bottom: 10px; }
+    .v-n .big { font-size: clamp(5rem, 10vw, 8.5rem); font-weight: 900; line-height: 0.9; letter-spacing: -0.04em; font-variant-numeric: tabular-nums; }
+    .v-n .date { margin: 12px 0 30px; font-size: 1.05rem; font-weight: 600; color: rgba(255, 255, 255, 0.7); text-transform: capitalize; }
+    .v-n .timeline { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; max-width: 560px; }
+    .v-n .seg { position: relative; padding: 16px 18px 20px; border-radius: 16px; background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1); backdrop-filter: blur(6px); }
+    .v-n .seg b { display: block; font-size: 1.5rem; font-weight: 900; color: rgba(255, 255, 255, 0.45); }
+    .v-n .seg span { font-size: 0.8rem; font-weight: 600; color: rgba(255, 255, 255, 0.45); }
+    /* bieżąca zmiana w kolorze wybranej zakładki (Użytkownik / Pracownik / Zalew) */
+    .v-n .seg { transition: background 0.3s, border-color 0.3s, box-shadow 0.3s; }
+    .v-n .seg.on { background: var(--tab, var(--accent)); border-color: var(--tab, var(--accent)); box-shadow: 0 16px 40px var(--tab-glow, rgba(252, 212, 68, 0.28)); }
+    /* napis na kafelku zawsze biały (jak przy Użytkowniku i Zalewie); przy Pracowniku ciemniejsze złoto, żeby był czytelny */
+    .v-n .seg.on b, .v-n .seg.on span { color: #fff; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25); }
+    .v-n .seg.on .bar { background: rgba(255, 255, 255, 0.28); }
+    .v-n .seg.on .bar i { background: #fff; }
+    body.t-employee .v-n .seg.on { background: #C9970F; border-color: #C9970F; }
+    body.t-employee .v-n .seg.on .bar i { background: #0E8A6A; }   /* przy Pracowniku pasek postępu zielony */
+    .v-n .seg.on span { opacity: 0.8; }
+    .v-n .seg .bar { position: absolute; left: 18px; right: 18px; bottom: 9px; height: 4px; border-radius: 999px; background: rgba(3, 36, 30, 0.15); overflow: hidden; display: none; }
+    .v-n .seg.on .bar { display: block; }
+    .v-n .seg .bar { background: color-mix(in srgb, var(--tab-ink, #03241E) 22%, transparent); }
+    .v-n .seg .bar i { display: block; height: 100%; background: var(--tab-ink, var(--deep)); }
+    .v-n .hint { display: flex; align-items: center; gap: 10px; margin-top: 16px; font-size: 0.86rem; color: rgba(255, 255, 255, 0.72); }
+    .v-n .hint .dot { width: 8px; height: 8px; border-radius: 50%; background: #3BE08F; box-shadow: 0 0 10px #3BE08F; }
+    .v-n .side { display: grid; place-items: center; }
+    .v-n .card { width: 100%; max-width: 430px; padding: 34px 32px 28px; border-radius: 24px;
+      /* jaśniejsza, mniej przezroczysta powierzchnia - karta wyraźnie odcina się od ciemnego tła */
+      background: linear-gradient(160deg, rgba(34, 92, 79, 0.94) 0%, rgba(17, 58, 49, 0.96) 55%, rgba(12, 44, 38, 0.97) 100%); border: 1px solid rgba(255, 255, 255, 0.14);
+      backdrop-filter: blur(18px) saturate(140%); -webkit-backdrop-filter: blur(18px) saturate(140%);
+      box-shadow: 0 40px 90px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.12); }
+    .v-n h2 { margin: 0 0 4px; font-size: 1.7rem; font-weight: 800; }
+    .v-n h2 span { color: var(--accent); }
+    .v-n .sub { margin: 0 0 22px; color: rgba(255, 255, 255, 0.65); font-size: 0.88rem; }
+    .v-n .tabs { background: rgba(0, 0, 0, 0.3); }
+    .v-n .tabs button { color: rgba(255, 255, 255, 0.7); }
+    .v-n .tabs button.on { background: var(--accent); color: var(--deep); box-shadow: 0 4px 14px rgba(252, 212, 68, 0.3); }
+    body.t-zalew .v-n .tabs button.on { background: #E5552B; color: #fff; box-shadow: 0 4px 14px rgba(229, 85, 43, 0.35); }
+    .v-n .lbl { color: rgba(255, 255, 255, 0.6); }
+    .v-n .inp i { color: rgba(255, 255, 255, 0.45); }
+    .v-n .inp input { border: 1px solid rgba(255, 255, 255, 0.2); background: rgba(0, 0, 0, 0.22); color: #fff; }
+    .v-n .inp input::placeholder { color: rgba(255, 255, 255, 0.4); }
+    .v-n .inp input:focus { border-color: var(--accent); box-shadow: 0 0 0 4px rgba(252, 212, 68, 0.18); }
+    .v-n .opts { color: rgba(255, 255, 255, 0.75); }
+    .v-n .opts a { color: var(--accent); }
+    .v-n .go { background: var(--accent); color: var(--deep); box-shadow: 0 10px 28px rgba(252, 212, 68, 0.25); }
+    .v-n .go:hover { background: #FFE27A; }
+
+    /* Kolor wybranego modułu (jak w C): ramka karty, zakładka, pola i przycisk */
+    /* stonowana zieleń (wcześniej #2FB38A - zbyt jaskrawa); poświata jaśniejszą zielenią, tak mocna jak przy pozostałych */
+    body.t-user .v-n { --tab: #1E7A64; --tab-ink: #fff; --tab-glow: rgba(52, 199, 150, 0.4); --tab-light: #34C796;
+      --ring-a: rgba(52, 199, 150, 0.9); --ring-b: #9BF0CF; }   /* pierścień wokół logo w kolorze modułu */
+    body.t-employee .v-n { --tab: #FCD444; --tab-ink: #03241E; --tab-glow: rgba(252, 212, 68, 0.35); --tab-light: #FCD444;
+      --ring-a: rgba(245, 158, 11, 0.9); --ring-b: #FCD444; }
+    body.t-zalew .v-n { --tab: #E5552B; --tab-ink: #fff; --tab-glow: rgba(229, 85, 43, 0.4); --tab-light: #FF7A4D;
+      --ring-a: rgba(229, 85, 43, 0.95); --ring-b: #FFB067; }
+    .v-n .card { border: 1.5px solid var(--tab); border-top-width: 6px; transition: border-color 0.3s, box-shadow 0.3s;
+      box-shadow: 0 40px 90px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(255, 255, 255, 0.06), 0 0 60px var(--tab-glow), inset 0 1px 0 rgba(255, 255, 255, 0.18); }
+    .v-n h2 span { color: var(--tab); transition: color 0.3s; }
+    .v-n .tabs button.on, body.t-zalew .v-n .tabs button.on { background: var(--tab); color: var(--tab-ink); box-shadow: 0 4px 14px var(--tab-glow); }
+    /* zaznaczone pole: jasna obwódka i poświata w kolorze zakładki (przy Użytkowniku jaśniejsza zieleń, żeby była widoczna) */
+    .v-n .inp input:focus { border-color: var(--tab-light, var(--tab)); box-shadow: 0 0 0 4px var(--tab-glow), 0 0 22px var(--tab-glow); }
+    .v-n .opts a { color: var(--tab); }
+    .v-n .go, .v-n .go:hover { background: var(--tab); color: var(--tab-ink); box-shadow: 0 10px 28px var(--tab-glow); transition: background 0.3s, box-shadow 0.3s; }
+    .v-n .go:hover { filter: brightness(1.08); }
+    /* =========================================================
+       EFEKTY W TLE (podglądy 1–5); w podglądzie "Bazowy" żaden nie jest włączony
+       ========================================================= */
+    .fx-haze, .fx-crane, .fx-steam { display: none; }
+
+    /* 1. Drganie gorącego powietrza: napis i pas nad metalem falują jak nad piecem */
+    body[data-fx="1"] .v-n .giant { filter: url(#heat-haze); }
+    body[data-fx="1"] .v-n .fx-haze { display: block; position: absolute; left: 0; right: 0; bottom: 60px; height: 220px; z-index: 1; pointer-events: none;
+      background: linear-gradient(to top, rgba(255, 170, 60, 0.16), transparent); filter: url(#heat-haze); }
+
+    /* 2. Suwnica z kadzią: szyna u góry, wózek z kadzią przejeżdża co ~45 s */
+    body[data-fx="2"] .v-n .fx-crane, body[data-fx="25"] .v-n .fx-crane { display: block; position: absolute; left: 0; right: 0; top: 96px; height: 160px; z-index: 1; pointer-events: none; }
+    /* subtelnie: cienka, ledwo widoczna szyna i mały, półprzezroczysty wózek jadący powoli */
+    .fx-crane .rail { position: absolute; left: 0; right: 0; top: 0; height: 3px; background: rgba(255, 255, 255, 0.05); }
+
+    .fx-crane .trolley { position: absolute; top: -1px; left: -160px; width: 64px; opacity: 0.28;
+      animation: crane 90s linear -30s infinite, sway 5s ease-in-out infinite; transform-origin: 50% 0; }   /* -30s: od razu widoczna w podglądzie */
+    .fx-crane .hot { animation: hot 3s ease-in-out infinite alternate; filter: drop-shadow(0 0 4px rgba(255, 154, 46, 0.6)); }
+    @keyframes crane { 0% { left: -160px; } 100% { left: calc(100% + 160px); } }
+    @keyframes sway { 0%, 100% { rotate: -0.8deg; } 50% { rotate: 0.8deg; } }
+    @keyframes hot { from { opacity: 0.6; } to { opacity: 1; } }
+
+    /* 3. Para i dym: miękkie smugi unoszące się od metalu */
+    body[data-fx="3"] .v-n .fx-steam { display: block; position: absolute; inset: 0; z-index: 1; pointer-events: none; overflow: hidden; }
+    .fx-steam span { position: absolute; bottom: -120px; width: 320px; height: 320px; border-radius: 50%;
+      background: radial-gradient(circle, rgba(220, 235, 230, 0.16), rgba(220, 235, 230, 0.05) 45%, transparent 70%);
+      filter: blur(14px); animation: steam 16s ease-in infinite; opacity: 0; }
+    .fx-steam span:nth-child(1) { left: 5%; animation-delay: -2s; }
+    .fx-steam span:nth-child(2) { left: 22%; animation-delay: 3s; width: 260px; height: 260px; }
+    .fx-steam span:nth-child(3) { left: 40%; animation-delay: 6s; }
+    .fx-steam span:nth-child(4) { left: 58%; animation-delay: 9s; width: 380px; height: 380px; }
+    .fx-steam span:nth-child(5) { left: 74%; animation-delay: 12s; }
+    .fx-steam span:nth-child(6) { left: 88%; animation-delay: 4.5s; width: 240px; height: 240px; }
+    @keyframes steam {
+      0% { transform: translate(0, 0) scale(0.6); opacity: 0; }
+      15% { opacity: 1; }
+      100% { transform: translate(60px, -75vh) scale(1.6); opacity: 0; }
+    }
+
+    /* 5. Puls zmiany: bieżący kafelek świeci; ostatnie 15 minut - pomarańczowy pasek i napis */
+    body[data-fx="5"] .v-n .seg.on, body[data-fx="25"] .v-n .seg.on { animation: seg-pulse 2.4s ease-in-out infinite; }
+    @keyframes seg-pulse {
+      0%, 100% { box-shadow: 0 16px 40px var(--tab-glow), 0 0 0 0 var(--tab-glow); }
+      50% { box-shadow: 0 16px 40px var(--tab-glow), 0 0 0 12px transparent; }
+    }
+    /* końcówka zmiany: pasek pomarańczowy (na czerwonym kafelku Zalewu - żółty, żeby był widoczny) */
+    .v-n .seg.ending .bar i { background: #FF8A1F; }
+    body.t-zalew .v-n .seg.ending .bar i { background: #FFD25A; }
+    .v-n .seg .ending-tag { display: none; position: absolute; top: -10px; right: 10px; padding: 2px 8px; border-radius: 999px;
+      /* fioletowy - kolor, którego nie ma nigdzie indziej na ekranie (nie zlewa się z żadną zakładką) */
+      background: #7C3AED; color: #fff; font-size: 0.66rem; font-weight: 800; box-shadow: 0 4px 12px rgba(124, 58, 237, 0.45); }
+    .v-n .seg.ending .ending-tag { display: block; }
+    .v-n .demo-note { display: none; margin-top: 8px; font-size: 0.72rem; color: rgba(255, 255, 255, 0.45); }
+    body[data-fx="5"] .v-n .demo-note, body[data-fx="25"] .v-n .demo-note { display: block; }
+
+    @media (prefers-reduced-motion: reduce) {
+      .fx-crane .trolley, .fx-steam span, body[data-fx="5"] .v-n .seg.on { animation: none; }
+    }
+    /* Telefon: we wszystkich wariantach sama karta */
+    @media (max-width: 900px) {
+      .v-c .wrap, .v-n .wrap { grid-template-columns: 1fr; }
+      .v-n .left, .v-n .ver { display: none; }
+      .v-n .wrap { padding: 10px 16px 40px; min-height: calc(100vh - 90px); }
+      .v-n .top { padding: 20px 16px; }
+      .v-c .left { display: none; }
+      .v-c .side { background: linear-gradient(160deg, #0B6B5B, #03241E); }
+      .v-a .giant, .v-a .now { display: none; }
+      .v-a .top { padding: 20px; }
+    }
+    @media (prefers-reduced-motion: reduce) { .v-a canvas, .v-a .floor { animation: none; } }
+  </style>
+</head>
+<body data-v="n" data-fx="25" class="t-user">
+
+  <div class="switch" role="tablist" aria-label="Podgląd">
+    <button type="button" class="on" data-v="n" data-fx="25">★ Puls + suwnica</button>
+    <button type="button" data-v="n" data-fx="0">Bazowy</button>
+    <button type="button" data-v="n" data-fx="1">1 • Drganie powietrza</button>
+    <button type="button" data-v="n" data-fx="2">2 • Suwnica z kadzią</button>
+    <button type="button" data-v="n" data-fx="3">3 • Para i dym</button>
+    <button type="button" data-v="n" data-fx="4">4 • Iskry i mysz</button>
+    <button type="button" data-v="n" data-fx="5">5 • Puls zmiany</button>
+  </div>
+
+  <!-- ===================== POŁĄCZENIE: tło i napis z A, kafelki zmian z C ===================== -->
+  <div class="variant v-n">
+    <div class="giant" aria-hidden="true"><span>ODLEWNIE</span><span>POLSKIE</span></div>
+    <canvas id="n-sparks" class="n-sparks" aria-hidden="true"></canvas>
+    <!-- Efekt 1: drganie gorącego powietrza (filtr SVG na napisie i poświacie) -->
+    <svg width="0" height="0" style="position: absolute;" aria-hidden="true">
+      <filter id="heat-haze" x="-5%" y="-5%" width="110%" height="110%">
+        <feTurbulence type="fractalNoise" baseFrequency="0.012 0.07" numOctaves="2" seed="3" result="noise">
+          <animate attributeName="baseFrequency" dur="6s" values="0.012 0.07;0.016 0.09;0.012 0.07" repeatCount="indefinite" />
+        </feTurbulence>
+        <feDisplacementMap in="SourceGraphic" in2="noise" scale="14" xChannelSelector="R" yChannelSelector="G" />
+      </filter>
+    </svg>
+    <div class="fx-haze" aria-hidden="true"></div>
+
+    <!-- Efekt 2: suwnica z kadzią przesuwająca się u góry -->
+    <div class="fx-crane" aria-hidden="true">
+      <div class="rail"></div>
+      <div class="trolley">
+        <svg viewBox="0 0 120 170">
+          <rect x="20" y="0" width="80" height="16" rx="3" fill="#0B1F1B" />
+          <circle cx="34" cy="16" r="6" fill="#0B1F1B" /><circle cx="86" cy="16" r="6" fill="#0B1F1B" />
+          <line x1="48" y1="16" x2="44" y2="88" stroke="#0B1F1B" stroke-width="3" />
+          <line x1="72" y1="16" x2="76" y2="88" stroke="#0B1F1B" stroke-width="3" />
+          <path d="M28 92 q32 -20 64 0" fill="none" stroke="#0B1F1B" stroke-width="5" />
+          <path d="M26 96 h68 l-8 56 q-26 12 -52 0 z" fill="#0B1F1B" />
+          <ellipse cx="60" cy="96" rx="34" ry="7" fill="#FF9A2E" class="hot" />
+        </svg>
+      </div>
+    </div>
+
+    <!-- Efekt 3: para i dym unoszące się od dołu -->
+    <div class="fx-steam" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span><span></span></div>
+    <!-- płynne żeliwo u dołu (jak na dotychczasowym ekranie logowania) -->
+    <div class="n-floor" aria-hidden="true">
+      <div class="n-wave back">
+        <svg viewBox="0 0 2880 120" preserveAspectRatio="none">
+          <defs>
+            <linearGradient id="nMoltenBack" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stop-color="#FCD444" /><stop offset="1" stop-color="#B45309" />
+            </linearGradient>
+          </defs>
+          <path fill="url(#nMoltenBack)" d="M0 46 Q180 6 360 46 T720 46 T1080 46 T1440 46 T1800 46 T2160 46 T2520 46 T2880 46 V120 H0 Z" />
+        </svg>
+      </div>
+      <div class="n-wave front">
+        <svg viewBox="0 0 2880 120" preserveAspectRatio="none">
+          <defs>
+            <linearGradient id="nMoltenFront" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stop-color="#FCD444" /><stop offset="0.45" stop-color="#F59E0B" /><stop offset="1" stop-color="#C2410C" />
+            </linearGradient>
+          </defs>
+          <path fill="url(#nMoltenFront)" d="M0 62 Q180 100 360 62 T720 62 T1080 62 T1440 62 T1800 62 T2160 62 T2520 62 T2880 62 V120 H0 Z" />
+        </svg>
+      </div>
+    </div>
+    <div class="top">
+      <div class="brand">
+        <span class="mark">
+          <i class="fa-solid fa-user-gear ic ic-user"></i>
+          <i class="fa-solid fa-helmet-safety ic ic-employee"></i>
+          <i class="fa-solid fa-fire-flame-curved ic ic-zalew"></i>
+        </span>
+        <span class="name">Odlewnie Polskie<small><span class="m-user">Panel użytkownika</span><span class="m-employee">Portal pracownika</span><span class="m-zalew">Zalew</span></small></span>
+      </div>
+      <div class="ver">Wersja: Testowa</div>
+    </div>
+    <div class="wrap">
+      <section class="left">
+        <div class="eyebrow">Ewidencja czasu pracy</div>
+        <div class="big" data-clock>--:--</div>
+        <div class="date" data-date></div>
+        <div class="timeline">
+          <div class="seg" data-seg="0"><b>I</b><span>06:30 – 14:30</span><div class="bar"><i></i></div><span class="ending-tag">kończy się</span></div>
+          <div class="seg" data-seg="1"><b>II</b><span>14:30 – 22:30</span><div class="bar"><i></i></div><span class="ending-tag">kończy się</span></div>
+          <div class="seg" data-seg="2"><b>III</b><span>22:30 – 06:30</span><div class="bar"><i></i></div><span class="ending-tag">kończy się</span></div>
+        </div>
+        <div class="hint"><span class="dot"></span><span data-shift-long></span></div>
+        <div class="demo-note">Podgląd: pomarańczowy pasek i napis „kończy się” pokazują się w ostatnich 15 minutach zmiany (tu włączone na pokaz).</div>
+      </section>
+      <section class="side">
+        <div class="card">
+          <h2>Witaj w <span>pracy</span></h2>
+          <p class="sub" data-sub>Panel dla mistrzów i biura.</p>
+          <div class="tabs" data-tabs>
+            <button type="button" class="on" data-t="user"><i class="fa-solid fa-user-gear"></i> Użytkownik</button>
+            <button type="button" data-t="employee"><i class="fa-solid fa-helmet-safety"></i> Pracownik</button>
+            <button type="button" data-t="zalew"><i class="fa-solid fa-fire-flame-curved"></i> Zalew</button>
+          </div>
+          <span class="lbl">Login</span>
+          <div class="inp"><i class="fa-solid fa-user"></i><input placeholder="Twój login" /></div>
+          <span class="lbl">Hasło</span>
+          <div class="inp"><i class="fa-solid fa-lock"></i><input type="password" placeholder="••••••••" /></div>
+          <div class="opts"><label><input type="checkbox" /> Zapamiętaj mnie</label><a href="#">Nie pamiętasz hasła?</a></div>
+          <button type="button" class="go"><i class="fa-solid fa-right-to-bracket"></i> Zaloguj</button>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <!-- ===================== WARIANT A ===================== -->
+  <div class="variant v-a">
+    <div class="floor"></div>
+    <canvas id="a-sparks" aria-hidden="true"></canvas>
+    <div class="giant" aria-hidden="true">ODLEWNIE</div>
+    <div class="top">
+      <div class="brand"><i class="fa-solid fa-industry"></i> Odlewnie Polskie</div>
+      <div class="now"><b data-clock>--:--</b><span data-shift></span></div>
+    </div>
+    <div class="center">
+      <div class="card">
+        <h2>Witaj w <span>pracy</span></h2>
+        <p class="sub">Zaloguj się, aby rozpocząć.</p>
+        <div class="tabs" data-tabs>
+          <button type="button" class="on" data-t="user"><i class="fa-solid fa-user-gear"></i> Użytkownik</button>
+          <button type="button" data-t="employee"><i class="fa-solid fa-helmet-safety"></i> Pracownik</button>
+          <button type="button" data-t="zalew"><i class="fa-solid fa-fire-flame-curved"></i> Zalew</button>
+        </div>
+        <span class="lbl">Login</span>
+        <div class="inp"><i class="fa-solid fa-user"></i><input placeholder="Twój login" /></div>
+        <span class="lbl">Hasło</span>
+        <div class="inp"><i class="fa-solid fa-lock"></i><input type="password" placeholder="••••••••" /></div>
+        <div class="opts"><label><input type="checkbox" /> Zapamiętaj mnie</label><a href="#">Nie pamiętasz hasła?</a></div>
+        <button type="button" class="go"><i class="fa-solid fa-fire"></i> Zaloguj</button>
+        <div class="shift"><span class="dot"></span><span data-shift-long></span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== WARIANT C ===================== -->
+  <div class="variant v-c">
+    <div class="wrap">
+      <section class="left">
+        <div class="brand"><i class="fa-solid fa-industry"></i> Odlewnie Polskie</div>
+        <div>
+          <div class="big" data-clock>--:--</div>
+          <div class="date" data-date></div>
+          <div class="timeline">
+            <div class="seg" data-seg="0"><b>I</b><span>06:30 – 14:30</span><div class="bar"><i></i></div></div>
+            <div class="seg" data-seg="1"><b>II</b><span>14:30 – 22:30</span><div class="bar"><i></i></div></div>
+            <div class="seg" data-seg="2"><b>III</b><span>22:30 – 06:30</span><div class="bar"><i></i></div></div>
+          </div>
+          <div class="hint" data-shift-long></div>
+        </div>
+        <div style="font-size: 0.8rem; color: #6B7280;">Ewidencja czasu pracy • Wersja: Testowa</div>
+      </section>
+      <section class="side">
+        <div class="card">
+          <h2>Zaloguj się</h2>
+          <p class="sub" data-sub>Panel dla mistrzów i biura.</p>
+          <div class="tabs" data-tabs>
+            <button type="button" class="on" data-t="user"><i class="fa-solid fa-user-gear"></i> Użytkownik</button>
+            <button type="button" data-t="employee"><i class="fa-solid fa-helmet-safety"></i> Pracownik</button>
+            <button type="button" data-t="zalew"><i class="fa-solid fa-fire-flame-curved"></i> Zalew</button>
+          </div>
+          <span class="lbl">Login</span>
+          <div class="inp"><i class="fa-solid fa-user"></i><input placeholder="Twój login" /></div>
+          <span class="lbl">Hasło</span>
+          <div class="inp"><i class="fa-solid fa-lock"></i><input type="password" placeholder="••••••••" /></div>
+          <div class="opts"><label><input type="checkbox" /> Zapamiętaj mnie</label><a href="#">Nie pamiętasz hasła?</a></div>
+          <button type="button" class="go"><i class="fa-solid fa-right-to-bracket"></i> Zaloguj</button>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <script>
+    // Przełącznik wariantów
+    document.querySelectorAll(".switch button").forEach(b => b.addEventListener("click", () => {
+      document.querySelectorAll(".switch button").forEach(x => x.classList.toggle("on", x === b));
+      document.body.dataset.v = b.dataset.v;
+      document.body.dataset.fx = b.dataset.fx || "0";
+      tick();
+    }));
+
+    // Zakładki (we wszystkich wariantach naraz)
+    const subs = { user: "Panel dla mistrzów i biura.", employee: "Twoje godziny, harmonogram i nieobecności.", zalew: "Rejestracja zalewów na liniach." };
+    document.querySelectorAll("[data-tabs] button").forEach(b => b.addEventListener("click", () => {
+      const t = b.dataset.t;
+      document.querySelectorAll("[data-tabs] button").forEach(x => x.classList.toggle("on", x.dataset.t === t));
+      document.body.classList.remove("t-user", "t-employee", "t-zalew");
+      document.body.classList.add("t-" + t);
+      document.querySelectorAll("[data-sub]").forEach(s => { s.textContent = subs[t]; });
+    }));
+
+    // Zegar i bieżąca zmiana (I 06:30–14:30, II 14:30–22:30, III 22:30–06:30)
+    function tick() {
+      const now = new Date();
+      const p = n => String(n).padStart(2, "0");
+      const m = (now.getHours() * 60 + now.getMinutes() - 390 + 1440) % 1440;
+      const idx = Math.floor(m / 480), names = ["I", "II", "III"], ranges = ["06:30–14:30", "14:30–22:30", "22:30–06:30"];
+      const left = 480 - (m % 480);
+      document.querySelectorAll("[data-clock]").forEach(e => { e.textContent = `${p(now.getHours())}:${p(now.getMinutes())}`; });
+      document.querySelectorAll("[data-date]").forEach(e => { e.textContent = now.toLocaleDateString("pl-PL", { weekday: "long", day: "numeric", month: "long", year: "numeric" }); });
+      document.querySelectorAll("[data-shift]").forEach(e => { e.textContent = `Zmiana ${names[idx]} • ${ranges[idx]}`; });
+      document.querySelectorAll("[data-shift-long]").forEach(e => { e.textContent = `Trwa zmiana ${names[idx]} — do końca ${Math.floor(left / 60)} h ${left % 60} min`; });
+      document.querySelectorAll("[data-seg]").forEach(s => {
+        const on = Number(s.dataset.seg) === idx;
+        s.classList.toggle("on", on);
+        // efekt 5: ostatnie 15 minut zmiany (w podglądzie 5 włączone na pokaz)
+        s.classList.toggle("ending", on && !!s.closest(".v-n") && (left <= 15 || ["5", "25"].includes(document.body.dataset.fx)));
+        s.querySelector(".bar i").style.width = on ? `${((m % 480) / 480) * 100}%` : "0";
+      });
+    }
+    tick();
+    setInterval(tick, 15000);
+
+    // Iskry (warianty A i Połączenie): unoszą się z żaru / płynnego metalu na dole.
+    // Co jakiś czas "wyrzut" - kilkanaście szybszych iskier ze smugą, jak przy spuście metalu.
+    const dpr = Math.min(devicePixelRatio || 1, 2);
+    const fx = {
+      a: { canvas: document.getElementById("a-sparks"), sparks: [], wide: false },
+      n: { canvas: document.getElementById("n-sparks"), sparks: [], wide: true }
+    };
+    Object.values(fx).forEach(f => { f.ctx = f.canvas.getContext("2d"); });
+    function size() {
+      Object.values(fx).forEach(f => { f.canvas.width = f.canvas.offsetWidth * dpr; f.canvas.height = f.canvas.offsetHeight * dpr; });
+    }
+    addEventListener("resize", size);
+    // Efekt 4: kursor sypie iskrami, a istniejące iskry są od niego odpychane
+    const mouse = { x: 0, y: 0, on: false, last: 0 };
+    addEventListener("mousemove", e => {
+      const r = fx.n.canvas.getBoundingClientRect();
+      mouse.x = e.clientX - r.left;
+      mouse.y = e.clientY - r.top;
+      mouse.on = true;
+      if (document.body.dataset.fx !== "4" || document.body.dataset.v !== "n") return;
+      const now = performance.now();
+      if (now - mouse.last < 16) return;
+      mouse.last = now;
+      for (let i = 0; i < 3; i++) {
+        fx.n.sparks.push({
+          x: mouse.x * dpr + (Math.random() - 0.5) * 10 * dpr, y: mouse.y * dpr + (Math.random() - 0.5) * 10 * dpr,
+          r: (Math.random() * 1.6 + 0.6) * dpr,
+          vy: (Math.random() * 1.6 + 0.4) * dpr, vx: (Math.random() - 0.5) * 2.2 * dpr,
+          g: 0.03 * dpr, trail: false, life: 0, max: 50 + Math.random() * 50
+        });
+      }
+    });
+    document.addEventListener("mouseleave", () => { mouse.on = false; });
+
+    function spark(f, burstX) {
+      const W = f.canvas.width, H = f.canvas.height;
+      const fast = burstX !== undefined;
+      return {
+        x: fast ? burstX + (Math.random() - 0.5) * 60 * dpr : W * (f.wide ? Math.random() : 0.25 + Math.random() * 0.5),
+        y: H - (f.wide ? 40 * dpr : -5),
+        r: (Math.random() * (fast ? 1.4 : 1.8) + 0.5) * dpr,
+        vy: (fast ? Math.random() * 3 + 2.2 : Math.random() * 1.1 + 0.4) * dpr,
+        vx: (Math.random() - 0.5) * (fast ? 2.4 : 0.6) * dpr,
+        g: fast ? 0.018 * dpr : 0,               // szybkie iskry zwalniają (grawitacja)
+        trail: fast, life: 0, max: fast ? 90 + Math.random() * 70 : 220 + Math.random() * 260
+      };
+    }
+
+    function draw(f) {
+      const ctx = f.ctx;
+      if (!f.canvas.width) size();
+      ctx.clearRect(0, 0, f.canvas.width, f.canvas.height);
+      if (f.sparks.length < (f.wide ? 110 : 90) && Math.random() < 0.6) f.sparks.push(spark(f));
+      // wyrzut iskier mniej więcej co 4 sekundy
+      if (f.wide && Math.random() < 0.004) {
+        const x = f.canvas.width * (0.15 + Math.random() * 0.7);
+        for (let i = 0; i < 18; i++) f.sparks.push(spark(f, x));
+      }
+      f.sparks = f.sparks.filter(s => s.life < s.max && s.y > -10 && s.y < f.canvas.height + 20 && s.x > -20 && s.x < f.canvas.width + 20).slice(-400);
+      // efekt 4: iskry odlatują od kursora
+      const repel = f.wide && document.body.dataset.fx === "4" && mouse.on;
+      f.sparks.forEach(s => {
+        s.life++;
+        s.vy -= s.g;
+        s.y -= s.vy;
+        s.x += s.vx + (s.trail ? 0 : Math.sin(s.life / 25) * 0.25);
+        if (repel) {
+          const dx = s.x - mouse.x * dpr, dy = s.y - mouse.y * dpr, d = Math.hypot(dx, dy), R = 150 * dpr;
+          // odpychanie przez zmianę prędkości (wyraźnie widać, jak iskry uciekają od kursora)
+          if (d < R && d > 0) { const k = (1 - d / R) * 0.9 * dpr; s.vx += (dx / d) * k; s.vy -= (dy / d) * k; s.vx *= 0.96; }
+        }
+        const a = Math.sin((s.life / s.max) * Math.PI);
+        const hot = s.life / s.max < 0.5;
+        ctx.globalAlpha = a * 0.9;
+        ctx.shadowColor = "#FF8A1F";
+        ctx.shadowBlur = 10 * dpr;
+        if (s.trail) {
+          // smuga: krótka linia w kierunku ruchu
+          ctx.strokeStyle = hot ? "#FFE58A" : "#FF8A1F";
+          ctx.lineWidth = s.r;
+          ctx.lineCap = "round";
+          ctx.beginPath();
+          ctx.moveTo(s.x, s.y);
+          ctx.lineTo(s.x - s.vx * 4, s.y + s.vy * 4);
+          ctx.stroke();
+        } else {
+          ctx.fillStyle = hot ? "#FFD25A" : "#FF7A1A";
+          ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2); ctx.fill();
+        }
+      });
+      ctx.globalAlpha = 1;
+    }
+
+    function frame() {
+      const f = fx[document.body.dataset.v];
+      if (f && !document.hidden) draw(f);
+      requestAnimationFrame(frame);
+    }
+    size();
+    if (!matchMedia("(prefers-reduced-motion: reduce)").matches) frame();
+  </script>
+</body>
+</html>

@@ -1,0 +1,254 @@
+/* =========================================================
+   EKRAN LOGOWANIA - NOWY WYGLĄD ("Puls + suwnica")
+   Ciemna hala z poświatą żaru, wielki napis ODLEWNIE POLSKIE, płynne żeliwo i iskry
+   (z login.css / login-fx.js), subtelna suwnica z kadzią, po lewej zegar i zmiany I / II / III,
+   po prawej ciemna karta w kolorze wybranego modułu.
+   Kolor modułu: Użytkownik - stonowana zieleń, Pracownik - żółty, Zalew - czerwony
+   (klasy mode-employee / mode-zalew ustawia setLoginMode w employee_portal.js).
+   Ładowany PO login.css i portal.css - nadpisuje ich wygląd karty.
+   ========================================================= */
+
+@property --lv2-ring { syntax: "<angle>"; initial-value: 0deg; inherits: false; }
+
+/* ---------- Kolor modułu ---------- */
+#auth-overlay.lv2 {
+  --tab: #1E7A64; --tab-ink: #fff; --tab-glow: rgba(52, 199, 150, 0.4); --tab-light: #34C796;
+  --ring-a: rgba(52, 199, 150, 0.9); --ring-b: #9BF0CF;
+}
+#auth-overlay.lv2.mode-employee {
+  --tab: #FCD444; --tab-ink: #03241E; --tab-glow: rgba(252, 212, 68, 0.35); --tab-light: #FCD444;
+  --ring-a: rgba(245, 158, 11, 0.9); --ring-b: #FCD444;
+}
+#auth-overlay.lv2.mode-zalew {
+  --tab: #E5552B; --tab-ink: #fff; --tab-glow: rgba(229, 85, 43, 0.4); --tab-light: #FF7A4D;
+  --ring-a: rgba(229, 85, 43, 0.95); --ring-b: #FFB067;
+}
+
+/* ---------- Tło i układ ---------- */
+#auth-overlay.lv2 {
+  flex-direction: column; justify-content: flex-start; align-items: stretch; overflow-x: hidden; overflow-y: auto;
+  background-color: #03241E;
+  /* ciemna hala + kropkowana siatka jak na wcześniejszym ekranie logowania */
+  background-image:
+    radial-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+    radial-gradient(800px 500px at 85% 10%, rgba(11, 107, 91, 0.45), transparent 60%),
+    linear-gradient(180deg, #021914 0%, #03241E 50%, #062F27 100%);
+  background-size: 28px 28px, auto, auto;
+  background-attachment: fixed;
+}
+/* dawne warstwy tła (barwa zakładki, poświata za kartą) - w nowym wyglądzie niepotrzebne */
+#auth-overlay.lv2 .auth-tint,
+#auth-overlay.lv2 .foundry-glow { display: none; }
+
+/* poświata żaru od dołu */
+#auth-overlay.lv2::after {
+  content: ""; position: fixed; left: 0; right: 0; bottom: 0; height: 45%; z-index: 0; pointer-events: none;
+  background: radial-gradient(70% 100% at 50% 100%, rgba(245, 158, 11, 0.38), rgba(252, 212, 68, 0.1) 45%, transparent 75%);
+  animation: lv2Heat 5s ease-in-out infinite;
+}
+@keyframes lv2Heat { 0%, 100% { opacity: 0.75; } 50% { opacity: 1; } }
+#auth-overlay.lv2 .foundry-floor,
+#auth-overlay.lv2 #foundry-sparks { position: fixed; }
+
+/* wielki napis w dwóch liniach, nad płynnym żeliwem */
+.lv2-giant {
+  position: fixed; left: 50%; bottom: 70px; transform: translateX(-50%); z-index: 1;
+  display: flex; flex-direction: column; align-items: center; white-space: nowrap; font-weight: 900;
+  font-size: clamp(4rem, 12vw, 11rem); letter-spacing: -0.03em; line-height: 0.88; color: transparent;
+  -webkit-text-stroke: 1.5px rgba(255, 255, 255, 0.08); user-select: none; pointer-events: none;
+}
+.lv2-giant span:last-child { -webkit-text-stroke-color: rgba(252, 212, 68, 0.12); }
+
+/* subtelna suwnica z kadzią */
+.lv2-crane { position: fixed; left: 0; right: 0; top: 96px; height: 160px; z-index: 1; pointer-events: none; }
+.lv2-crane .rail { position: absolute; left: 0; right: 0; top: 0; height: 3px; background: rgba(255, 255, 255, 0.05); }
+.lv2-crane .trolley { position: absolute; top: -1px; left: -160px; width: 64px; opacity: 0.28;
+  animation: lv2Crane 90s linear -30s infinite, lv2Sway 5s ease-in-out infinite; transform-origin: 50% 0; }
+.lv2-crane .hot { animation: lv2Hot 3s ease-in-out infinite alternate; filter: drop-shadow(0 0 4px rgba(255, 154, 46, 0.6)); }
+@keyframes lv2Crane { 0% { left: -160px; } 100% { left: calc(100% + 160px); } }
+@keyframes lv2Sway { 0%, 100% { rotate: -0.8deg; } 50% { rotate: 0.8deg; } }
+@keyframes lv2Hot { from { opacity: 0.6; } to { opacity: 1; } }
+
+/* ---------- Logo (lewy górny róg) ---------- */
+.lv2-top { position: relative; z-index: 3; display: flex; align-items: center; padding: 26px 48px; color: #fff; }
+.lv2-brand { display: flex; align-items: center; gap: 14px; font-weight: 800; font-size: 1.1rem; }
+.lv2-brand .mark {
+  position: relative; width: 42px; height: 42px; border-radius: 12px; display: grid; place-items: center;
+  background: var(--tab); color: var(--tab-ink); box-shadow: 0 0 22px var(--tab-glow);
+  transition: background 0.4s, color 0.4s, box-shadow 0.4s;
+}
+/* obracający się pierścień żaru (jak na dawnym ekranie), w kolorze modułu */
+.lv2-brand .mark::before {
+  content: ""; position: absolute; inset: -6px; border-radius: 16px; padding: 2.5px;
+  background: conic-gradient(from var(--lv2-ring), transparent 0%, transparent 55%, var(--ring-a) 85%, var(--ring-b) 100%);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0); -webkit-mask-composite: xor;
+  mask: linear-gradient(#fff 0 0) content-box exclude, linear-gradient(#fff 0 0); mask-composite: exclude;
+  animation: lv2Ring 2.8s linear infinite; pointer-events: none;
+}
+@keyframes lv2Ring { to { --lv2-ring: 360deg; } }
+.lv2-brand .mark .ic { position: absolute; font-size: 1.05rem; opacity: 0; transform: scale(0.3) rotate(-120deg);
+  transition: opacity 0.35s ease, transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1); }
+#auth-overlay.lv2:not(.mode-employee):not(.mode-zalew) .ic-user,
+#auth-overlay.lv2.mode-employee .ic-employee,
+#auth-overlay.lv2.mode-zalew .ic-zalew { opacity: 1; transform: none; }
+.lv2-brand .name { display: flex; flex-direction: column; line-height: 1.15; }
+.lv2-brand .name small { position: relative; height: 1.1em; font-size: 0.72rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; }
+.lv2-brand .name small span { position: absolute; left: 0; top: 0; white-space: nowrap; color: var(--tab-light);
+  opacity: 0; transform: translateY(6px); transition: opacity 0.3s, transform 0.3s; }
+#auth-overlay.lv2:not(.mode-employee):not(.mode-zalew) .m-user,
+#auth-overlay.lv2.mode-employee .m-employee,
+#auth-overlay.lv2.mode-zalew .m-zalew { opacity: 1; transform: none; }
+
+/* zegar ze zmianami i karta blisko siebie, razem na środku ekranu (bez pustej przestrzeni pośrodku) */
+.lv2-wrap { position: relative; z-index: 2; flex: 1; display: grid; grid-template-columns: minmax(0, 560px) minmax(0, 430px);
+  justify-content: center; align-items: center; column-gap: clamp(40px, 6vw, 96px); padding: 10px 48px 120px; }
+
+/* ---------- Lewa część: zegar i zmiany ---------- */
+.lv2-left { color: #fff; }
+.lv2-left .eyebrow { font-size: 0.78rem; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent); margin-bottom: 10px; }
+.lv2-left .big { display: flex; align-items: center; font-size: clamp(5rem, 10vw, 8.5rem); font-weight: 900; line-height: 1; letter-spacing: -0.04em; font-variant-numeric: tabular-nums; }
+/* zegar-kołowrotek: cyfra wjeżdża z góry, stara wyjeżdża w dół (js/login-v2.js) */
+.lv2-left .big .colon { width: 0.32em; text-align: center; }   /* dwukropek stały, bez migania */
+/* szerokość pod najszersze cyfry (0, 8) w Montserrat 900; przycinanie tylko w pionie (clip-path), w poziomie nic nie jest ucinane */
+.lv2-left .big .reel { position: relative; display: inline-block; width: 0.7em; height: 1em; overflow: visible; clip-path: inset(0 -25% 0 -25%); letter-spacing: 0;
+  -webkit-mask-image: linear-gradient(transparent 0%, #000 14%, #000 86%, transparent 100%);
+  mask-image: linear-gradient(transparent 0%, #000 14%, #000 86%, transparent 100%); }
+.lv2-left .big .reel span { position: absolute; left: -0.1em; right: -0.1em; top: 0; text-align: center; }
+.lv2-left .big .reel span.in { animation: lv2RollIn 0.7s cubic-bezier(0.34, 1.4, 0.64, 1) both; }
+.lv2-left .big .reel span.out { animation: lv2RollOut 0.7s cubic-bezier(0.55, 0, 0.75, 0.4) both; }
+.lv2-left .big .reel.flash span.in { animation: lv2RollIn 0.7s cubic-bezier(0.34, 1.4, 0.64, 1) both, lv2DigitGlow 1.2s ease-out both; }
+@keyframes lv2RollIn { from { transform: translateY(-105%); filter: blur(2px); } to { transform: translateY(0); filter: blur(0); } }
+@keyframes lv2RollOut { from { transform: translateY(0); opacity: 1; } to { transform: translateY(105%); opacity: 0.2; filter: blur(2px); } }
+@keyframes lv2DigitGlow { 0% { color: #FFD25A; text-shadow: 0 0 24px rgba(255, 170, 60, 0.8); } 100% { color: #fff; text-shadow: none; } }
+/* sekundy mniejsze i przygaszone, równo z dołem godziny */
+.lv2-left .big .secs { display: inline-flex; align-items: center; font-size: 0.42em; color: rgba(255, 255, 255, 0.75); align-self: flex-end; margin-bottom: 0.12em; margin-left: 0.04em; }
+.lv2-left .big .secs .colon { animation: none; opacity: 0.6; width: auto; margin: 0 0.18em 0 0.1em; }   /* wyraźny odstęp przed sekundami */
+@media (prefers-reduced-motion: reduce) { .lv2-left .big .reel span, .lv2-left .big .colon { animation: none !important; } }
+.lv2-left .date { margin: 12px 0 30px; font-size: 1.05rem; font-weight: 600; color: rgba(255, 255, 255, 0.7); }
+.lv2-left .timeline { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; max-width: 560px; }
+.lv2-left .seg { position: relative; padding: 16px 18px 20px; border-radius: 16px; background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1); transition: background 0.3s, border-color 0.3s, box-shadow 0.3s; }
+.lv2-left .seg b { display: block; font-size: 1.5rem; font-weight: 900; color: rgba(255, 255, 255, 0.45); }
+.lv2-left .seg span { font-size: 0.8rem; font-weight: 600; color: rgba(255, 255, 255, 0.45); }
+/* bieżąca zmiana w kolorze modułu, z pulsem */
+.lv2-left .seg.on { background: var(--tab); border-color: var(--tab); box-shadow: 0 16px 40px var(--tab-glow);
+  animation: lv2SegPulse 2.4s ease-in-out infinite; }
+#auth-overlay.lv2.mode-employee .seg.on { background: #C9970F; border-color: #C9970F; }   /* ciemniejsze złoto - biały napis czytelny */
+.lv2-left .seg.on b, .lv2-left .seg.on span { color: #fff; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25); }
+.lv2-left .seg.on span { opacity: 0.85; }
+@keyframes lv2SegPulse {
+  0%, 100% { box-shadow: 0 16px 40px var(--tab-glow), 0 0 0 0 var(--tab-glow); }
+  50% { box-shadow: 0 16px 40px var(--tab-glow), 0 0 0 12px transparent; }
+}
+.lv2-left .seg .bar { position: absolute; left: 18px; right: 18px; bottom: 9px; height: 4px; border-radius: 999px;
+  background: rgba(255, 255, 255, 0.28); overflow: hidden; display: none; }
+.lv2-left .seg.on .bar { display: block; }
+/* pasek postępu zawsze w kolorze jak w podglądzie: Użytkownik - pomarańczowy, Pracownik - zielony, Zalew - żółty */
+.lv2-left .seg .bar i { display: block; height: 100%; background: #FF8A1F; }
+#auth-overlay.lv2.mode-employee .seg.on .bar i { background: #0E8A6A; }
+#auth-overlay.lv2.mode-zalew .seg.on .bar i { background: #FFD25A; }
+/* ostatnie 15 minut zmiany: fioletowe "kończy się" na kafelku */
+.lv2-left .seg .ending-tag { display: none; position: absolute; top: -10px; right: 10px; padding: 2px 8px; border-radius: 999px;
+  background: #7C3AED; color: #fff; font-size: 0.66rem; font-weight: 800; box-shadow: 0 4px 12px rgba(124, 58, 237, 0.45); }
+.lv2-left .seg.ending .ending-tag { display: block; }
+.lv2-left .hint { display: flex; align-items: center; gap: 10px; margin-top: 16px; font-size: 0.86rem; color: rgba(255, 255, 255, 0.72); }
+.lv2-left .hint .dot { width: 8px; height: 8px; border-radius: 50%; background: #3BE08F; box-shadow: 0 0 10px #3BE08F; }
+
+/* ---------- Prawa część: karta logowania ---------- */
+.lv2-side { display: grid; place-items: center; width: 100%; }
+#auth-overlay.lv2 .unified-auth-card {
+  width: 100%; max-width: 430px; min-height: 0; padding: 30px 32px 26px; border-radius: 24px; color: #fff;
+  background: linear-gradient(160deg, rgba(34, 92, 79, 0.94) 0%, rgba(17, 58, 49, 0.96) 55%, rgba(12, 44, 38, 0.97) 100%);
+  border: 1.5px solid var(--tab); border-top-width: 6px;
+  box-shadow: 0 40px 90px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(255, 255, 255, 0.06), 0 0 60px var(--tab-glow), inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  transition: border-color 0.3s, box-shadow 0.3s;
+}
+#auth-overlay.lv2 .molten-bar { display: none; }
+/* ikona w karcie tylko przy animacji sukcesu i powitania (logo jest w lewym górnym rogu) */
+#auth-overlay.lv2 #auth-icon-box:not(.state-success):not(.state-welcome) { display: none; }
+#auth-overlay.lv2 .morph-icon-box.state-welcome { color: var(--accent); }
+
+#auth-overlay.lv2 #step-login h2 { color: #fff; font-size: 1.7rem; margin-bottom: 4px; }
+#auth-overlay.lv2 #step-login h2 span { color: var(--tab-light); transition: color 0.3s; }
+#auth-overlay.lv2 #step-login .subtitle { color: rgba(255, 255, 255, 0.65); }
+#auth-overlay.lv2 #step-login label { color: rgba(255, 255, 255, 0.6); }
+
+#auth-overlay.lv2 .login-tabs { background: rgba(0, 0, 0, 0.3); }
+#auth-overlay.lv2 .login-tabs button { color: rgba(255, 255, 255, 0.72); }
+#auth-overlay.lv2 .login-tabs button:not(.on):hover { background: rgba(255, 255, 255, 0.08); color: #fff; }
+#auth-overlay.lv2 .login-tabs button.on { background: var(--tab); color: var(--tab-ink); box-shadow: 0 4px 14px var(--tab-glow); }
+
+#auth-overlay.lv2 #step-login .form-control { background: rgba(0, 0, 0, 0.22); border: 1px solid rgba(255, 255, 255, 0.2); color: #fff; }
+#auth-overlay.lv2 #step-login .form-control::placeholder { color: rgba(255, 255, 255, 0.4); }
+#auth-overlay.lv2 #step-login .form-control:focus { border-color: var(--tab-light); box-shadow: 0 0 0 4px var(--tab-glow), 0 0 22px var(--tab-glow); }
+#auth-overlay.lv2 #step-login .form-control.input-error { background: rgba(217, 56, 58, 0.18); }
+#auth-overlay.lv2 .login-pass button { color: rgba(255, 255, 255, 0.6); }
+#auth-overlay.lv2 .login-pass button:hover { background: rgba(255, 255, 255, 0.1); color: #fff; }
+#auth-overlay.lv2 .login-remember { color: rgba(255, 255, 255, 0.75); }
+#auth-overlay.lv2 .login-remember input { accent-color: var(--tab-light); }
+#auth-overlay.lv2 #login-error-msg { color: #FF9C9C; }
+#auth-overlay.lv2 #login-caps-hint { color: #FFC46B; }
+
+#auth-overlay.lv2 #btn-login { background: var(--tab); color: var(--tab-ink); box-shadow: 0 10px 28px var(--tab-glow); }
+#auth-overlay.lv2 #btn-login:hover:not(:disabled) { background: var(--tab); color: var(--tab-ink); filter: brightness(1.1); box-shadow: 0 12px 32px var(--tab-glow); }
+#auth-overlay.lv2 #step-login .link-btn { color: var(--tab-light); }
+#auth-overlay.lv2 .login-install { border-color: rgba(255, 255, 255, 0.3); background: rgba(255, 255, 255, 0.06); color: #fff; }
+#auth-overlay.lv2 .login-install:hover { border-color: var(--tab-light); background: rgba(255, 255, 255, 0.12); }
+#auth-overlay.lv2 .login-install-hint { color: rgba(255, 255, 255, 0.65); }
+
+/* kroki po zalogowaniu */
+#auth-overlay.lv2 #step-success .success-label,
+#auth-overlay.lv2 #welcome-text { color: #fff; }
+#auth-overlay.lv2 #welcome-user-meta { background: rgba(255, 255, 255, 0.08); border-color: rgba(255, 255, 255, 0.14); color: #fff; }
+#auth-overlay.lv2 .progress-bar-bg { background: rgba(255, 255, 255, 0.12); }
+#auth-overlay.lv2 .status-subtext { color: rgba(255, 255, 255, 0.65); }
+
+/* ---------- Telefon i wąskie okna: sama karta ---------- */
+@media (max-width: 900px) {
+  .lv2-wrap { grid-template-columns: minmax(0, 430px); padding: 6px 16px 110px; }
+  .lv2-left { display: none; }
+  .lv2-top { padding: 18px 16px; justify-content: center; }
+  .lv2-crane { top: 80px; }
+}
+@media (max-width: 480px) {
+  #auth-overlay.lv2 .unified-auth-card { padding: 24px 20px 22px; }
+  .lv2-giant { bottom: 60px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #auth-overlay.lv2::after, .lv2-crane .trolley, .lv2-crane .hot, .lv2-brand .mark::before, .lv2-left .seg.on { animation: none; }
+}
+
+/* ---------- Zębatki w tle (jak na wcześniejszym ekranie, bardzo subtelne) ---------- */
+#auth-overlay.lv2 .foundry-gear { display: block; position: fixed; z-index: 0; color: rgba(252, 212, 68, 0.045); }
+#auth-overlay.lv2 .foundry-gear.gear-c { color: rgba(255, 255, 255, 0.035); }
+
+/* Mniejsze ekrany: napis ODLEWNIE POLSKIE w jednej linii, niżej - nie chowa się za zegarem i kartą */
+@media (max-width: 1280px), (max-height: 820px) {
+  .lv2-giant { flex-direction: row; gap: 0.25em; font-size: clamp(2.6rem, 8vw, 7rem); bottom: 64px; line-height: 1; }
+}
+
+/* ---------- Zakładki logowania: pływające zaznaczenie (js/login-v2.js), jak wskaźnik w menu ---------- */
+#auth-overlay.lv2 .login-tabs { position: relative; }
+#auth-overlay.lv2 .login-tabs button { position: relative; z-index: 1; transition: color 0.3s; }
+#auth-overlay.lv2 .login-tabs button.on { background: transparent; box-shadow: none; color: var(--tab-ink); }
+#auth-overlay.lv2 .lt-indicator {
+  position: absolute; left: 0; top: 0; z-index: 0; border-radius: 8px; overflow: hidden; pointer-events: none; opacity: 0;
+  background: var(--tab); box-shadow: 0 4px 14px var(--tab-glow);
+  transition: transform 0.5s cubic-bezier(0.34, 1.35, 0.5, 1), width 0.3s ease, height 0.3s ease, opacity 0.3s ease,
+    background-color 0.35s ease, box-shadow 0.3s ease;
+}
+#auth-overlay.lv2 .lt-indicator.visible { opacity: 1; }
+#auth-overlay.lv2 .lt-indicator.no-anim { transition: none; }
+#auth-overlay.lv2 .lt-indicator.is-moving { box-shadow: 0 0 22px var(--tab-glow); }
+/* wolny połysk przebiegający po zaznaczeniu */
+#auth-overlay.lv2 .lt-indicator::after {
+  content: ""; position: absolute; inset: 0;
+  background: linear-gradient(100deg, transparent 30%, rgba(255, 255, 255, 0.35) 50%, transparent 70%);
+  background-size: 250% 100%; background-position: 130% 0; animation: ltShine 5s ease-in-out infinite;
+}
+@keyframes ltShine { 0%, 55% { background-position: 130% 0; } 100% { background-position: -130% 0; } }
+@media (prefers-reduced-motion: reduce) {
+  #auth-overlay.lv2 .lt-indicator { transition: none; }
+  #auth-overlay.lv2 .lt-indicator::after { animation: none; }
+}

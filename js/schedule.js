@@ -742,52 +742,6 @@ async function shCopyMonday(id) {
     `pn → wt–pt (${shEntryView(mon).title})`);
 }
 
-// Puste dni widocznych pracowników uzupełnia wpisami z tych samych dni poprzedniego tygodnia.
-// Niczego nie nadpisuje.
-async function shCopyPrevious() {
-  if (shBusy || shReadOnly) return;
-  const prevDays = shBuildDays(new Date(shMonday.getFullYear(), shMonday.getMonth(), shMonday.getDate() - 7));
-  const visible = shVisibleEmployees();
-  const btn = document.getElementById("sh-copy-btn");
-  if (btn) btn.disabled = true;
-
-  try {
-    const prev = await rpFetchAll(() => supabaseClient
-      .from("schedule_days")
-      .select("*")
-      .gte("day", prevDays[0].iso)
-      .lte("day", prevDays[6].iso));
-    const prevMap = {};
-    prev.forEach(r => {
-      const byDay = prevMap[r.employee_id] || (prevMap[r.employee_id] = {});
-      (byDay[r.day] || (byDay[r.day] = [])).push(r);
-    });
-
-    const changes = [];
-    visible.forEach(emp => {
-      shDays.forEach((d, i) => {
-        if (shEntry(emp.id, d.iso)) return;
-        const src = (prevMap[emp.id] || {})[prevDays[i].iso];
-        if (!src || !src.length) return;
-        changes.push({ emp: Number(emp.id), iso: d.iso, entries: src.sort((a, b) => (a.slot || 1) - (b.slot || 1)).map(shCopyEntry) });
-      });
-    });
-
-    if (!changes.length) {
-      shShowBanner("warning", "Nie ma czego uzupełnić: widoczne osoby nie mają wpisów w poprzednim tygodniu na dni, które są teraz puste.");
-      return;
-    }
-    if (await shSetDays(changes, "uzupełnienie z poprzedniego tygodnia")) {
-      shShowBanner("success", `Uzupełniono ${changes.length} ${changes.length === 1 ? "dzień" : "dni"} na podstawie poprzedniego tygodnia.`);
-    }
-  } catch (err) {
-    console.error("Błąd kopiowania harmonogramu:", err);
-    shShowBanner("warning", "Nie udało się pobrać poprzedniego tygodnia: " + (err.message || err));
-  } finally {
-    if (btn) btn.disabled = false;
-  }
-}
-
 // Esc odznacza (gdy nie jest otwarte okienko godzin ani okno modalne)
 document.addEventListener("keydown", e => {
   if (e.key !== "Escape" || !document.getElementById("sh-table-body") || !shSel.size) return;

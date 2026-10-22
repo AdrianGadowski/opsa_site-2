@@ -241,6 +241,17 @@
     .db-periodpick { width: 100%; }
     .db-period-label { flex: 1; width: auto; min-width: 0; font-size: 0.88rem; }
   }
+
+  /* Zakładki pulpitu: Ewidencja czasu pracy / Zalew */
+  .db-tabs { display: inline-flex; gap: 4px; padding: 4px; margin-bottom: 18px; border-radius: 12px; background: #E9EDEB; }
+  .db-tab { display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 18px; border: none; border-radius: 9px; background: transparent;
+    font-family: inherit; font-size: 0.88rem; font-weight: 700; color: #5B6470; cursor: pointer; transition: background 0.2s, color 0.2s, box-shadow 0.2s; }
+  .db-tab:hover:not(.on) { background: rgba(255, 255, 255, 0.6); color: var(--primary); }
+  .db-tab.on { background: #fff; color: var(--primary); box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08); }
+  .db-tab[data-dtab="zalew"].on { color: #B52B2D; }
+  .db-tab:focus-visible { outline: 3px solid rgba(8, 88, 75, 0.35); outline-offset: 1px; }
+  .db-pane[hidden], .db-tab[hidden], .db-tabs[hidden] { display: none !important; }
+  @media (max-width: 768px) { .db-tabs { display: flex; } .db-tab { flex: 1; justify-content: center; padding: 0 10px; font-size: 0.82rem; } }
 </style>
 
 <div class="db-root" id="db-root">
@@ -261,6 +272,13 @@
     </div>
   </div>
 
+  <!-- Zakładki: Ewidencja czasu pracy / Zalew -->
+  <div class="db-tabs" role="tablist" aria-label="Pulpit">
+    <button type="button" class="db-tab on" data-dtab="time" role="tab" aria-selected="true" onclick="dbSetTab('time')"><i class="fa-solid fa-clock"></i> Ewidencja czasu pracy</button>
+    <button type="button" class="db-tab" data-dtab="zalew" id="db-tab-zalew" role="tab" aria-selected="false" onclick="dbSetTab('zalew')"><i class="fa-solid fa-fire-flame-curved"></i> Zalew</button>
+  </div>
+
+  <section class="db-pane" data-pane="zalew" hidden>
   <!-- Zalew: podsumowanie zalewów w wybranym okresie -->
   <div class="db-panel" id="db-zalew-panel" style="margin-bottom: 16px;">
     <div class="db-panel-head">
@@ -277,6 +295,9 @@
     <div id="db-zalew"></div>
   </div>
 
+  </section>
+
+  <section class="db-pane" data-pane="time">
   <div class="db-kpis" id="db-kpis"></div>
 
   <div class="db-panel">
@@ -334,6 +355,8 @@
     </div>
     <div id="db-year"></div>
   </div>
+
+  </section>
 
   <div class="db-tip" id="db-tip" role="tooltip"></div>
 </div>

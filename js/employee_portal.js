@@ -22,9 +22,9 @@ let epLoadToken = 0;
 
 // ---------- Zakładki na ekranie logowania ----------
 const LOGIN_MODES = {
-  user: { tab: "login-tab-user", subtitle: "System Ewidencji Czasu Pracy" },
-  employee: { tab: "login-tab-employee", subtitle: "Podgląd godzin pracownika" },
-  zalew: { tab: "login-tab-zalew", subtitle: "Moduł Zalew" }
+  user: { tab: "login-tab-user", subtitle: "Ewidencja czasu pracy" },
+  employee: { tab: "login-tab-employee", subtitle: "Twoje godziny i harmonogram pracy" },
+  zalew: { tab: "login-tab-zalew", subtitle: "Rejestracja zalewu na liniach" }
 };
 
 function setLoginMode(mode) {
@@ -194,6 +194,7 @@ function epOpen() {
   epLoadSchedule();
   if (typeof abPortalLoad === "function") abPortalLoad(); // zgłoszenia nieobecności (absences.js)
   if (typeof pushSync === "function") pushSync();          // powiadomienia push (push.js)
+  if (typeof msgStart === "function") msgStart();          // komunikaty (messages.js)
   epLoad();
 }
 

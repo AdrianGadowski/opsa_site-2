@@ -205,9 +205,12 @@ function prTipShow(tile) {
   el.style.top = `${top}px`;
 }
 
+// Ukrycie = usunięcie okienka ze strony: nic nie zostaje po przejściu do innego modułu,
+// przełączeniu okna albo karty (wtedy przeglądarka nie zgłasza zjechania myszką)
 function prTipHide() {
-  document.getElementById("pr-tip")?.classList.remove("open");
+  document.getElementById("pr-tip")?.remove();
 }
 
-// przewinięcie albo zmiana widoku chowa okienko
 document.addEventListener("scroll", prTipHide, true);
+window.addEventListener("blur", prTipHide);
+document.addEventListener("visibilitychange", prTipHide);

@@ -1,0 +1,137 @@
+<div class="page-hero">
+  <div>
+    <div class="eyebrow">Komunikacja</div>
+    <h3>Komunikaty</h3>
+    <p>Wyślij informację do wybranych użytkowników i pracowników. Wyskoczy im po zalogowaniu (i w trakcie pracy), a na telefonie przyjdzie powiadomienie.</p>
+  </div>
+  <div class="page-hero-actions">
+    <button type="button" class="page-hero-btn" onclick="msgOpenEditor()">
+      <i class="fa-solid fa-plus"></i> Nowy komunikat
+    </button>
+  </div>
+</div>
+
+<div class="card" style="padding: 0; overflow: hidden;">
+  <div style="overflow-x: auto;">
+    <table class="users-table msg-table" style="width: 100%; border-collapse: collapse;">
+      <thead>
+        <tr>
+          <th>Komunikat i odbiorcy</th>
+          <th class="msg-c">Wyświetlany od</th>
+          <th class="msg-c">Status</th>
+          <th class="msg-c">Przeczytało</th>
+          <th class="msg-c"></th>
+          <th style="width: 170px;"></th>
+        </tr>
+      </thead>
+      <tbody id="msg-body">
+        <tr><td colspan="6" class="msg-empty"><i class="fa-solid fa-spinner fa-spin"></i> Ładowanie komunikatów...</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Okno: nowy / edycja komunikatu -->
+<div id="modal-msg-edit" class="modal">
+  <div class="modal-box msg-ed-box">
+    <button type="button" class="link-btn" onclick="msgCloseEditor()" style="position: absolute; top: 22px; right: 22px; font-size: 1.2rem;" title="Zamknij" aria-label="Zamknij">
+      <i class="fa-solid fa-xmark"></i>
+    </button>
+    <h3 id="msg-ed-title" style="color: var(--primary); margin: 0 0 14px 0; font-size: 1.15rem; padding-right: 30px;">Nowy komunikat</h3>
+
+    <div class="msg-ed-scroll">
+      <div class="form-group">
+        <label for="msg-f-title">Temat</label>
+        <input type="text" id="msg-f-title" class="form-control" maxlength="120" placeholder="np. Zmiana godzin pracy w piątek" autocomplete="off" />
+      </div>
+
+      <div class="form-group">
+        <label>Ważność</label>
+        <div class="msg-prio-pick">
+          <label class="info"><input type="radio" name="msg-prio" value="info" checked /><span><i class="fa-solid fa-circle-info"></i> Informacja</span></label>
+          <label class="important"><input type="radio" name="msg-prio" value="important" /><span><i class="fa-solid fa-triangle-exclamation"></i> Ważne</span></label>
+          <label class="urgent"><input type="radio" name="msg-prio" value="urgent" /><span><i class="fa-solid fa-bell"></i> Pilne</span></label>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="msg-f-body">Treść</label>
+        <div class="msg-toolbar">
+          <button type="button" onclick="msgWrap('b')" title="Pogrubienie"><i class="fa-solid fa-bold"></i></button>
+          <button type="button" onclick="msgWrap('i')" title="Kursywa"><i class="fa-solid fa-italic"></i></button>
+          <button type="button" onclick="msgWrap('list')" title="Lista"><i class="fa-solid fa-list-ul"></i></button>
+          <button type="button" onclick="msgWrap('link')" title="Link"><i class="fa-solid fa-link"></i></button>
+          <span class="msg-muted">**pogrubienie**, *kursywa*, „- ” lista</span>
+        </div>
+        <div class="msg-ed-split">
+          <textarea id="msg-f-body" class="form-control" rows="8" maxlength="5000" oninput="msgPreview()" placeholder="Treść komunikatu..."></textarea>
+          <div class="msg-preview-wrap"><div class="msg-preview-lbl">Podgląd</div><div id="msg-preview" class="msg-preview msg-text"></div></div>
+        </div>
+      </div>
+
+      <div class="msg-sec">
+        <div class="msg-sec-h"><i class="fa-solid fa-user-gear"></i> Użytkownicy systemu</div>
+        <label class="msg-check"><input type="checkbox" id="msg-all-users" onchange="msgToggleAllUsers(this.checked)" /> Wszyscy użytkownicy</label>
+        <div class="msg-lbl">Działy</div>
+        <div class="msg-chips" id="msg-user-depts"></div>
+        <div class="msg-lbl">Role</div>
+        <div class="msg-chips" id="msg-user-roles"></div>
+        <div class="msg-lbl">Wybrani użytkownicy <span class="msg-muted" id="msg-users-count"></span></div>
+        <input type="text" id="msg-search-users" class="form-control msg-search" placeholder="Szukaj: imię, nazwisko, dział..." oninput="msgRenderPeople('users')" autocomplete="off" />
+        <div class="msg-people" id="msg-users-list"></div>
+      </div>
+
+      <div class="msg-sec">
+        <div class="msg-sec-h"><i class="fa-solid fa-helmet-safety"></i> Pracownicy (portal)</div>
+        <div class="msg-lbl">Działy</div>
+        <div class="msg-chips" id="msg-emp-depts"></div>
+        <div class="msg-lbl">Wybrani pracownicy <span class="msg-muted" id="msg-emps-count"></span></div>
+        <input type="text" id="msg-search-emps" class="form-control msg-search" placeholder="Szukaj: imię, nazwisko, dział..." oninput="msgRenderPeople('emps')" autocomplete="off" />
+        <div class="msg-people" id="msg-emps-list"></div>
+      </div>
+
+      <div class="msg-count" id="msg-count"></div>
+
+      <div class="msg-row2">
+        <div class="form-group">
+          <label for="msg-f-start">Wyświetlaj od</label>
+          <input type="datetime-local" id="msg-f-start" class="form-control" />
+        </div>
+        <div class="form-group">
+          <label for="msg-f-end">Wyświetlaj do (opcjonalnie)</label>
+          <input type="datetime-local" id="msg-f-end" class="form-control" />
+        </div>
+      </div>
+
+      <label class="msg-check"><input type="checkbox" id="msg-f-ack" /> Wymagaj potwierdzenia „Przeczytałem” (pilne wymagają zawsze)</label>
+      <label class="msg-check"><input type="checkbox" id="msg-f-push" checked /> Wyślij powiadomienie na telefon (push)</label>
+      <div class="msg-muted" id="msg-push-note" style="display: none; margin: -4px 0 8px 26px;">Powiadomienie push wysyła się tylko przy wysłaniu komunikatu (nie przy edycji). Zaplanowany na później komunikat nie wysyła push.</div>
+    </div>
+
+    <div id="msg-ed-msg" style="display: none; color: var(--danger); font-size: 0.86rem; margin: 10px 0 0;"></div>
+    <div class="modal-btn-row" style="margin-top: 14px;">
+      <button type="button" class="btn-secondary" onclick="msgCloseEditor()">Anuluj</button>
+      <button type="button" id="msg-save" class="btn-primary" onclick="msgSave()"><i class="fa-solid fa-paper-plane"></i> Wyślij komunikat</button>
+    </div>
+  </div>
+</div>
+
+<!-- Okno: kto przeczytał -->
+<div id="modal-msg-details" class="modal">
+  <div class="modal-box msg-det-box">
+    <button type="button" class="link-btn" onclick="msgCloseDetails()" style="position: absolute; top: 22px; right: 22px; font-size: 1.2rem;" title="Zamknij" aria-label="Zamknij">
+      <i class="fa-solid fa-xmark"></i>
+    </button>
+    <h3 id="msg-det-title" style="color: var(--primary); margin: 0 0 10px 0; font-size: 1.15rem; padding-right: 30px;">Komunikat</h3>
+    <div id="msg-det-body" class="msg-text msg-det-text"></div>
+    <div class="msg-det-head">
+      <span id="msg-det-stats" class="msg-muted"></span>
+      <span class="msg-det-tabs">
+        <button type="button" class="msg-det-tab on" data-f="all" onclick="msgDetailTab('all')">Wszyscy</button>
+        <button type="button" class="msg-det-tab" data-f="read" onclick="msgDetailTab('read')">Przeczytali</button>
+        <button type="button" class="msg-det-tab" data-f="unread" onclick="msgDetailTab('unread')">Nie przeczytali</button>
+      </span>
+    </div>
+    <div id="msg-det-list" class="msg-det-list"></div>
+  </div>
+</div>

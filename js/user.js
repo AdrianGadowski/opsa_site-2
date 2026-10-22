@@ -14,7 +14,8 @@ const US_MODULES = [
   { column: "allow_users", label: "Użytkownicy", icon: "fa-user-gear" },
   { column: "allow_updates", label: "Aktualizacje", icon: "fa-rotate" },
   { column: "allow_options", label: "Opcje", icon: "fa-sliders" },
-  { column: "allow_logs", label: "Logi", icon: "fa-clipboard-list" }
+  { column: "allow_logs", label: "Logi", icon: "fa-clipboard-list" },
+  { column: "allow_messages", label: "Komunikaty", icon: "fa-bullhorn" }
 ];
 
 let usSaving = false;

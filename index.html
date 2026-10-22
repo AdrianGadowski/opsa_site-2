@@ -6,10 +6,10 @@
   <title>Odlewnie Polskie - Ewidencja czasu pracy</title>
 
   <!-- Instalacja jako aplikacja -->
-  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="manifest" href="manifest.webmanifest?v=2" />
   <meta name="theme-color" content="#06362F" />
-  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png" />
-  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png?v=2" />
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png?v=2" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
@@ -20,18 +20,20 @@
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
 
-  <link rel="stylesheet" href="css/style.css?v=20261147" />
-  <link rel="stylesheet" href="css/login.css?v=20261147" />
-  <link rel="stylesheet" href="css/menu.css?v=20261147" />
-  <link rel="stylesheet" href="css/mobile.css?v=20261147" />
-  <link rel="stylesheet" href="css/portal.css?v=20261147" />
-  <link rel="stylesheet" href="css/timepicker.css?v=20261147" />
-  <link rel="stylesheet" href="css/emp_lists.css?v=20261147" />
-  <link rel="stylesheet" href="css/absences.css?v=20261147" />
+  <link rel="stylesheet" href="css/style.css?v=20261176" />
+  <link rel="stylesheet" href="css/login.css?v=20261176" />
+  <link rel="stylesheet" href="css/menu.css?v=20261176" />
+  <link rel="stylesheet" href="css/mobile.css?v=20261176" />
+  <link rel="stylesheet" href="css/portal.css?v=20261176" />
+  <link rel="stylesheet" href="css/timepicker.css?v=20261176" />
+  <link rel="stylesheet" href="css/emp_lists.css?v=20261176" />
+  <link rel="stylesheet" href="css/absences.css?v=20261176" />
+  <link rel="stylesheet" href="css/messages.css?v=20261176" />
+  <link rel="stylesheet" href="css/login-v2.css?v=20261176" />
 </head>
 <body>
 
-  <div id="auth-overlay">
+  <div id="auth-overlay" class="lv2">
 
     <!-- Barwa tła zależna od wybranej zakładki (Pracownik / Zalew); Użytkownik = tło podstawowe -->
     <div class="auth-tint tint-employee" aria-hidden="true"></div>
@@ -72,6 +74,53 @@
 
     <canvas id="foundry-sparks" aria-hidden="true"></canvas>
 
+    <!-- ===== Nowy wygląd (css/login-v2.css, js/login-v2.js) ===== -->
+    <!-- Wielki napis w tle -->
+    <div class="lv2-giant" aria-hidden="true"><span>ODLEWNIE</span><span>POLSKIE</span></div>
+
+    <!-- Subtelna suwnica z kadzią przejeżdżająca u góry -->
+    <div class="lv2-crane" aria-hidden="true">
+      <div class="rail"></div>
+      <div class="trolley">
+        <svg viewBox="0 0 120 170">
+          <rect x="20" y="0" width="80" height="16" rx="3" fill="#0B1F1B" />
+          <circle cx="34" cy="16" r="6" fill="#0B1F1B" /><circle cx="86" cy="16" r="6" fill="#0B1F1B" />
+          <line x1="48" y1="16" x2="44" y2="88" stroke="#0B1F1B" stroke-width="3" />
+          <line x1="72" y1="16" x2="76" y2="88" stroke="#0B1F1B" stroke-width="3" />
+          <path d="M28 92 q32 -20 64 0" fill="none" stroke="#0B1F1B" stroke-width="5" />
+          <path d="M26 96 h68 l-8 56 q-26 12 -52 0 z" fill="#0B1F1B" />
+          <ellipse cx="60" cy="96" rx="34" ry="7" fill="#FF9A2E" class="hot" />
+        </svg>
+      </div>
+    </div>
+
+    <!-- Logo: ikona i podpis zmieniają się z wybranym modułem -->
+    <header class="lv2-top">
+      <div class="lv2-brand">
+        <span class="mark">
+          <i class="fa-solid fa-user-gear ic ic-user"></i>
+          <i class="fa-solid fa-helmet-safety ic ic-employee"></i>
+          <i class="fa-solid fa-fire-flame-curved ic ic-zalew"></i>
+        </span>
+        <span class="name">Odlewnie Polskie<small><span class="m-user">Panel użytkownika</span><span class="m-employee">Portal pracownika</span><span class="m-zalew">Zalew</span></small></span>
+      </div>
+    </header>
+
+    <div class="lv2-wrap">
+      <!-- Zegar, data i zmiany I / II / III (bieżąca w kolorze modułu, puls, końcówka zmiany) -->
+      <section class="lv2-left" aria-label="Bieżąca zmiana">
+        <div class="eyebrow">Ewidencja czasu pracy</div>
+        <div class="big" id="lv2-clock">--:--</div>
+        <div class="date" id="lv2-date"></div>
+        <div class="timeline">
+          <div class="seg" data-seg="0"><b>I</b><span>06:30 – 14:30</span><div class="bar"><i></i></div><span class="ending-tag">kończy się</span></div>
+          <div class="seg" data-seg="1"><b>II</b><span>14:30 – 22:30</span><div class="bar"><i></i></div><span class="ending-tag">kończy się</span></div>
+          <div class="seg" data-seg="2"><b>III</b><span>22:30 – 06:30</span><div class="bar"><i></i></div><span class="ending-tag">kończy się</span></div>
+        </div>
+        <div class="hint"><span class="dot"></span><span id="lv2-shift"></span></div>
+      </section>
+
+      <div class="lv2-side">
     <!-- Karta logowania -->
     <div class="unified-auth-card">
       <div class="molten-bar" aria-hidden="true"></div>
@@ -93,8 +142,8 @@
       <div class="card-steps-stage">
 
         <div id="step-login" class="card-body-step active">
-          <h2>Odlewnie Polskie S.A.</h2>
-          <div class="subtitle">System Ewidencji Czasu Pracy</div>
+          <h2>Witaj w <span>pracy</span></h2>
+          <div class="subtitle">Ewidencja czasu pracy</div>
 
           <div class="login-tabs" role="tablist" aria-label="Rodzaj konta">
             <button type="button" id="login-tab-user" class="on" role="tab" aria-selected="true" onclick="setLoginMode('user')"><i class="fa-solid fa-user-gear"></i> Użytkownik</button>
@@ -153,6 +202,8 @@
 
       </div>
     </div>
+      </div><!-- /.lv2-side -->
+    </div><!-- /.lv2-wrap -->
 
     <div class="auth-footer-copyright">
       &copy; 2026 Adrian Gadowski<span id="auth-version"></span>
@@ -176,19 +227,14 @@
             <i class="fa-solid fa-users"></i> Baza pracowników
           </button>
         </li>
-        <li class="menu-item" data-tab="report_time" id="nav-report_time" style="display: none;">
-          <button class="menu-btn" onclick="navigateTo('report_time')">
-            <i class="fa-solid fa-clock"></i> Rozliczanie czasu
-          </button>
-        </li>
         <li class="menu-item" data-tab="schedule" id="nav-schedule" style="display: none;">
           <button class="menu-btn" onclick="navigateTo('schedule')">
             <i class="fa-solid fa-calendar-week"></i> Harmonogram
           </button>
         </li>
-        <li class="menu-item" data-tab="absences" id="nav-absences" style="display: none;">
-          <button class="menu-btn" onclick="navigateTo('absences')">
-            <i class="fa-solid fa-user-clock"></i> Nieobecności <span class="ab-badge" style="display: none;"></span>
+        <li class="menu-item" data-tab="report_time" id="nav-report_time" style="display: none;">
+          <button class="menu-btn" onclick="navigateTo('report_time')">
+            <i class="fa-solid fa-clock"></i> Rozliczanie czasu
           </button>
         </li>
         <li class="menu-item" data-tab="reports" id="nav-reports" style="display: none;">
@@ -196,19 +242,29 @@
             <i class="fa-solid fa-file-lines"></i> Lista raportów
           </button>
         </li>
+        <li class="menu-item" data-tab="absences" id="nav-absences" style="display: none;">
+          <button class="menu-btn" onclick="navigateTo('absences')">
+            <i class="fa-solid fa-user-clock"></i> Nieobecności <span class="ab-badge" style="display: none;"></span>
+          </button>
+        </li>
         <li class="menu-item" data-tab="users" id="nav-users" style="display: none;">
           <button class="menu-btn" onclick="navigateTo('users')">
             <i class="fa-solid fa-user-gear"></i> Użytkownicy
           </button>
         </li>
-        <li class="menu-item" data-tab="updates" id="nav-updates" style="display: none;">
-          <button class="menu-btn" onclick="navigateTo('updates')">
-            <i class="fa-solid fa-rotate"></i> Aktualizacje
+        <li class="menu-item" data-tab="messages" id="nav-messages" style="display: none;">
+          <button class="menu-btn" onclick="navigateTo('messages')">
+            <i class="fa-solid fa-bullhorn"></i> Komunikaty
           </button>
         </li>
         <li class="menu-item" data-tab="options" id="nav-options" style="display: none;">
           <button class="menu-btn" onclick="navigateTo('options')">
             <i class="fa-solid fa-sliders"></i> Opcje
+          </button>
+        </li>
+        <li class="menu-item" data-tab="updates" id="nav-updates" style="display: none;">
+          <button class="menu-btn" onclick="navigateTo('updates')">
+            <i class="fa-solid fa-rotate"></i> Aktualizacje
           </button>
         </li>
         <li class="menu-item" data-tab="logs" id="nav-logs" style="display: none;">
@@ -227,6 +283,10 @@
             <span id="current-user-dept" class="user-dept">Dział</span>
           </div>
         </div>
+        <!-- Moje komunikaty (skrzynka) - js/messages.js -->
+        <button type="button" class="ab-bell msg-env" data-msg-env style="display: none;" onclick="msgOpenInbox()" title="Komunikaty" aria-label="Komunikaty">
+          <i class="fa-solid fa-envelope"></i><span class="ab-badge msg-badge" style="display: none;"></span>
+        </button>
         <!-- Zgłoszenia nieobecności do rozpatrzenia (mistrz, administrator) - js/absences.js -->
         <button type="button" id="ab-bell" class="ab-bell" style="display: none;" onclick="pushToggle()" title="Powiadomienia" aria-label="Powiadomienia" aria-pressed="false">
           <i class="fa-solid fa-bell"></i><span class="ab-badge" style="display: none;"></span>
@@ -496,9 +556,15 @@
   <div id="employee-portal" class="ep-root">
     <header class="ep-top">
       <div class="ep-brand"><i class="fa-solid fa-industry"></i> Odlewnie Polskie</div>
-      <button type="button" class="ep-logout" onclick="epLogout()" aria-label="Wyloguj">
-        <i class="fa-solid fa-right-from-bracket"></i> <span>Wyloguj</span>
-      </button>
+      <div class="ep-top-actions">
+        <!-- Moje komunikaty (skrzynka) - js/messages.js -->
+        <button type="button" class="ep-msg-btn" data-msg-env style="display: none;" onclick="msgOpenInbox()" title="Komunikaty" aria-label="Komunikaty">
+          <i class="fa-solid fa-envelope"></i> <span>Komunikaty</span><span class="ab-badge msg-badge" style="display: none;"></span>
+        </button>
+        <button type="button" class="ep-logout" onclick="epLogout()" aria-label="Wyloguj">
+          <i class="fa-solid fa-right-from-bracket"></i> <span>Wyloguj</span>
+        </button>
+      </div>
     </header>
 
     <main class="ep-main">
@@ -688,6 +754,35 @@
     </div>
   </div>
 
+  <!-- Komunikat: wyskakujące okno (js/messages.js) -->
+  <div id="modal-msg-popup" class="modal">
+    <div id="msg-popup-box" class="modal-box msg-popup info" role="alertdialog" aria-labelledby="msg-popup-title">
+      <div class="msg-popup-head">
+        <span class="prio" id="msg-popup-prio"></span>
+        <span class="cnt" id="msg-popup-count"></span>
+      </div>
+      <h3 id="msg-popup-title"></h3>
+      <div class="msg-popup-meta" id="msg-popup-meta"></div>
+      <div class="msg-popup-body msg-text" id="msg-popup-body"></div>
+      <div class="modal-btn-row">
+        <button type="button" id="msg-popup-later" class="btn-secondary" onclick="msgPopupLater()">Później</button>
+        <button type="button" id="msg-popup-ok" class="btn-primary" onclick="msgPopupOk()">Przeczytałem</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Komunikaty: skrzynka (js/messages.js) -->
+  <div id="modal-msg-inbox" class="modal">
+    <div class="modal-box msg-inbox-box">
+      <button type="button" class="link-btn" onclick="msgCloseInbox()" style="position: absolute; top: 22px; right: 22px; font-size: 1.2rem;" title="Zamknij" aria-label="Zamknij">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+      <h3 style="color: var(--primary); margin: 0 0 4px 0; font-size: 1.15rem; padding-right: 30px;">Moje komunikaty</h3>
+      <p class="msg-muted" style="margin: 0 0 12px 0;">Komunikaty z ostatnich 60 dni. Kliknij, aby rozwinąć.</p>
+      <div id="msg-inbox-list" class="msg-inbox-list"></div>
+    </div>
+  </div>
+
   <!-- Wymuszona zmiana hasła przy pierwszym logowaniu -->
   <div id="modal-force-password" class="modal">
     <div class="modal-box" style="max-width: 420px;">
@@ -732,26 +827,28 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="js/app.js?v=20261147"></script>
-  <script src="js/login-fx.js?v=20261147"></script>
-  <script src="js/menu-fx.js?v=20261147"></script>
-  <script src="js/mobile.js?v=20261147"></script>
-  <script src="js/report_time.js?v=20261147"></script>
-  <script src="js/emp_lists.js?v=20261147"></script>
-  <script src="js/reports.js?v=20261147"></script>
-  <script src="js/updates.js?v=20261147"></script>
-  <script src="js/dashboard.js?v=20261147"></script>
-  <script src="js/schedule.js?v=20261147"></script>
-  <script src="js/employee_presence.js?v=20261147"></script>
-  <script src="js/user.js?v=20261147"></script>
-  <script src="js/employee_hours.js?v=20261147"></script>
-  <script src="js/options.js?v=20261147"></script>
-  <script src="js/logs.js?v=20261147"></script>
-  <script src="js/employee_portal.js?v=20261147"></script>
-  <script src="js/absences.js?v=20261147"></script>
-  <script src="js/push.js?v=20261147"></script>
-  <script src="js/zalew.js?v=20261147"></script>
-  <script src="js/password.js?v=20261147"></script>
-  <script src="js/pwa.js?v=20261147"></script>
+  <script src="js/app.js?v=20261176"></script>
+  <script src="js/login-fx.js?v=20261176"></script>
+  <script src="js/login-v2.js?v=20261176"></script>
+  <script src="js/menu-fx.js?v=20261176"></script>
+  <script src="js/mobile.js?v=20261176"></script>
+  <script src="js/report_time.js?v=20261176"></script>
+  <script src="js/emp_lists.js?v=20261176"></script>
+  <script src="js/reports.js?v=20261176"></script>
+  <script src="js/updates.js?v=20261176"></script>
+  <script src="js/dashboard.js?v=20261176"></script>
+  <script src="js/schedule.js?v=20261176"></script>
+  <script src="js/employee_presence.js?v=20261176"></script>
+  <script src="js/user.js?v=20261176"></script>
+  <script src="js/employee_hours.js?v=20261176"></script>
+  <script src="js/options.js?v=20261176"></script>
+  <script src="js/logs.js?v=20261176"></script>
+  <script src="js/employee_portal.js?v=20261176"></script>
+  <script src="js/absences.js?v=20261176"></script>
+  <script src="js/push.js?v=20261176"></script>
+  <script src="js/messages.js?v=20261176"></script>
+  <script src="js/zalew.js?v=20261176"></script>
+  <script src="js/password.js?v=20261176"></script>
+  <script src="js/pwa.js?v=20261176"></script>
 </body>
 </html>

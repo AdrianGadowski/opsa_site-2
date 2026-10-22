@@ -41,6 +41,80 @@ function when(r: { date_from: string; date_to: string; time_from: string | null;
   return `${dates}, ${shift ?? `godz. ${r.time_from}–${r.time_to}`}`;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type Db = any;
+
+// Wynik funkcji SQL zwracającej zbiór liczb: [1, 2] albo [{ nazwa: 1 }, ...] - zawsze tablica liczb
+function idList(data: unknown): number[] {
+  return ((data as unknown[]) ?? []).map((x) => Number(typeof x === "object" && x ? Object.values(x)[0] : x)).filter(Boolean);
+}
+
+// Treść bez znaczników formatowania (**, *, -, [tekst](adres)) - do powiadomienia
+function plain(text: string) {
+  return text
+    .replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, "$1")
+    .replace(/\*\*([^*]+)\*\*/g, "$1")
+    .replace(/\*([^*]+)\*/g, "$1")
+    .replace(/^\s*[-•]\s+/gm, "• ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+// Wysyłka na listę urządzeń; nieaktualne urządzenia są usuwane
+async function sendPush(db: Db, subs: { id: number; endpoint: string; p256dh: string; auth: string }[], payload: string) {
+  webpush.setVapidDetails(env("VAPID_SUBJECT") || "mailto:admin@example.com", env("VAPID_PUBLIC_KEY"), env("VAPID_PRIVATE_KEY"));
+  let sent = 0;
+  const gone: number[] = [];
+  await Promise.all(subs.map(async (s) => {
+    try {
+      await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, payload, { TTL: 86400 });
+      sent++;
+    } catch (err) {
+      const code = (err as { statusCode?: number }).statusCode;
+      if (code === 404 || code === 410) gone.push(s.id);
+      else console.error("Błąd wysyłki push:", code, (err as Error).message);
+    }
+  }));
+  if (gone.length) await db.from("push_subscriptions").delete().in("id", gone);
+  return { sent, removed: gone.length };
+}
+
+// Komunikat: do wszystkich odbiorców (użytkownicy i pracownicy) z włączonymi powiadomieniami
+async function announcementPush(db: Db, id: number) {
+  const { data: a } = await db
+    .from("announcements")
+    .select("id, title, body, priority, push, closed_at")
+    .eq("id", id)
+    .maybeSingle();
+  if (!a || !a.push || a.closed_at) return Response.json({ sent: 0 });
+
+  const [{ data: users }, { data: emps }] = await Promise.all([
+    db.rpc("app_announcement_user_ids", { p_id: id }),
+    db.rpc("app_announcement_employee_ids", { p_id: id }),
+  ]);
+  const userIds = idList(users), empIds = idList(emps);
+  const subs: { id: number; endpoint: string; p256dh: string; auth: string }[] = [];
+  if (userIds.length) {
+    const { data } = await db.from("push_subscriptions").select("id, endpoint, p256dh, auth").in("user_id", userIds);
+    subs.push(...(data ?? []));
+  }
+  if (empIds.length) {
+    const { data } = await db.from("push_subscriptions").select("id, endpoint, p256dh, auth").in("employee_id", empIds);
+    subs.push(...(data ?? []));
+  }
+  if (!subs.length) return Response.json({ sent: 0 });
+
+  const prefix = a.priority === "urgent" ? "PILNE: " : a.priority === "important" ? "Ważne: " : "";
+  const text = plain(String(a.body ?? ""));
+  const payload = JSON.stringify({
+    title: `${prefix}${a.title}`,
+    body: text.length > 180 ? text.slice(0, 177) + "…" : text,
+    url: "./",
+    tag: `announcement-${a.id}`,
+  });
+  return Response.json(await sendPush(db, subs, payload));
+}
+
 Deno.serve(async (req) => {
   if (req.method !== "POST") return new Response("Method not allowed", { status: 405 });
   // Hasło wywołania (spacje / entery na końcach są pomijane). Odpowiedź mówi, co jest nie tak,
@@ -57,11 +131,17 @@ Deno.serve(async (req) => {
     );
   }
 
-  let body: { request_id?: number; event?: string };
+  let body: { request_id?: number; event?: string; announcement_id?: number };
   try {
     body = await req.json();
   } catch {
     return new Response("Bad request", { status: 400 });
+  }
+
+  // Komunikat (moduł "Komunikaty", sql/33)
+  if (body.announcement_id) {
+    const db = createClient(env("SUPABASE_URL"), env("SUPABASE_SERVICE_ROLE_KEY"), { auth: { persistSession: false } });
+    return await announcementPush(db, Number(body.announcement_id));
   }
   const event = String(body.event ?? "");
   if (!body.request_id || !["new", "cancelled", "approved", "rejected"].includes(event)) {

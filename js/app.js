@@ -48,7 +48,7 @@ const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
 
 // Numer wydania doklejany do adresów plików, żeby przeglądarka nie używała starych kopii.
 // Zmieniaj przy każdej publikacji - tutaj i w index.html (?v=...).
-const APP_BUILD = "20261147";
+const APP_BUILD = "20261176";
 
 let currentUser = null;
 let cachedUsers = [];
@@ -66,7 +66,8 @@ const viewTitles = {
   user: "Moje konto",
   options: "Opcje systemu",
   logs: "Logi systemu",
-  absences: "Zgłoszenia nieobecności"
+  absences: "Zgłoszenia nieobecności",
+  messages: "Komunikaty"
 };
 
 // Kliknięcie w awatar lub dane użytkownika w stopce menu otwiera "Moje konto"
@@ -83,7 +84,8 @@ const permissionMap = {
   users: { elementId: "nav-users", column: "allow_users" },
   updates: { elementId: "nav-updates", column: "allow_updates" },
   options: { elementId: "nav-options", column: "allow_options" },
-  logs: { elementId: "nav-logs", column: "allow_logs" }
+  logs: { elementId: "nav-logs", column: "allow_logs" },
+  messages: { elementId: "nav-messages", column: "allow_messages" }
 };
 
 function hasPermission(columnName) {
@@ -685,6 +687,7 @@ function initDashboardApp(startView) {
   const firstAvailableView = applyNavVisibility();
   if (typeof abStartBadge === "function") abStartBadge(); // dymek z liczbą zgłoszeń nieobecności
   if (typeof pushSync === "function") pushSync();         // to urządzenie dostaje powiadomienia tej osoby
+  if (typeof msgStart === "function") msgStart();         // komunikaty: wyskakujące okno i skrzynka
 
   // Po odświeżeniu strony wróć do ostatnio otwartego widoku, jeśli nadal jest dozwolony
   if (startView && viewTitles[startView] && canOpenView(startView)) {
@@ -709,6 +712,8 @@ function initDashboardApp(startView) {
 async function navigateTo(viewName) {
   const contentEl = document.getElementById("main-content");
   const topbarTitle = document.getElementById("topbar-title");
+  if (typeof prTipHide === "function") prTipHide();     // okienko obecności z Bazy pracowników
+  if (typeof rtPickClose === "function") rtPickClose(false); // okienko wyboru godzin
 
   const permissionInfo = permissionMap[viewName];
   if (!canOpenView(viewName)) {
@@ -740,10 +745,22 @@ async function navigateTo(viewName) {
     onViewLoaded(viewName);
 
   } catch (err) {
+    // "Failed to fetch" = przeglądarka w ogóle nie połączyła się z serwerem strony
+    const network = err instanceof TypeError || /failed to fetch|networkerror|load failed/i.test(String(err.message));
+    const fileMode = location.protocol === "file:";
+    const hint = fileMode
+      ? "Strona jest otwarta bezpośrednio z pliku (adres zaczyna się od <b>file://</b>). Moduły wczytują się tylko przez serwer: otwórz ją przez Live Server albo pod adresem strony w internecie."
+      : network
+        ? "Nie udało się połączyć z serwerem strony. Sprawdź połączenie z internetem (albo czy działa Live Server) i spróbuj ponownie."
+        : rtEsc(err.message);
     contentEl.innerHTML = `
       <div class="card" style="border-left: 4px solid var(--danger);">
         <h3 style="color: var(--danger);">Błąd wczytywania modułu</h3>
-        <p>${err.message}</p>
+        <p>${hint}</p>
+        ${network || fileMode ? `<p style="font-size: 0.8rem; color: var(--text-muted);">Szczegóły: ${rtEsc(err.message)}</p>` : ""}
+        <button type="button" class="btn-primary" style="width: auto; padding: 10px 18px; margin-top: 6px;" onclick="navigateTo('${viewName}')">
+          <i class="fa-solid fa-rotate-right"></i> Spróbuj ponownie
+        </button>
       </div>
     `;
   }
@@ -772,6 +789,9 @@ async function onViewLoaded(viewName) {
       break;
     case 'updates':
       await initUpdatesView();
+      break;
+    case 'messages':
+      await initMessagesView();
       break;
     case 'absences':
       await initAbsencesView();
@@ -924,6 +944,8 @@ async function openEditUserModal(login) {
   document.getElementById("perm-updates").checked = !!(user.allow_updates);
   document.getElementById("perm-options").checked = !!(user.allow_options);
   document.getElementById("perm-logs").checked = !!(user.allow_logs);
+  const permMsg = document.getElementById("perm-messages");
+  if (permMsg) permMsg.checked = !!(user.allow_messages);
 
   const msgBox = document.getElementById("user-form-msg");
   if (msgBox) msgBox.style.display = "none";
@@ -1073,7 +1095,8 @@ async function loadUsersList() {
         { label: "Użytkownicy", active: u.allow_users },
         { label: "Aktualizacje", active: u.allow_updates },
         { label: "Opcje", active: u.allow_options },
-        { label: "Logi", active: u.allow_logs }
+        { label: "Logi", active: u.allow_logs },
+        { label: "Komunikaty", active: u.allow_messages }
       ];
 
       const activeBadges = permissions
@@ -1151,7 +1174,10 @@ async function handleSaveUser(e) {
     allow_users: document.getElementById("perm-users") ? document.getElementById("perm-users").checked : false,
     allow_updates: document.getElementById("perm-updates") ? document.getElementById("perm-updates").checked : false,
     allow_options: document.getElementById("perm-options") ? document.getElementById("perm-options").checked : false,
-    allow_logs: document.getElementById("perm-logs") ? document.getElementById("perm-logs").checked : false
+    allow_logs: document.getElementById("perm-logs") ? document.getElementById("perm-logs").checked : false,
+    // kolumna allow_messages istnieje dopiero po sql/33 - bez niej zapis by się nie udał
+    ...(currentUser && "allow_messages" in currentUser && document.getElementById("perm-messages")
+      ? { allow_messages: document.getElementById("perm-messages").checked } : {})
   };
 
   try {
