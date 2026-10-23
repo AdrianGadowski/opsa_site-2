@@ -73,10 +73,18 @@
           <label for="form-user-login">Login</label>
           <input type="text" id="form-user-login" class="form-control" placeholder="np. jkowalski" required />
         </div>
-        <div class="form-group">
+        <!-- nowy użytkownik: hasło startowe -->
+        <div class="form-group" id="user-pass-group">
           <label for="form-user-password" id="label-form-user-password">Hasło</label>
           <input type="password" id="form-user-password" class="form-control" placeholder="••••••••" required />
-          <small id="password-hint" style="display: none; color: var(--text-muted); font-size: 0.75rem;">Pozostaw puste, aby nie zmieniać hasła</small>
+        </div>
+        <!-- edycja: tylko reset hasła na 123456 (przy logowaniu trzeba ustawić nowe) -->
+        <div class="form-group" id="user-reset-group" style="display: none;">
+          <label>Hasło</label>
+          <button type="button" id="btn-reset-user-password" class="btn-secondary account-reset-btn" data-kind="user" onclick="resetAccountPassword(this)">
+            <i class="fa-solid fa-key"></i> Resetuj hasło
+          </button>
+          <small id="user-reset-hint" style="display: block; color: var(--text-muted); font-size: 0.75rem; margin-top: 4px;">Hasło zostanie ustawione na „123456”, a przy logowaniu trzeba będzie ustawić nowe.</small>
         </div>
       </div>
 
@@ -131,6 +139,9 @@
           </label>
           <label style="display: flex; align-items: center; gap: 10px; font-size: 0.88rem; cursor: pointer;">
             <input type="checkbox" id="perm-messages" /> Komunikaty
+          </label>
+          <label style="display: flex; align-items: center; gap: 10px; font-size: 0.88rem; cursor: pointer;" title="Zatwierdzanie, odsyłanie do poprawy i cofanie zatwierdzenia raportów z całego zakładu">
+            <input type="checkbox" id="perm-report-approve" /> Zatwierdzanie raportów
           </label>
         </div>
       </div>

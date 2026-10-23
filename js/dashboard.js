@@ -167,16 +167,18 @@ async function dbLoad() {
   try {
     // Wykres roczny na dole zawsze pokazuje cały rok, niezależnie od wybranego miesiąca.
     // Przy "Cały rok" wystarcza jedno pobranie.
+    // Liczą się tylko zatwierdzone raporty (sql/34; przed nim - wszystkie)
+    const approved = await rpaApprovedOnly();
     const [rows, yearOnly] = await Promise.all([
-      rpFetchAll(() => supabaseClient
+      rpFetchAll(() => rpaFilterApproved(supabaseClient
         .from("work_reports")
         .select("*") // "*": działa też przed dodaniem kolumny id_department (sql/24)
-        .like("report_date", pattern)),
+        .like("report_date", pattern), approved)),
       month
-        ? rpFetchAll(() => supabaseClient
+        ? rpFetchAll(() => rpaFilterApproved(supabaseClient
             .from("work_reports")
             .select("report_date, total_hours, at_work")
-            .like("report_date", `%.${year}`))
+            .like("report_date", `%.${year}`), approved))
         : null
     ]);
     if (token !== dbLoadToken) return; // w międzyczasie zmieniono okres

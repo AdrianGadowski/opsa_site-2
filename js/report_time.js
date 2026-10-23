@@ -723,7 +723,12 @@ function rtUpdateSaveButton() {
   const btn = document.getElementById("rt-btn-save");
   if (!btn) return;
   const noEntries = rtFilledEntries().length === 0;
-  btn.disabled = rtSaving || noEntries || !rtMeta.date || rtLocked || rtTarget === null || rtHasConflicts();
+  btn.disabled = rtSaving || noEntries || !rtMeta.date || rtLocked || rtTarget === null || rtHasConflicts() || rtTargetApproved();
+}
+
+// Raport, do którego trafiłyby osoby, jest już zatwierdzony (dopisać się nie da)
+function rtTargetApproved() {
+  return rtTargets.some(t => t.number === rtTarget && t.status === "approved");
 }
 
 // Szuka wpisów tych pracowników w wybranym dniu i zmianie, które nakładają się godzinowo
@@ -765,10 +770,13 @@ function rtUserName(id) {
 
 // Raporty na wybrany dzień i zmianę, do których zalogowana osoba może dopisać:
 // zwykły użytkownik - tylko własne, administrator - wszystkie.
+// Zatwierdzonego raportu nie da się uzupełnić (sql/34): administrator go nie widzi na liście,
+// zwykły użytkownik dostaje informację, że trzeba cofnąć zatwierdzenie.
 async function rtFetchTargets() {
+  const withStatus = typeof rpaInstalled === "function" && rpaInstalled();
   const { data, error } = await supabaseClient
     .from("work_reports")
-    .select("number_report, add_first_name_id, add_data, first_name_id")
+    .select("number_report, add_first_name_id, add_data, first_name_id" + (withStatus ? ", approval_status" : ""))
     .eq("report_date", rtIsoToPl(rtMeta.date))
     .eq("shift", rtMeta.shift);
   if (error) return { error, list: [] };
@@ -777,7 +785,7 @@ async function rtFetchTargets() {
   (data || []).forEach(r => {
     let t = map.get(r.number_report);
     if (!t) {
-      t = { number: Number(r.number_report), creatorId: r.add_first_name_id, created: r.add_data, people: new Set() };
+      t = { number: Number(r.number_report), creatorId: r.add_first_name_id, created: r.add_data, status: r.approval_status || null, people: new Set() };
       map.set(r.number_report, t);
     }
     t.people.add(r.first_name_id);
@@ -785,7 +793,7 @@ async function rtFetchTargets() {
 
   const admin = rtIsAdmin();
   const list = [...map.values()]
-    .filter(t => admin || Number(t.creatorId) === Number(currentUser.id))
+    .filter(t => admin ? t.status !== "approved" : Number(t.creatorId) === Number(currentUser.id))
     .sort((a, b) => a.number - b.number);
 
   // nazwiska autorów są potrzebne tylko administratorowi (lista wyboru)
@@ -842,10 +850,17 @@ function rtRenderTarget() {
 
   if (!rtIsAdmin()) {
     const t = rtTargets.find(x => x.number === rtTarget) || rtTargets[0];
+    if (t.status === "approved") {
+      el.className = "rt-target choose";
+      el.innerHTML = `<i class="fa-solid fa-lock"></i>
+        <span>Twój raport <strong>nr ${t.number}</strong> na ten dzień i tę zmianę jest już <strong>zatwierdzony</strong>.
+        Nie można do niego dopisać osób — poproś osobę z uprawnieniem „Zatwierdzanie raportów” o cofnięcie zatwierdzenia.</span>`;
+      return;
+    }
     el.className = "rt-target info";
     el.innerHTML = `<i class="fa-solid fa-circle-info"></i>
       <span>Masz już raport <strong>nr ${t.number}</strong> na ten dzień i tę zmianę (osób: ${t.people.size}).
-      Nowe osoby zostaną do niego dopisane.</span>`;
+      Nowe osoby zostaną do niego dopisane${t.status === "rejected" ? " (raport jest odesłany do poprawy — po uzupełnieniu wyślij go ponownie z Listy raportów)" : ""}.</span>`;
     return;
   }
 
@@ -1107,6 +1122,13 @@ async function rtSaveReport() {
       }
     }
 
+    if (target && target.status === "approved") {
+      rtApplyTargets(fresh.list);
+      rtUpdateSaveButton();
+      rtShowSummaryMsg(`Raport nr ${target.number} na ten dzień i zmianę jest już zatwierdzony. Nie można do niego dopisać osób — najpierw trzeba cofnąć zatwierdzenie.`, "#9b1c1f");
+      return;
+    }
+
     let reportNumber;
     if (target) {
       reportNumber = target.number;
@@ -1155,9 +1177,12 @@ async function rtSaveReport() {
     logAction(target ? "Dopisanie do raportu" : "Utworzenie raportu",
       `Raport nr ${reportNumber}, ${reportDate}, ${rtMeta.shift}, osób: ${records.length}`);
     rtClearTargets();
-    rtShowBanner("success", target
+    const toApproval = typeof rpaInstalled === "function" && rpaInstalled() && !(target && target.status === "rejected");
+    rtShowBanner("success", (target
       ? `Dopisano ${records.length} os. do raportu nr ${reportNumber} (${reportDate}, ${rtMeta.shift}).`
-      : `Raport nr ${reportNumber} (${reportDate}, ${rtMeta.shift}) został zapisany. Liczba osób: ${records.length}.`);
+      : `Raport nr ${reportNumber} (${reportDate}, ${rtMeta.shift}) został zapisany. Liczba osób: ${records.length}.`) +
+      (toApproval ? " Raport czeka na zatwierdzenie." : ""));
+    if (typeof rpaRefreshBadges === "function") rpaRefreshBadges();
   } catch (err) {
     console.error("Błąd zapisu raportu:", err);
     rtShowSummaryMsg("Wystąpił błąd podczas zapisu: " + (err.message || err));

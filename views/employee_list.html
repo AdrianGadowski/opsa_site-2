@@ -11,12 +11,31 @@
     min-width: 38px; height: 28px; padding: 0 4px; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center;
     font-size: 0.7rem; font-weight: 700; border: 1px solid transparent; cursor: default; box-sizing: border-box;
   }
-  .pr-day.plan   { border-color: var(--primary); color: var(--primary); background: #fff; }
-  .pr-day.ok     { background: var(--primary); border-color: var(--primary); color: #fff; }
-  .pr-day.diff   { background: var(--accent); border-color: var(--accent-hover); color: #03241E; }
-  .pr-day.absent { background: var(--danger); border-color: var(--danger); color: #fff; }
-  .pr-day.none   { background: #E5E7EB; border-color: #E5E7EB; color: #6B7280; }
-  .pr-day.absplan { border-color: var(--danger); color: var(--danger); background: #fff; }
+  .pr-day.plan,   .pr-h.plan   { border-color: var(--primary); color: var(--primary); background: #fff; }
+  .pr-day.ok,     .pr-h.ok     { background: var(--primary); border-color: var(--primary); color: #fff; }
+  .pr-day.diff,   .pr-h.diff   { background: var(--accent); border-color: var(--accent-hover); color: #03241E; }
+  .pr-day.absent, .pr-h.absent { background: var(--danger); border-color: var(--danger); color: #fff; }
+  .pr-day.none,   .pr-h.none   { background: #E5E7EB; border-color: #E5E7EB; color: #6B7280; }
+  .pr-day.absplan, .pr-h.absplan { border-color: var(--danger); color: var(--danger); background: #fff; }
+
+  /* Dwie zmiany w jednym dniu o różnym stanie: dwie połówki (lewa - wcześniejsza zmiana),
+     każda w kolorze swojego stanu; napis dnia w kolorach obu połówek */
+  .pr-day.split { position: relative; border: none; background: none; padding: 0; }
+  .pr-h { position: absolute; top: 0; bottom: 0; width: calc(50% - 1px); border: 1px solid transparent; box-sizing: border-box; }
+  /* bez kresek w środku (nie przecinają napisu); połówki rozdziela 2 px przerwy */
+  .pr-h:first-child { left: 0; border-radius: 6px 0 0 6px; border-right-width: 0; }
+  .pr-h:nth-child(2) { right: 0; border-radius: 0 6px 6px 0; border-left-width: 0; }
+  .pr-day.split .pr-lbl {
+    position: relative; z-index: 1; width: 100%; text-align: center; font-weight: 700;
+    color: transparent; background: linear-gradient(90deg, var(--lc) 50%, var(--rc) 50%);
+    -webkit-background-clip: text; background-clip: text;
+  }
+  .pr-day.l-plan { --lc: var(--primary); }   .pr-day.r-plan { --rc: var(--primary); }
+  .pr-day.l-ok { --lc: #fff; }               .pr-day.r-ok { --rc: #fff; }
+  .pr-day.l-diff { --lc: #03241E; }          .pr-day.r-diff { --rc: #03241E; }
+  .pr-day.l-absent { --lc: #fff; }           .pr-day.r-absent { --rc: #fff; }
+  .pr-day.l-none { --lc: #6B7280; }          .pr-day.r-none { --rc: #6B7280; }
+  .pr-day.l-absplan { --lc: var(--danger); } .pr-day.r-absplan { --rc: var(--danger); }
   /* dzisiaj: cienka ciemna kreska pod kafelkiem zamiast grubej obwódki */
   .pr-day.today  { position: relative; }
   .pr-day.today::after { content: ""; position: absolute; left: 25%; right: 25%; bottom: -5px; height: 2px; border-radius: 2px; background: #1F2937; }
@@ -26,9 +45,20 @@
   .pr-legend b { color: var(--text-dark); font-weight: 600; margin-right: 2px; }
   .pr-legend span { display: inline-flex; align-items: center; gap: 6px; }
   .pr-legend .pr-day { min-width: 22px; height: 16px; padding: 0; border-radius: 4px; }
+  /* Telefon: obecność pod nazwą kolumny, siedem dni w jednym równym rzędzie na całą szerokość karty */
   @media (max-width: 768px) {
-    .pr-week { flex-wrap: wrap; justify-content: flex-end; }
-    .pr-day { min-width: 34px; }
+    /* legenda: tytuł na całą szerokość, pod nim pozycje w dwóch równych kolumnach */
+    .pr-legend { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 12px; padding: 12px 14px; align-items: start; }
+    .pr-legend b { grid-column: 1 / -1; }
+    .pr-legend span { align-items: flex-start; line-height: 1.3; }
+    .pr-legend span:last-child { grid-column: 1 / -1; }
+    .pr-legend .pr-day { flex: none; margin-top: 1px; }
+    #main-content tbody td.pr-cell { padding: 26px 0 10px 0 !important; text-align: center !important; }
+    #main-content tbody td.pr-cell::before { content: "Obecność"; width: 100%; top: 6px; }
+    #main-content tbody td.pr-cell[data-range]::before { content: "Obecność · " attr(data-range); }
+    .pr-week { display: flex; flex-wrap: nowrap; width: 100%; gap: 4px; }
+    .pr-week .pr-day { flex: 1 1 0; min-width: 0; padding: 0; font-size: 0.66rem; white-space: nowrap; overflow: hidden; }
+    .pr-week .pr-day.today { overflow: visible; }
   }
 
   /* Okienko po najechaniu na kafelek dnia (js/employee_presence.js) */
@@ -55,7 +85,7 @@
   <div style="display: grid; grid-template-columns: 2fr 1.2fr 1.2fr auto; gap: 14px; align-items: end;">
     <div class="form-group" style="margin-bottom: 0;">
       <label for="emp-filter-search" style="font-size: 0.8rem; text-transform: uppercase; color: var(--text-muted);">
-        Szukaj (Imię / Nazwisko)
+        Szukaj
       </label>
       <div style="position: relative;">
         <input 
@@ -72,7 +102,7 @@
 
     <div class="form-group" style="margin-bottom: 0;">
       <label for="emp-filter-business" style="font-size: 0.8rem; text-transform: uppercase; color: var(--text-muted);">
-        Firma (Business)
+        Firma
       </label>
       <select id="emp-filter-business" class="form-control" onchange="applyEmployeeFilters()">
         <option value="">Wszystkie firmy</option>
@@ -81,7 +111,7 @@
 
     <div class="form-group" style="margin-bottom: 0;">
       <label for="emp-filter-dept" style="font-size: 0.8rem; text-transform: uppercase; color: var(--text-muted);">
-        Dział (Department)
+        Dział
       </label>
       <select id="emp-filter-dept" class="form-control" onchange="applyEmployeeFilters()">
         <option value="">Wszystkie działy</option>
@@ -105,13 +135,14 @@
 <!-- Karta z tabelą pracowników -->
 <div class="card" style="padding: 0; overflow: hidden;">
   <div class="pr-legend" aria-label="Legenda kolumny Obecność">
-    <b>Obecność (bieżący tydzień):</b>
+    <b>Obecność w bieżącym tygodniu:</b>
     <span><i class="pr-day plan"></i> zaplanowany</span>
     <span><i class="pr-day ok"></i> obecny zgodnie z harmonogramem</span>
     <span><i class="pr-day diff"></i> obecny inaczej niż w harmonogramie</span>
     <span><i class="pr-day absent"></i> nieobecny</span>
     <span><i class="pr-day absplan"></i> zgłoszona nieobecność</span>
     <span><i class="pr-day none"></i> brak zaplanowanych godzin</span>
+    <span><i class="pr-day split"><i class="pr-h plan"></i><i class="pr-h absplan"></i></i> dwie zmiany w dniu - każda połówka osobno</span>
   </div>
   <div style="overflow-x: auto;">
     <table class="users-table emp-table" style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.9rem;">
@@ -196,9 +227,18 @@
           <input type="text" id="form-emp-login" class="form-control" placeholder="np. jko" autocomplete="off" oninput="employeeLoginEdited()" />
           <small id="form-emp-login-hint" style="display: block; margin-top: 4px; color: var(--text-muted); font-size: 0.75rem;"></small>
         </div>
-        <div class="form-group">
+        <!-- nowy pracownik: hasło startowe -->
+        <div class="form-group" id="emp-pass-group">
           <label for="form-emp-password">Hasło</label>
           <input type="text" id="form-emp-password" class="form-control" autocomplete="off" />
+        </div>
+        <!-- edycja: tylko reset hasła na 123456 (przy logowaniu trzeba ustawić nowe) -->
+        <div class="form-group" id="emp-reset-group" style="display: none;">
+          <label>Hasło</label>
+          <button type="button" id="btn-reset-emp-password" class="btn-secondary account-reset-btn" data-kind="employee" onclick="resetAccountPassword(this)">
+            <i class="fa-solid fa-key"></i> Resetuj hasło
+          </button>
+          <small id="emp-reset-hint" style="display: block; color: var(--text-muted); font-size: 0.75rem; margin-top: 4px;">Hasło zostanie ustawione na „123456”, a przy logowaniu trzeba będzie ustawić nowe.</small>
         </div>
       </div>
 

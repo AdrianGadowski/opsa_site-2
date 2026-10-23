@@ -222,6 +222,22 @@ async function opToggleLock(month, lock) {
   opHideLockMsg();
 
   try {
+    // Miesiąca z niezatwierdzonymi raportami nie da się zamknąć (sql/34; baza i tak to sprawdza)
+    if (lock && typeof rpaInstalled === "function" && rpaInstalled()) {
+      const { data: left, error: leftErr } = await supabaseClient.rpc("app_report_unapproved_in_month", { p_key: key });
+      if (leftErr) throw leftErr;
+      const c = (Array.isArray(left) ? left[0] : left) || {};
+      const pending = Number(c.pending) || 0, rejected = Number(c.rejected) || 0;
+      if (pending + rejected > 0) {
+        opShowLockMsg(`Nie można zablokować miesiąca ${opMonthLabel(key)} — są w nim niezatwierdzone raporty: ` +
+          `w oczekiwaniu na zatwierdzenie: ${pending}, do poprawy: ${rejected}. ` +
+          "Najpierw trzeba je zatwierdzić (Lista raportów → W oczekiwaniu / Do poprawy).");
+        opLockBusy = false;
+        opRenderLocks();         // suwak wraca na "odblokowany"
+        return;
+      }
+    }
+
     const { data, error } = await supabaseClient
       .from(OP_PERIODS_TABLE)
       .update(payload)

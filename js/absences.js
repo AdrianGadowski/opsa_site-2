@@ -335,7 +335,9 @@ function abSetBadge(count) {
   const text = n > 99 ? "99+" : String(n);
   const bell = document.getElementById("ab-bell");
   if (bell) {
-    bell.style.display = abCanReview() ? "" : "none";
+    // dzwonek = włącznik powiadomień, więc ma go każdy zalogowany użytkownik
+    // (komunikaty, raporty do poprawy); liczba zgłoszeń tylko u mistrza i administratora
+    bell.style.display = typeof currentUser !== "undefined" && currentUser ? "" : "none";
     bell.classList.toggle("has", n > 0);
     // kolor dzwonka = stan powiadomień (push.js); liczba = zgłoszenia do rozpatrzenia
     bell.dataset.count = String(n);

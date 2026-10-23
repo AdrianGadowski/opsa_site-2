@@ -45,7 +45,7 @@ self.addEventListener("notificationclick", (event) => {
     for (const client of list) {
       if (client.url.startsWith(self.registration.scope)) {
         await client.focus();
-        if (view) client.postMessage({ type: "open-view", view });
+        if (view) client.postMessage({ type: "open-view", view, tab: target.searchParams.get("tab") });
         return;
       }
     }

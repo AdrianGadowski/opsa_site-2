@@ -340,3 +340,64 @@
   .menu-label,
   .sidebar .menu-btn i { animation: none !important; transition: none !important; }
 }
+/* ---------- Pozycja z zakładkami: Lista raportów (js/report_approval.js) ----------
+   Na widoku raportów pozycja się rozwija w dół w trzy zakładki. Liczniki: żółty - w oczekiwaniu
+   na zatwierdzenie, czerwony - do poprawy. Gdy pozycja jest zwinięta, liczniki stoją przy niej,
+   a po rozwinięciu przy zakładkach. Zwinięty panel pokazuje tylko ikonę (z licznikami). */
+.sidebar .menu-btn i.menu-caret {
+  width: auto; margin: 0 0 0 8px; font-size: 0.68rem; opacity: 0.7;
+  transition: transform 0.3s ease, opacity 0.2s;
+}
+.sidebar .menu-btn:hover i.menu-caret { transform: none; color: inherit; }
+.sidebar .menu-item.has-sub.open > .menu-btn i.menu-caret { transform: rotate(180deg); }
+.rpa-badges { margin-left: auto; display: inline-flex; gap: 4px; }
+.rpa-badge {
+  min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; box-sizing: border-box;
+  font-size: 0.68rem; font-weight: 800; line-height: 18px; text-align: center; font-style: normal;
+}
+.rpa-badge.pending { background: #FCD444; color: #03241E; }
+.rpa-badge.rejected { background: var(--danger); color: #fff; }
+.sidebar .menu-item.has-sub.open > .menu-btn .rpa-badges { display: none; }
+
+.sidebar .menu-sub {
+  list-style: none; margin: 0 0 0 26px; padding: 0 0 0 8px;
+  border-left: 1px solid rgba(255, 255, 255, 0.14);
+  max-height: 0; opacity: 0; overflow: hidden;
+  transition: max-height 0.32s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s ease, margin 0.32s ease;
+}
+.sidebar .menu-item.has-sub.open .menu-sub { max-height: 200px; opacity: 1; margin-top: 4px; margin-bottom: 4px; }
+.sidebar .menu-sub li { margin: 2px 0; }
+.sidebar .menu-sub li[hidden] { display: none; }
+.sidebar .menu-sub-btn {
+  position: relative; display: flex; align-items: center; gap: 10px; width: 100%;
+  padding: 9px 10px; border: none; border-radius: 8px; background: transparent; cursor: pointer;
+  font-family: inherit; font-size: 0.84rem; font-weight: 600; text-align: left; white-space: nowrap;
+  color: rgba(255, 255, 255, 0.66); transition: background-color 0.2s, color 0.2s;
+}
+.sidebar .menu-sub-btn i { width: 16px; text-align: center; font-size: 0.8rem; }
+.sidebar .menu-sub-btn .rpa-badge { margin-left: auto; }
+.sidebar .menu-sub-btn:hover { background: rgba(255, 255, 255, 0.08); color: #fff; }
+.sidebar .menu-sub-btn:focus-visible { outline: 2px solid #FCD444; outline-offset: -2px; }
+.sidebar .menu-sub-btn.active { color: #FCD444; background: rgba(252, 212, 68, 0.1); }
+.sidebar .menu-sub-btn.active::before {
+  content: ""; position: absolute; left: -9px; top: 8px; bottom: 8px; width: 3px; border-radius: 3px; background: #FCD444;
+}
+
+/* zwinięty panel: bez zakładek i strzałki, liczniki małe w rogu ikony */
+.sidebar.collapsed .menu-sub,
+.sidebar.collapsed .menu-btn i.menu-caret { display: none; }
+.sidebar.collapsed .rpa-badges,
+.sidebar.collapsed .menu-item.has-sub.open > .menu-btn .rpa-badges {
+  display: inline-flex; position: absolute; top: 3px; right: 3px; margin: 0; gap: 2px;
+}
+.sidebar.collapsed .rpa-badge { min-width: 14px; height: 14px; padding: 0 3px; font-size: 0.56rem; line-height: 14px; }
+
+/* telefon: kropka na przycisku menu, gdy są raporty do zatwierdzenia albo poprawy */
+.topbar-menu-btn.rpa-dot::before {
+  content: ""; position: absolute; top: 6px; left: 6px; width: 9px; height: 9px; border-radius: 50%;
+  background: #F59E0B; box-shadow: 0 0 0 2px #fff;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sidebar .menu-sub, .sidebar .menu-btn i.menu-caret { transition: none; }
+}

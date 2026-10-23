@@ -47,9 +47,11 @@
     const skipAnimation = instant || !wasVisible;
     if (skipAnimation) indicator.classList.add("no-anim");
 
-    indicator.style.width = active.offsetWidth + "px";
-    indicator.style.height = active.offsetHeight + "px";
-    indicator.style.transform = `translate(${active.offsetLeft}px, ${active.offsetTop}px)`;
+    // pozycja z zakładkami (Lista raportów): wskaźnik tylko pod jej przyciskiem, bez rozwiniętych zakładek
+    const target = active.querySelector(":scope > .menu-btn") || active;
+    indicator.style.width = target.offsetWidth + "px";
+    indicator.style.height = target.offsetHeight + "px";
+    indicator.style.transform = `translate(${active.offsetLeft + target.offsetLeft}px, ${active.offsetTop + target.offsetTop}px)`;
     indicator.classList.add("visible");
 
     if (skipAnimation) {
@@ -77,6 +79,10 @@
     new ResizeObserver(() => placeIndicator(true)).observe(list);
   }
   window.addEventListener("resize", () => placeIndicator(true));
+  // zakładki Listy raportów zwinęły się albo rozwinęły - pozycje pod nimi się przesunęły
+  list.addEventListener("transitionend", (e) => {
+    if (e.target.classList && e.target.classList.contains("menu-sub") && e.propertyName === "max-height") placeIndicator(false);
+  });
 
   // ---------- 3. Zwijanie panelu ----------
   const toggleBtn = document.createElement("button");

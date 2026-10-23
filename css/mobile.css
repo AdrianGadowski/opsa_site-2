@@ -131,3 +131,12 @@
 @media (max-width: 768px) and (prefers-reduced-motion: reduce) {
   .sidebar, .sidebar-backdrop { transition: none; }
 }
+
+/* Telefon: pozycja z zakładkami (Lista raportów) jak w pełnym panelu, także gdy na komputerze był zwinięty */
+@media (max-width: 768px) {
+  .sidebar.collapsed .menu-sub { display: block; }
+  .sidebar.collapsed .menu-btn i.menu-caret { display: inline-block; }
+  .sidebar.collapsed .rpa-badges { position: static; margin-left: auto; gap: 4px; }
+  .sidebar.collapsed .menu-item.has-sub.open > .menu-btn .rpa-badges { display: none; }
+  .sidebar.collapsed .rpa-badge { min-width: 18px; height: 18px; padding: 0 5px; font-size: 0.68rem; line-height: 18px; }
+}

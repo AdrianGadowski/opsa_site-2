@@ -329,13 +329,15 @@ async function epLoad(userAction) {
   });
 
   try {
+    // pracownik widzi tylko godziny z zatwierdzonych raportów (sql/34; przed nim - wszystkie)
+    const approved = await rpaApprovedOnly();
     const [lockState, rows] = await Promise.all([
       lockPromise,
-      rpFetchAll(() => supabaseClient
+      rpFetchAll(() => rpaFilterApproved(supabaseClient
         .from("work_reports")
         .select("id, report_date, shift, start_time, end_time, total_hours, at_work, number_report")
         .eq("first_name_id", epEmployee.id)
-        .like("report_date", `%.${month}.${year}`))
+        .like("report_date", `%.${month}.${year}`), approved))
     ]);
     if (token !== epLoadToken) return; // zmieniono miesiąc albo wylogowano
 

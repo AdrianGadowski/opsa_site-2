@@ -170,8 +170,12 @@ async function shLoad() {
   shWeek = dbWeekOfYear(shMonday.getFullYear(), shMonday.getMonth() + 1, shMonday.getDate());
   shYear = shMonday.getFullYear();
 
+  // numer tygodnia i daty osobno - na telefonie stoją jedno pod drugim
   const label = document.getElementById("sh-week-label");
-  if (label) label.textContent = shWeekTitle();
+  if (label) {
+    const [week, dates] = shWeekTitle().split(" • ");
+    label.innerHTML = `<b>${rtEsc(week)}</b><span class="dot">•</span><span class="dates">${rtEsc(dates)}</span>`;
+  }
   const todayBtn = document.getElementById("sh-today");
   if (todayBtn) todayBtn.disabled = shDays.some(d => d.today);
 
@@ -320,20 +324,25 @@ function shEntryView(list) {
     cls: anyAbsence ? (list.every(e => e.kind === "absence") ? "absence" : "work mixed") : "work two",
     main: list.map(shEntryLabel).join("+"),
     sub: joined ? `${a.time_from}–${b.time_to}` : "2 wpisy",
+    from: joined ? a.time_from : "", to: joined ? b.time_to : "",
     title: views.map(v => v.title).join(" • ")
   };
 }
 
-// Wygląd jednego wpisu
+// Wygląd jednego wpisu: { cls, main, sub, title } oraz from / to, gdy pod spodem są godziny
+// (na telefonie godzina rozpoczęcia i zakończenia stoją jedna pod drugą)
 function shSingleView(e) {
   if (e.kind === "off") return { cls: "off", main: "Wolne", sub: "", title: "Wolne" };
   if (e.kind === "absence") {
     const hours = e.time_from && e.time_to ? `${e.time_from}–${e.time_to}` : "";
-    return { cls: "absence", main: "Nieob.", sub: hours || e.note || "", title: `Zgłoszona nieobecność${e.note ? ": " + e.note : ""}${hours ? ", godz. " + hours : ""}` };
+    return {
+      cls: "absence", main: "Nieob.", sub: hours || e.note || "", from: hours ? e.time_from : "", to: hours ? e.time_to : "",
+      title: `Zgłoszona nieobecność${e.note ? ": " + e.note : ""}${hours ? ", godz. " + hours : ""}`
+    };
   }
   const preset = SH_PRESETS.find(p => p.from === e.time_from && p.to === e.time_to);
   if (preset) {
-    return { cls: "work", main: preset.label, sub: `${e.time_from}–${e.time_to}`, title: `Zmiana ${preset.label}: ${e.time_from}–${e.time_to}` };
+    return { cls: "work", main: preset.label, sub: `${e.time_from}–${e.time_to}`, from: e.time_from, to: e.time_to, title: `Zmiana ${preset.label}: ${e.time_from}–${e.time_to}` };
   }
   // inne godziny niż pełna zmiana: zmiana na górze, godziny pod spodem (pogrubione)
   const shift = shShiftLabel(e.time_from);
@@ -341,8 +350,17 @@ function shSingleView(e) {
     cls: "work custom",
     main: shift || e.time_from,
     sub: shift ? `${e.time_from}–${e.time_to}` : e.time_to,
+    from: shift ? e.time_from : "", to: shift ? e.time_to : "",
     title: `${shift ? `Zmiana ${shift}, inne godziny: ` : "Praca "}${e.time_from}–${e.time_to}`
   };
+}
+
+// Podpis pod nazwą zmiany: godziny jako dwie części (od, do) albo zwykły tekst
+function shSubHtml(v) {
+  if (v.from && v.to) {
+    return `<span class="s hrs"><span>${rtEsc(v.from)}</span><span class="dash">–</span><span>${rtEsc(v.to)}</span></span>`;
+  }
+  return v.sub ? `<span class="s">${rtEsc(v.sub)}</span>` : "";
 }
 
 // Kratka = pracownik + dzień + zmiana (slot 1 albo 2)
@@ -382,7 +400,7 @@ function shCellBtn(emp, day, r, c, slot) {
       data-r="${r * 2 + slot - 1}" data-c="${c}"
       title="${rtEsc(v.title)}" aria-pressed="${sel}" aria-label="${rtEsc(`${emp.first_name || ""} ${emp.last_name || ""}, ${SH_DAY_SHORT[c]} ${day.pl}, ${slot}. zmiana: ${v.title}`)}"
       onmousedown="shCellDown(event, this)" onmouseenter="shCellEnter(this)" onclick="shCellClick(event, this)">
-      <span class="m">${rtEsc(v.main)}</span>${v.sub ? `<span class="s">${rtEsc(v.sub)}</span>` : ""}
+      <span class="m">${rtEsc(v.main)}</span>${shSubHtml(v)}
     </button>`;
 }
 
@@ -450,7 +468,7 @@ function shRefreshCells() {
     btn.className = `sh-cell slot${slot} ${v.cls}${sel ? " sel" : ""}`;
     btn.title = v.title;
     btn.setAttribute("aria-pressed", String(sel));
-    btn.innerHTML = `<span class="m">${rtEsc(v.main)}</span>${v.sub ? `<span class="s">${rtEsc(v.sub)}</span>` : ""}`;
+    btn.innerHTML = `<span class="m">${rtEsc(v.main)}</span>${shSubHtml(v)}`;
   });
   shSyncBar();
 }

@@ -20,16 +20,16 @@
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
 
-  <link rel="stylesheet" href="css/style.css?v=20261204" />
-  <link rel="stylesheet" href="css/login.css?v=20261204" />
-  <link rel="stylesheet" href="css/menu.css?v=20261204" />
-  <link rel="stylesheet" href="css/mobile.css?v=20261204" />
-  <link rel="stylesheet" href="css/portal.css?v=20261204" />
-  <link rel="stylesheet" href="css/timepicker.css?v=20261204" />
-  <link rel="stylesheet" href="css/emp_lists.css?v=20261204" />
-  <link rel="stylesheet" href="css/absences.css?v=20261204" />
-  <link rel="stylesheet" href="css/messages.css?v=20261204" />
-  <link rel="stylesheet" href="css/login-v2.css?v=20261204" />
+  <link rel="stylesheet" href="css/style.css?v=20261226" />
+  <link rel="stylesheet" href="css/login.css?v=20261226" />
+  <link rel="stylesheet" href="css/menu.css?v=20261226" />
+  <link rel="stylesheet" href="css/mobile.css?v=20261226" />
+  <link rel="stylesheet" href="css/portal.css?v=20261226" />
+  <link rel="stylesheet" href="css/timepicker.css?v=20261226" />
+  <link rel="stylesheet" href="css/emp_lists.css?v=20261226" />
+  <link rel="stylesheet" href="css/absences.css?v=20261226" />
+  <link rel="stylesheet" href="css/messages.css?v=20261226" />
+  <link rel="stylesheet" href="css/login-v2.css?v=20261226" />
 </head>
 <body>
 
@@ -247,10 +247,18 @@
             <i class="fa-solid fa-clock"></i> Rozliczanie czasu
           </button>
         </li>
-        <li class="menu-item" data-tab="reports" id="nav-reports" style="display: none;">
-          <button class="menu-btn" onclick="navigateTo('reports')">
+        <!-- Lista raportów: rozwija się w trzy zakładki; liczniki raportów do zatwierdzenia i do poprawy (js/report_approval.js) -->
+        <li class="menu-item has-sub" data-tab="reports" id="nav-reports" style="display: none;">
+          <button class="menu-btn" onclick="rpaOpenTab()" aria-expanded="false">
             <i class="fa-solid fa-file-lines"></i> Lista raportów
+            <span class="rpa-badges" aria-hidden="true"><span class="rpa-badge pending" style="display: none;"></span><span class="rpa-badge rejected" style="display: none;"></span></span>
+            <i class="fa-solid fa-chevron-down menu-caret" aria-hidden="true"></i>
           </button>
+          <ul class="menu-sub">
+            <li><button type="button" class="menu-sub-btn" data-rtab="archive" onclick="rpaOpenTab('archive')"><i class="fa-solid fa-box-archive"></i><span>Zatwierdzone</span></button></li>
+            <li><button type="button" class="menu-sub-btn" data-rtab="pending" onclick="rpaOpenTab('pending')"><i class="fa-solid fa-hourglass-half"></i><span>W oczekiwaniu</span><span class="rpa-badge pending" style="display: none;"></span></button></li>
+            <li><button type="button" class="menu-sub-btn" data-rtab="rejected" onclick="rpaOpenTab('rejected')"><i class="fa-solid fa-rotate-left"></i><span>Do poprawy</span><span class="rpa-badge rejected" style="display: none;"></span></button></li>
+          </ul>
         </li>
         <li class="menu-item" data-tab="absences" id="nav-absences" style="display: none;">
           <button class="menu-btn" onclick="navigateTo('absences')">
@@ -302,7 +310,7 @@
         <button type="button" class="ab-bell msg-env" data-msg-env style="display: none;" onclick="msgOpenInbox()" title="Komunikaty" aria-label="Komunikaty">
           <i class="fa-solid fa-envelope"></i><span class="ab-badge msg-badge" style="display: none;"></span>
         </button>
-        <!-- Zgłoszenia nieobecności do rozpatrzenia (mistrz, administrator) - js/absences.js -->
+        <!-- Włącznik powiadomień push (każdy użytkownik) z liczbą zgłoszeń nieobecności do rozpatrzenia (mistrz, administrator) - js/absences.js, js/push.js -->
         <button type="button" id="ab-bell" class="ab-bell" style="display: none;" onclick="pushToggle()" title="Powiadomienia" aria-label="Powiadomienia" aria-pressed="false">
           <i class="fa-solid fa-bell"></i><span class="ab-badge" style="display: none;"></span>
         </button>
@@ -843,28 +851,29 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="js/app.js?v=20261204"></script>
-  <script src="js/login-fx.js?v=20261204"></script>
-  <script src="js/login-v2.js?v=20261204"></script>
-  <script src="js/menu-fx.js?v=20261204"></script>
-  <script src="js/mobile.js?v=20261204"></script>
-  <script src="js/report_time.js?v=20261204"></script>
-  <script src="js/emp_lists.js?v=20261204"></script>
-  <script src="js/reports.js?v=20261204"></script>
-  <script src="js/updates.js?v=20261204"></script>
-  <script src="js/dashboard.js?v=20261204"></script>
-  <script src="js/schedule.js?v=20261204"></script>
-  <script src="js/employee_presence.js?v=20261204"></script>
-  <script src="js/user.js?v=20261204"></script>
-  <script src="js/employee_hours.js?v=20261204"></script>
-  <script src="js/options.js?v=20261204"></script>
-  <script src="js/logs.js?v=20261204"></script>
-  <script src="js/employee_portal.js?v=20261204"></script>
-  <script src="js/absences.js?v=20261204"></script>
-  <script src="js/push.js?v=20261204"></script>
-  <script src="js/messages.js?v=20261204"></script>
-  <script src="js/zalew.js?v=20261204"></script>
-  <script src="js/password.js?v=20261204"></script>
-  <script src="js/pwa.js?v=20261204"></script>
+  <script src="js/app.js?v=20261226"></script>
+  <script src="js/login-fx.js?v=20261226"></script>
+  <script src="js/login-v2.js?v=20261226"></script>
+  <script src="js/menu-fx.js?v=20261226"></script>
+  <script src="js/mobile.js?v=20261226"></script>
+  <script src="js/report_time.js?v=20261226"></script>
+  <script src="js/emp_lists.js?v=20261226"></script>
+  <script src="js/reports.js?v=20261226"></script>
+  <script src="js/report_approval.js?v=20261226"></script>
+  <script src="js/updates.js?v=20261226"></script>
+  <script src="js/dashboard.js?v=20261226"></script>
+  <script src="js/schedule.js?v=20261226"></script>
+  <script src="js/employee_presence.js?v=20261226"></script>
+  <script src="js/user.js?v=20261226"></script>
+  <script src="js/employee_hours.js?v=20261226"></script>
+  <script src="js/options.js?v=20261226"></script>
+  <script src="js/logs.js?v=20261226"></script>
+  <script src="js/employee_portal.js?v=20261226"></script>
+  <script src="js/absences.js?v=20261226"></script>
+  <script src="js/push.js?v=20261226"></script>
+  <script src="js/messages.js?v=20261226"></script>
+  <script src="js/zalew.js?v=20261226"></script>
+  <script src="js/password.js?v=20261226"></script>
+  <script src="js/pwa.js?v=20261226"></script>
 </body>
 </html>

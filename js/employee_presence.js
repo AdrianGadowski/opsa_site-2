@@ -90,17 +90,74 @@ async function prLoad() {
 // Opis jednego wpisu harmonogramu
 function prPlanText(p) {
   if (p.kind === "work") return `zaplanowano ${p.time_from}–${p.time_to}`;
+  if (p.kind === "extra") return `poza harmonogramem ${p.time_from}–${p.time_to}`;
   if (p.kind === "off") return "wolne w harmonogramie";
   return `zgłoszona nieobecność${p.note ? " (" + p.note + ")" : ""}${p.time_from ? ", godz. " + p.time_from + "–" + p.time_to : ""}`;
 }
 
-// Stan jednego dnia: { cls, text }. Dzień może mieć 1 albo 2 wpisy (np. zmiana I i II).
+// Zmiany dnia, od wcześniejszej: zaplanowane w harmonogramie (np. I i II albo I i III) oraz
+// przepracowane poza harmonogramem - raport, który nie pokrywa się z żadną zaplanowaną zmianą
+// (np. zaplanowana I, a w raporcie także II). Takie zmiany mają kind "extra".
+function prDayShifts(plans, rows) {
+  const planned = plans.filter(p => p.kind !== "off" && p.time_from && p.time_to);
+  const ranges = planned.map(p => rtRange(p.time_from, p.time_to));
+  const extra = [];
+  rows.forEach(r => {
+    if (!r.start_time || !r.end_time) return;
+    const rr = rtRange(r.start_time, r.end_time);
+    if (ranges.some(x => rtOverlap(x, rr))) return;
+    // kilka nakładających się raportów spoza planu to jedna zmiana
+    const same = extra.find(x => rtOverlap(rtRange(x.time_from, x.time_to), rr));
+    if (!same) extra.push({ kind: "extra", time_from: r.start_time, time_to: r.end_time });
+  });
+  return [...planned, ...extra].sort((a, b) => rtToMin(a.time_from) - rtToMin(b.time_from));
+}
+
+// Stan każdej z dwóch zmian osobno. Raport należy do zmiany, z którą pokrywa się godzinowo
+// (zmiana III liczy się do dnia, w którym się zaczyna - tak jak w harmonogramie i raportach).
+function prHalfStates(shifts, rows) {
+  const ranges = shifts.map(p => rtRange(p.time_from, p.time_to));
+  const mine = shifts.map(() => []);
+  const loose = [];   // raporty w godzinach poza obiema zmianami
+  rows.forEach(r => {
+    const k = r.start_time && r.end_time ? ranges.findIndex(x => rtOverlap(x, rtRange(r.start_time, r.end_time))) : -1;
+    (k < 0 ? loose : mine[k]).push(r);
+  });
+  return shifts.map((p, k) => {
+    const present = mine[k].filter(r => r.at_work !== false);
+    // zmiana spoza harmonogramu: przepracowana - "inaczej niż w harmonogramie", inaczej nieobecny
+    if (p.kind === "extra") return present.length ? "diff" : "absent";
+    if (present.length) {
+      const exact = p.kind === "work" && present.some(r => r.start_time === p.time_from && r.end_time === p.time_to);
+      return exact ? "ok" : "diff";
+    }
+    if (mine[k].length) return "absent";
+    if (loose.some(r => r.at_work !== false)) return "diff";   // pracował, ale w innych godzinach
+    return p.kind === "absence" ? "absplan" : "plan";
+  });
+}
+
+// Stan jednego dnia: { cls, text } albo przy dwóch zmianach o różnym stanie
+// { cls: "split", halves: [stan lewej, stan prawej], shifts, text }.
 function prDayState(empId, day, index) {
   const plans = (prSchedule[empId] || {})[day.iso] || [];
   const works = plans.filter(p => p.kind === "work");
   const rows = (prReports[empId] || {})[day.pl] || [];
   const planText = plans.length ? plans.map(prPlanText).join(" + ") : "brak zaplanowanych godzin";
   const head = `${PR_DAY_NAMES[index]} ${day.pl}`;
+
+  // dwie zmiany (zaplanowane albo przepracowane poza planem): kafelek z dwiema połówkami,
+  // każda ze stanem swojej zmiany (gdy obie mają ten sam stan, kafelek jest zwykły, jednokolorowy)
+  const shifts = prDayShifts(plans, rows);
+  if (shifts.length === 2) {
+    const halves = prHalfStates(shifts, rows);
+    if (halves[0] !== halves[1]) {
+      return {
+        cls: "split", halves, shifts,
+        text: `${head}: ` + shifts.map((p, k) => `${prPlanText(p)} — ${PR_STATE_LABELS[halves[k]].toLowerCase()}`).join("; ")
+      };
+    }
+  }
 
   const present = rows.filter(r => r.at_work !== false);
   const absent = rows.filter(r => r.at_work === false);
@@ -126,13 +183,20 @@ function prCellHtml(empId) {
   }
   return `<div class="pr-week">${prDays.map((day, i) => {
     const s = prDayState(empId, day, i);
-    return `<span class="pr-day ${s.cls}${day.today ? " today" : ""}" tabindex="0" data-emp="${rtEsc(empId)}" data-i="${i}" aria-label="${rtEsc(s.text)}"
-      onmouseenter="prTipShow(this)" onmouseleave="prTipHide()" onfocus="prTipShow(this)" onblur="prTipHide()" onclick="prTipShow(this)">${PR_DAY_LABELS[i]}</span>`;
+    // dwie zmiany o różnym stanie: dwie połówki, a napis w kolorach obu (l-… / r-…)
+    const split = s.cls === "split";
+    const cls = split ? `split l-${s.halves[0]} r-${s.halves[1]}` : s.cls;
+    const inner = split
+      ? `<i class="pr-h ${s.halves[0]}"></i><i class="pr-h ${s.halves[1]}"></i><b class="pr-lbl">${PR_DAY_LABELS[i]}</b>`
+      : PR_DAY_LABELS[i];
+    return `<span class="pr-day ${cls}${day.today ? " today" : ""}" tabindex="0" data-emp="${rtEsc(empId)}" data-i="${i}" aria-label="${rtEsc(s.text)}"
+      onmouseenter="prTipShow(this)" onmouseleave="prTipHide()" onfocus="prTipShow(this)" onblur="prTipHide()" onclick="prTipShow(this)">${inner}</span>`;
   }).join("")}</div>`;
 }
 
 function prFillCells() {
   document.querySelectorAll("#employees-table-body td.pr-cell[data-emp]").forEach(td => {
+    td.dataset.range = prWeekLabel();   // na telefonie: "Obecność 19.10–25.10" nad kafelkami
     td.innerHTML = prCellHtml(td.dataset.emp);
   });
 }
@@ -168,8 +232,11 @@ function prTipShow(tile) {
   if (!day) return;
 
   const s = prDayState(empId, day, i);
-  const plans = ((prSchedule[empId] || {})[day.iso] || []).slice().sort((a, b) => (a.slot || 1) - (b.slot || 1));
-  const rows = (prReports[empId] || {})[day.pl] || [];
+  // od najwcześniejszej zmiany - tak jak połówki kafelka (cały dzień / wolne na początku)
+  const startMin = p => (p.time_from ? rtToMin(p.time_from) : -1);
+  const plans = ((prSchedule[empId] || {})[day.iso] || []).slice().sort((a, b) => startMin(a) - startMin(b));
+  const rows = ((prReports[empId] || {})[day.pl] || []).slice()
+    .sort((a, b) => (a.start_time ? rtToMin(a.start_time) : -1) - (b.start_time ? rtToMin(b.start_time) : -1));
   const emp = (typeof cachedEmployees !== "undefined" ? cachedEmployees : []).find(e => String(e.id) === String(empId));
   const name = emp ? `${emp.first_name || ""} ${emp.last_name || ""}`.trim() : "";
 
@@ -186,10 +253,20 @@ function prTipShow(tile) {
   const reportLine = r => `<div class="row"><span class="tag ${r.at_work === false ? "absence" : "work"}">${r.at_work === false ? "Nieobecny" : "Obecny"}</span>
     <span>${rtEsc(r.start_time || "?")}–${rtEsc(r.end_time || "?")}</span></div>`;
 
+  // dwie zmiany o różnym stanie: osobna ocena każdej (lewa połówka - wcześniejsza zmiana)
+  const shiftName = p => {
+    const preset = SH_PRESETS.find(x => x.from === p.time_from && x.to === p.time_to);
+    const label = preset ? preset.label : (typeof shShiftLabel === "function" ? shShiftLabel(p.time_from) : "");
+    return (label ? `Zmiana ${label}` : `${p.time_from}–${p.time_to}`) + (p.kind === "extra" ? " (poza harmonogramem)" : "");
+  };
+  const stateHtml = s.cls === "split"
+    ? s.shifts.map((p, k) => `<div class="state ${s.halves[k]}">${rtEsc(shiftName(p))}: ${rtEsc(PR_STATE_LABELS[s.halves[k]].toLowerCase())}</div>`).join("")
+    : `<div class="state ${s.cls}">${rtEsc(PR_STATE_LABELS[s.cls] || "")}</div>`;
+
   const el = prTipEl();
   el.innerHTML = `
     <div class="head"><b>${rtEsc(PR_DAY_NAMES[i])} ${rtEsc(day.pl)}</b>${name ? `<span>${rtEsc(name)}</span>` : ""}</div>
-    <div class="state ${s.cls}">${rtEsc(PR_STATE_LABELS[s.cls] || "")}</div>
+    ${stateHtml}
     <div class="sec">Harmonogram</div>
     ${plans.length ? plans.map(planLine).join("") : `<div class="row muted">nic nie zaplanowano</div>`}
     <div class="sec">Raporty</div>

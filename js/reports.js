@@ -24,6 +24,15 @@ let rpDateEdit = null;       // nowa data raportu (rrrr-mm-dd) czekająca na "Za
 let rpPendingDelete = null;  // { type: "report", number, label, date } | { type: "row", id, date }
 let rpLockedKeys = new Set(); // zablokowane miesiące "RRRR-MM" (Opcje -> Blokada miesiąca)
 let rpDeleteTimer = null;
+let rpSelected = new Set();  // raporty zaznaczone do zatwierdzenia (zakładka "W oczekiwaniu")
+let rpAction = null;         // { type: "reject" | "unapprove" | "resubmit", number } - okno potwierdzenia
+
+// Zakładki widoku (report_approval.js): archive - zatwierdzone, pending - w oczekiwaniu, rejected - do poprawy
+const RP_TAB_HERO = {
+  archive: ["Archiwum", "Lista raportów", "Archiwum zatwierdzonych raportów czasu pracy. Zatwierdzonego raportu nie można zmienić ani usunąć, dopóki osoba z uprawnieniem nie cofnie zatwierdzenia."],
+  pending: ["Zatwierdzanie", "W oczekiwaniu na zatwierdzenie", "Raporty czekające na zatwierdzenie, z wszystkich miesięcy. Do czasu zatwierdzenia autor może je edytować; nie liczą się jeszcze w statystykach."],
+  rejected: ["Poprawki", "Raporty do poprawy", "Raporty odesłane do poprawy, z powodem odrzucenia. Po poprawieniu autor wysyła raport ponownie do zatwierdzenia."]
+};
 
 // ---------- Pomocnicze ----------
 function rpHours(row) {
@@ -84,9 +93,16 @@ async function rpFetchAll(build) {
 async function initReportsView() {
   rpCurrent = null;
   rpReports = [];
+  rpSelected = new Set();
 
   const now = new Date();
   rpSetPeriod(now.getFullYear(), now.getMonth() + 1);
+
+  // zakładka z menu (albo z powiadomienia); niedostępna - pierwsza dostępna
+  const tabs = rpaTabs();
+  if (!tabs.includes(rpaTab)) rpaTab = tabs[0] || "archive";
+  rpaSyncMenu("reports");
+  rpApplyTab();
 
   try {
     const [users, employees, depts] = await Promise.all([
@@ -119,6 +135,56 @@ async function initReportsView() {
   await rpLoad();
 }
 
+// ---------- Zakładki ----------
+// Przełączenie zakładki na otwartym widoku (zakładki w menu - rpaOpenTab)
+function rpSetTab(tab) {
+  rpaTab = tab;
+  rpSelected = new Set();
+  rpApplyTab();
+  rpLoad();
+}
+
+// Nagłówek, wybór miesiąca (tylko w archiwum - kolejki pokazują wszystkie miesiące) i zaznaczona zakładka
+function rpApplyTab() {
+  const [eyebrow, title, desc] = RP_TAB_HERO[rpaTab] || RP_TAB_HERO.archive;
+  const set = (id, text) => { const el = document.getElementById(id); if (el) el.textContent = text; };
+  set("rp-hero-eyebrow", eyebrow);
+  set("rp-hero-title", title);
+  // przed sql/34 lista pokazuje wszystkie raporty, jak dawniej
+  set("rp-hero-desc", rpaInstalled() ? desc
+    : "Raporty czasu pracy. Raport można podejrzeć, edytować (dodać lub usunąć pracownika) albo usunąć w całości.");
+  const pick = document.getElementById("rp-periodpick");
+  if (pick) pick.style.display = rpaTab === "archive" ? "" : "none";
+  const tbody = document.getElementById("rp-table-body");
+  if (tbody) {
+    tbody.innerHTML = `<tr><td colspan="12" style="text-align: center; padding: 30px; color: var(--text-muted);">
+      <i class="fa-solid fa-spinner fa-spin"></i> Ładowanie raportów...</td></tr>`;
+  }
+  rpRenderHead();
+  rpSyncBulk();
+}
+
+// Stan raportu (przed sql/34 każdy raport traktowany jak dawniej: bez zatwierdzania)
+function rpStatus(rep) {
+  return rpaInstalled() ? rep.status || "pending" : null;
+}
+
+// Edycja i usuwanie: autor albo administrator, miesiąc niezablokowany, raport niezatwierdzony
+function rpCanEdit(rep) {
+  return canModifyReport(rep.creatorId) &&
+    !rpLockedKeys.has(opPeriodKeyFromPl(rep.date)) &&
+    rpStatus(rep) !== "approved";
+}
+
+// "05.10.2026, 14:32" z daty i godziny w bazie
+function rpDateTime(iso) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (isNaN(d)) return "";
+  const p = n => String(n).padStart(2, "0");
+  return `${p(d.getDate())}.${p(d.getMonth() + 1)}.${d.getFullYear()}, ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
 // ---------- Lista raportów ----------
 function rpGroup(rows) {
   const map = new Map();
@@ -132,6 +198,14 @@ function rpGroup(rows) {
         creatorId: r.add_first_name_id,
         departmentId: r.id_department ?? null,
         created: r.add_data,
+        // zatwierdzanie (sql/34) - na każdym wierszu raportu jest to samo
+        status: r.approval_status ?? null,
+        approvedBy: r.approved_by ?? null,
+        approvedAt: r.approved_at ?? null,
+        rejectedBy: r.rejected_by ?? null,
+        rejectedAt: r.rejected_at ?? null,
+        reason: r.reject_reason ?? null,
+        submittedAt: r.submitted_at ?? null,
         rows: [],
         empIds: new Set(),
         present: 0,
@@ -147,6 +221,12 @@ function rpGroup(rows) {
 
   const num = r => Number(r.number) || 0;
   const reports = [...map.values()];
+
+  // Kolejki (w oczekiwaniu, do poprawy): od najstarszego raportu, bez numeru w miesiącu
+  // (są w nich raporty z różnych miesięcy, więc numer w miesiącu byłby mylący)
+  if (rpaTab !== "archive") {
+    return reports.sort((a, b) => rpDateKey(a.date).localeCompare(rpDateKey(b.date)) || num(a) - num(b));
+  }
 
   // Numer kolejny w miesiącu: od najstarszego raportu (data raportu, potem numer z bazy)
   const counters = {};
@@ -164,9 +244,9 @@ function rpGroup(rows) {
   );
 }
 
-// "numer w miesiącu (numer z bazy)"
+// "numer w miesiącu (numer z bazy)"; w kolejkach sam numer z bazy
 function rpLabel(rep) {
-  return `${rep.seq} (${rep.number})`;
+  return rep.seq ? `${rep.seq} (${rep.number})` : String(rep.number);
 }
 
 // ---------- Wybór miesiąca: strzałki ‹ › jak na pulpicie ----------
@@ -220,12 +300,20 @@ async function rpLoad() {
   const month = document.getElementById("rp-filter-month")?.value;
   const pattern = month ? `%.${month}.${year}` : `%.${year}`;
   const token = ++rpLoadToken;
+  const tab = rpaTab;
+
+  // Archiwum: wybrany miesiąc, tylko zatwierdzone (przed sql/34 - wszystkie raporty).
+  // Kolejki: wszystkie miesiące; zatwierdzający widzi raporty z całego zakładu, autor - swoje.
+  const build = () => {
+    // "*": działa też przed dodaniem kolumn id_department (sql/24) i statusu (sql/34)
+    let q = supabaseClient.from("work_reports").select("*");
+    if (tab === "archive") return rpaFilterApproved(q.like("report_date", pattern), rpaInstalled());
+    q = q.eq("approval_status", tab);
+    return rpaCanApprove() ? q : q.eq("add_first_name_id", currentUser.id);
+  };
 
   try {
-    const rows = await rpFetchAll(() => supabaseClient
-      .from("work_reports")
-      .select("*") // "*": działa też przed dodaniem kolumny id_department (sql/24)
-      .like("report_date", pattern));
+    const rows = await rpFetchAll(build);
     // Zablokowane miesiące: przy nich nie ma edycji ani usuwania
     let lockedKeys = new Set();
     try {
@@ -234,17 +322,20 @@ async function rpLoad() {
       // przyciski zostają, ale każda akcja i tak sprawdza blokadę w bazie
       console.error("Błąd pobierania blokad miesięcy:", lockErr);
     }
-    if (token !== rpLoadToken) return; // w międzyczasie zmieniono filtr
+    if (token !== rpLoadToken) return; // w międzyczasie zmieniono filtr albo zakładkę
     rpLockedKeys = lockedKeys;
 
     rpReports = rpGroup(rows);
+    // zaznaczone zostają tylko raporty, które nadal czekają na zatwierdzenie
+    rpSelected = new Set([...rpSelected].filter(n => rpReports.some(r => Number(r.number) === n)));
     rpRenderTable();
+    rpaRefreshBadges();          // liczniki w menu zgodne z tym, co właśnie widać na liście
     return true;
   } catch (err) {
     if (token !== rpLoadToken) return;
     console.error("Błąd pobierania raportów:", err);
     rpReports = [];
-    tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;color:var(--danger);padding:25px;">
+    tbody.innerHTML = `<tr><td colspan="12" style="text-align:center;color:var(--danger);padding:25px;">
       Nie udało się pobrać raportów: ${rtEsc(err.message || err)}</td></tr>`;
   }
 }
@@ -292,7 +383,7 @@ function rpOnSearch() {
   const m = (rpParseDateQuery(q) || "").match(/^\d{2}\.(\d{2})\.(\d{4})$/);
   const { year, month } = rpPeriod();
 
-  if (m && Number(m[1]) >= 1 && Number(m[1]) <= 12 && (year !== Number(m[2]) || month !== Number(m[1]))) {
+  if (rpaTab === "archive" && m && Number(m[1]) >= 1 && Number(m[1]) <= 12 && (year !== Number(m[2]) || month !== Number(m[1]))) {
     rpSetPeriod(Number(m[2]), Number(m[1]));
     rpLoad();
     return;
@@ -300,11 +391,82 @@ function rpOnSearch() {
   rpRenderTable();
 }
 
+// Kolumny tabeli w zakładce. Archiwum: kto zatwierdził; w oczekiwaniu: kiedy wysłano (i pole
+// zaznaczenia dla zatwierdzającego); do poprawy: kto odesłał i powód.
+function rpColumns() {
+  const cols = [];
+  if (rpaTab === "pending" && rpaCanApprove()) cols.push("check");
+  cols.push("num", "date", "shift", "author", "dept", "people", "present", "absent");
+  if (rpaTab === "archive") cols.push("created", ...(rpaInstalled() ? ["approved"] : []));
+  if (rpaTab === "pending") cols.push("submitted");
+  if (rpaTab === "rejected") cols.push("rejected", "reason");
+  cols.push("actions");
+  return cols;
+}
+
+function rpRenderHead() {
+  const head = document.getElementById("rp-table-head");
+  if (!head) return;
+  const titles = {
+    num: "Nr", date: "Data raportu", shift: "Zmiana", author: "Utworzył", dept: "Dział", people: "Pracowników",
+    created: "Data utworzenia", approved: "Zatwierdził", submitted: "Wysłano", rejected: "Odesłał", reason: "Powód odrzucenia"
+  };
+  head.innerHTML = `<tr>${rpColumns().map(c => {
+    if (c === "check") {
+      return `<th class="rp-col-check"><input type="checkbox" id="rp-check-all" class="rp-check" aria-label="Zaznacz wszystkie" onchange="rpToggleAll(this.checked)" /></th>`;
+    }
+    if (c === "present") return `<th class="rp-c rp-col-ok">Godz. obecne</th>`;
+    if (c === "absent") return `<th class="rp-c rp-col-absent">Godz. nieobecne</th>`;
+    if (c === "actions") return `<th style="width: 150px;"></th>`;
+    return `<th class="rp-c">${titles[c]}</th>`;
+  }).join("")}</tr>`;
+}
+
+// "Imię Nazwisko" i pod spodem data - kto zatwierdził / odesłał
+function rpWhoHtml(userId, iso, emptyText) {
+  if (!userId && !iso) return `<span style="color: var(--text-muted);">${emptyText}</span>`;
+  return `<span class="rp-who">${rtEsc(userId ? rpUserName(userId) : "-")}</span><span class="rp-when">${rtEsc(rpDateTime(iso))}</span>`;
+}
+
+// Przyciski w wierszu: podgląd, edycja i usuwanie (autor), zatwierdzanie (uprawnienie), ponowne wysłanie (autor)
+function rpActionsHtml(r) {
+  const n = Number(r.number);
+  const status = rpStatus(r);
+  const locked = rpLockedKeys.has(opPeriodKeyFromPl(r.date));
+  const approver = rpaCanApprove();
+  const btn = (cls, title, icon, onclick) =>
+    `<button class="link-btn rp-act ${cls}" title="${title}" aria-label="${title}" onclick="${onclick}"><i class="fa-solid ${icon}"></i></button>`;
+
+  let html = btn("", "Podgląd raportu", "fa-eye", `rpOpenDetail(${n}, false)`);
+  if (rpCanEdit(r)) {
+    html += btn("", "Edytuj raport", "fa-pen", `rpOpenDetail(${n}, true)`);
+    html += btn("delete", "Usuń raport", "fa-trash", `rpDeleteReport(${n})`);
+  }
+  if (status === "pending" && approver) {
+    html += btn("approve", "Zatwierdź raport", "fa-check", `rpApprove([${n}])`);
+    html += btn("reject", "Odeślij do poprawy", "fa-reply", `rpOpenAction('reject', ${n})`);
+  }
+  if (status === "rejected" && canModifyReport(r.creatorId) && !locked) {
+    html += btn("resubmit", "Wyślij ponownie do zatwierdzenia", "fa-paper-plane", `rpOpenAction('resubmit', ${n})`);
+  }
+  if (status === "approved" && approver && !locked) {
+    html += btn("unapprove", "Cofnij zatwierdzenie", "fa-lock-open", `rpOpenAction('unapprove', ${n})`);
+  }
+  if (locked) {
+    const why = status === "approved" && approver
+      ? "Miesiąc zablokowany — aby cofnąć zatwierdzenie, najpierw odblokuj miesiąc w Opcjach"
+      : "Miesiąc zablokowany — raportu nie można edytować ani usuwać";
+    html += `<span class="rp-lock" title="${why}"><i class="fa-solid fa-lock"></i></span>`;
+  }
+  return html;
+}
+
 function rpRenderTable() {
   const tbody = document.getElementById("rp-table-body");
   const info = document.getElementById("rp-filter-info");
   if (!tbody) return;
 
+  const cols = rpColumns();
   const list = rpVisibleReports();
   if (info) {
     info.textContent = list.length === rpReports.length
@@ -313,40 +475,183 @@ function rpRenderTable() {
   }
 
   if (list.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;color:var(--text-muted);padding:30px;">
-      ${rpReports.length === 0 ? "Brak raportów w wybranym okresie." : "Brak raportów spełniających podane kryteria."}</td></tr>`;
+    const empty = rpReports.length
+      ? "Brak raportów spełniających podane kryteria."
+      : { archive: rpaInstalled() ? "Brak zatwierdzonych raportów w wybranym okresie." : "Brak raportów w wybranym okresie.",
+          pending: "Żaden raport nie czeka na zatwierdzenie.",
+          rejected: "Brak raportów do poprawy." }[rpaTab];
+    tbody.innerHTML = `<tr><td colspan="${cols.length}" style="text-align:center;color:var(--text-muted);padding:30px;">${empty}</td></tr>`;
+    rpSyncBulk();
     return;
   }
 
   tbody.innerHTML = list.map(r => {
     const n = Number(r.number);
-    const locked = rpLockedKeys.has(opPeriodKeyFromPl(r.date));
-    const canModify = canModifyReport(r.creatorId) && !locked;
-    return `
-      <tr>
-        <td class="rp-c rp-num">${r.seq} <span class="rp-num-db">(${rtEsc(r.number)})</span></td>
-        <td class="rp-c" style="font-weight: 600;">${rtEsc(r.date)}</td>
-        <td class="rp-c">${rtEsc(r.shift || "-")}</td>
-        <td class="rp-c">${rtEsc(rpUserName(r.creatorId))}</td>
-        <td class="rp-c">${rtEsc(rpDeptName(r.departmentId))}</td>
-        <td class="rp-c">${r.empIds.size}</td>
-        <td class="rp-c rp-hours-ok">${rtFmtHours(r.present)}</td>
-        <td class="rp-c rp-hours-absent">${rtFmtHours(r.absent)}</td>
-        <td class="rp-c" style="color: var(--text-muted);">${rtEsc(r.created || "-")}</td>
-        <td style="text-align: right;">
-          <button class="link-btn" title="Podgląd raportu" style="font-size: 1rem; padding: 4px 8px; cursor: pointer;" onclick="rpOpenDetail(${n}, false)">
-            <i class="fa-solid fa-eye"></i>
-          </button>${canModify ? `
-          <button class="link-btn" title="Edytuj raport" style="font-size: 1rem; padding: 4px 8px; cursor: pointer; margin-left: 6px;" onclick="rpOpenDetail(${n}, true)">
-            <i class="fa-solid fa-pen"></i>
-          </button>
-          <button class="link-btn" title="Usuń raport" style="font-size: 1rem; padding: 4px 8px; cursor: pointer; color: var(--danger, #ef4444); margin-left: 6px;" onclick="rpDeleteReport(${n})">
-            <i class="fa-solid fa-trash"></i>
-          </button>` : ""}${locked ? `
-          <span class="rp-lock" title="Miesiąc zablokowany — raportu nie można edytować ani usuwać"><i class="fa-solid fa-lock"></i></span>` : ""}
-        </td>
-      </tr>`;
+    const cells = {
+      check: `<td class="rp-col-check"><input type="checkbox" class="rp-check" aria-label="Zaznacz raport nr ${rtEsc(r.number)}"
+                ${rpSelected.has(n) ? "checked" : ""} onchange="rpToggleSelect(${n}, this.checked)" /></td>`,
+      num: `<td class="rp-c rp-num">${r.seq ? `${r.seq} <span class="rp-num-db">(${rtEsc(r.number)})</span>` : rtEsc(r.number)}${
+        rpaTab === "pending" && r.rejectedAt ? `<span class="rp-tag fixed" title="Raport był odesłany do poprawy i został wysłany ponownie">Poprawiony</span>` : ""}</td>`,
+      date: `<td class="rp-c" style="font-weight: 600;">${rtEsc(r.date)}</td>`,
+      shift: `<td class="rp-c">${rtEsc(r.shift || "-")}</td>`,
+      author: `<td class="rp-c">${rtEsc(rpUserName(r.creatorId))}</td>`,
+      dept: `<td class="rp-c">${rtEsc(rpDeptName(r.departmentId))}</td>`,
+      people: `<td class="rp-c">${r.empIds.size}</td>`,
+      present: `<td class="rp-c rp-hours-ok">${rtFmtHours(r.present)}</td>`,
+      absent: `<td class="rp-c rp-hours-absent">${rtFmtHours(r.absent)}</td>`,
+      created: `<td class="rp-c" style="color: var(--text-muted);">${rtEsc(r.created || "-")}</td>`,
+      approved: `<td class="rp-c">${rpWhoHtml(r.approvedBy, r.approvedAt, "przed wprowadzeniem zatwierdzania")}</td>`,
+      submitted: `<td class="rp-c" style="color: var(--text-muted);">${rtEsc(rpDateTime(r.submittedAt) || r.created || "-")}</td>`,
+      rejected: `<td class="rp-c">${rpWhoHtml(r.rejectedBy, r.rejectedAt, "-")}</td>`,
+      reason: `<td class="rp-reason ${r.reason ? "" : "empty"}">${rtEsc(r.reason || "bez podanego powodu")}</td>`,
+      actions: `<td style="text-align: right; white-space: nowrap;">${rpActionsHtml(r)}</td>`
+    };
+    return `<tr class="${rpSelected.has(n) ? "rp-selected" : ""}">${cols.map(c => cells[c]).join("")}</tr>`;
   }).join("");
+  rpSyncBulk();
+}
+
+// ---------- Zaznaczanie i zatwierdzanie kilku raportów naraz ----------
+function rpToggleSelect(number, on) {
+  if (on) rpSelected.add(number);
+  else rpSelected.delete(number);
+  rpRenderTable();
+}
+
+// "Zaznacz wszystkie" dotyczy raportów widocznych po filtrze wyszukiwania
+function rpToggleAll(on) {
+  rpVisibleReports().forEach(r => {
+    if (on) rpSelected.add(Number(r.number));
+    else rpSelected.delete(Number(r.number));
+  });
+  rpRenderTable();
+}
+
+function rpSyncBulk() {
+  const btn = document.getElementById("rp-bulk-approve");
+  const show = rpaTab === "pending" && rpaCanApprove();
+  if (btn) {
+    btn.style.display = show ? "" : "none";
+    btn.disabled = !rpSelected.size || rpBusy;
+    btn.innerHTML = `<i class="fa-solid fa-check-double"></i> Zatwierdź zaznaczone${rpSelected.size ? ` (${rpSelected.size})` : ""}`;
+  }
+  const all = document.getElementById("rp-check-all");
+  if (all) {
+    const visible = rpVisibleReports();
+    const picked = visible.filter(r => rpSelected.has(Number(r.number))).length;
+    all.checked = visible.length > 0 && picked === visible.length;
+    all.indeterminate = picked > 0 && picked < visible.length;
+  }
+}
+
+function rpApproveSelected() {
+  if (rpSelected.size) rpApprove([...rpSelected]);
+}
+
+// Zatwierdzenie jednego albo kilku raportów (funkcja bazy sprawdza uprawnienie i stan)
+async function rpApprove(numbers) {
+  if (rpBusy || !numbers.length) return;
+  rpBusy = true;
+  rpSyncBulk();
+  try {
+    const { data, error } = await supabaseClient.rpc("app_report_approve", { p_numbers: numbers.map(Number) });
+    if (error) throw error;
+    const done = Number(data) || 0;
+    rpaAdjust(-done, 0);
+    numbers.forEach(n => rpSelected.delete(Number(n)));
+    if (rpCurrent && numbers.map(Number).includes(Number(rpCurrent.number))) rpCloseDetail();
+    rpShowBanner(done ? "success" : "warning", done
+      ? (numbers.length === 1 ? `Raport nr ${numbers[0]} został zatwierdzony.` : `Zatwierdzono raportów: ${done}.`)
+      : "Nic nie zostało zatwierdzone - raporty mogły zostać już zatwierdzone albo odesłane do poprawy.");
+  } catch (err) {
+    console.error("Błąd zatwierdzania raportów:", err);
+    rpShowBanner("warning", "Nie udało się zatwierdzić: " + (err.message || err));
+  } finally {
+    rpBusy = false;
+  }
+  await rpReloadAfterEdit();
+}
+
+// ---------- Okno: odesłanie do poprawy, cofnięcie zatwierdzenia, ponowne wysłanie ----------
+const RP_ACTIONS = {
+  reject: {
+    icon: "fa-reply", iconCls: "", title: "Odesłanie raportu do poprawy", confirm: "Odeślij do poprawy", btnCls: "btn-danger",
+    text: rep => `Raport nr ${rpLabel(rep)} z dnia ${rep.date} (${rep.shift || "-"}) autora ${rpUserName(rep.creatorId)} trafi do zakładki „Do poprawy”. Autor dostanie powiadomienie z powodem.`
+  },
+  unapprove: {
+    icon: "fa-lock-open", iconCls: "warn", title: "Cofnięcie zatwierdzenia", confirm: "Cofnij zatwierdzenie", btnCls: "btn-primary",
+    text: rep => `Raport nr ${rpLabel(rep)} z dnia ${rep.date} (${rep.shift || "-"}) wróci do zakładki „W oczekiwaniu”. Do ponownego zatwierdzenia nie będzie liczony w statystykach, a autor będzie mógł go edytować.`
+  },
+  resubmit: {
+    icon: "fa-paper-plane", iconCls: "ok", title: "Ponowne wysłanie do zatwierdzenia", confirm: "Wyślij ponownie", btnCls: "btn-primary",
+    text: rep => `Raport nr ${rpLabel(rep)} z dnia ${rep.date} (${rep.shift || "-"}) wróci do zakładki „W oczekiwaniu na zatwierdzenie”. Upewnij się, że wszystko zostało poprawione${rep.reason ? ` (powód odrzucenia: „${rep.reason}”)` : ""}.`
+  }
+};
+
+function rpOpenAction(type, number) {
+  const rep = rpFindReport(number);
+  const cfg = RP_ACTIONS[type];
+  if (!rep || !cfg) return;
+  rpAction = { type, number: Number(number) };
+
+  document.getElementById("rp-action-icon").className = `rp-action-icon ${cfg.iconCls}`;
+  document.getElementById("rp-action-icon").innerHTML = `<i class="fa-solid ${cfg.icon}"></i>`;
+  document.getElementById("rp-action-title").textContent = cfg.title;
+  document.getElementById("rp-action-text").textContent = cfg.text(rep);
+  document.getElementById("rp-action-reason-wrap").style.display = type === "reject" ? "" : "none";
+  document.getElementById("rp-action-reason").value = "";
+  document.getElementById("rp-action-msg").style.display = "none";
+  const confirmBtn = document.getElementById("rp-action-confirm");
+  confirmBtn.className = cfg.btnCls;
+  confirmBtn.disabled = false;
+  confirmBtn.textContent = cfg.confirm;
+
+  toggleModal("modal-rp-action", true);
+  if (type === "reject") document.getElementById("rp-action-reason").focus();
+}
+
+function rpCloseAction() {
+  rpAction = null;
+  toggleModal("modal-rp-action", false);
+}
+
+async function rpConfirmAction() {
+  const a = rpAction;
+  if (!a || rpBusy) return;
+  const confirmBtn = document.getElementById("rp-action-confirm");
+  const msg = document.getElementById("rp-action-msg");
+  confirmBtn.disabled = true;
+  rpBusy = true;
+
+  const calls = {
+    reject: () => supabaseClient.rpc("app_report_reject", { p_number: a.number, p_reason: document.getElementById("rp-action-reason").value }),
+    unapprove: () => supabaseClient.rpc("app_report_unapprove", { p_number: a.number }),
+    resubmit: () => supabaseClient.rpc("app_report_resubmit", { p_number: a.number })
+  };
+  const done = {
+    reject: `Raport nr ${a.number} został odesłany do poprawy.`,
+    unapprove: `Cofnięto zatwierdzenie raportu nr ${a.number}. Raport jest w zakładce „W oczekiwaniu”.`,
+    resubmit: `Raport nr ${a.number} został wysłany ponownie do zatwierdzenia.`
+  };
+
+  try {
+    const { error } = await calls[a.type]();
+    if (error) throw error;
+    rpBusy = false;
+    // liczniki w menu od razu: [w oczekiwaniu, do poprawy]
+    rpaAdjust(...{ reject: [-1, 1], unapprove: [1, 0], resubmit: [1, -1] }[a.type]);
+    rpCloseAction();
+    if (rpCurrent && Number(rpCurrent.number) === a.number) rpCloseDetail();
+    rpShowBanner("success", done[a.type]);
+    await rpReloadAfterEdit();
+  } catch (err) {
+    console.error("Błąd zmiany stanu raportu:", err);
+    msg.textContent = err.message || String(err);
+    msg.style.display = "block";
+    confirmBtn.disabled = false;
+  } finally {
+    rpBusy = false;
+  }
 }
 
 // Sprawdza w bazie blokadę miesiąca raportu tuż przed zmianą. Zwraca true (i pokazuje
@@ -413,7 +718,7 @@ function rpCloseDelete() {
 
 function rpDeleteReport(number) {
   const rep = rpFindReport(number);
-  if (!rep || !canModifyReport(rep.creatorId)) return;
+  if (!rep || !rpCanEdit(rep)) return;
   rpOpenDelete(
     { type: "report", number: rep.number, label: rpLabel(rep), date: rep.date, info: `Raport nr ${rep.number}, ${rep.date}, ${rep.shift || "-"}, osób: ${rep.empIds.size}` },
     "Usuwanie raportu",
@@ -426,7 +731,7 @@ function rpDeleteReport(number) {
 function rpDeleteRow(recordId) {
   const rep = rpCurrent && rpFindReport(rpCurrent.number);
   const row = rep && rep.rows.find(r => Number(r.id) === Number(recordId));
-  if (!row || !canModifyReport(rep.creatorId)) return;
+  if (!row || !rpCanEdit(rep)) return;
   rpOpenDelete(
     { type: "row", id: row.id, date: rep.date, info: `Raport nr ${rep.number}, ${rep.date}: ${rpEmpName(row.first_name_id)}` },
     "Usuwanie pracownika z raportu",
@@ -492,7 +797,7 @@ async function rpConfirmDelete() {
 function rpOpenDetail(number, edit) {
   const rep = rpFindReport(number);
   if (!rep) return;
-  rpCurrent = { number, edit: edit && canModifyReport(rep.creatorId) && !rpLockedKeys.has(opPeriodKeyFromPl(rep.date)) };
+  rpCurrent = { number, edit: edit && rpCanEdit(rep) };
   rpRowEdits = {};
   rpDateEdit = null;
   rpHideDetailMsg();
@@ -534,6 +839,9 @@ function rpRenderDetail(resetForm) {
     <span>Zmiana:<strong>${rtEsc(rep.shift || "-")}</strong></span>
     <span>Utworzył:<strong>${rtEsc(rpUserName(rep.creatorId))}</strong></span>
     <span>Data utworzenia:<strong>${rtEsc(rep.created || "-")}</strong></span>`;
+
+  rpRenderDetailStatus(rep);
+  rpRenderDetailActions(rep);
 
   document.getElementById("rp-detail-summary").innerHTML = `
     <span>Pracowników:<strong>${rep.empIds.size}</strong></span>
@@ -596,6 +904,67 @@ function rpRenderDetail(resetForm) {
     rpResetAddTimes();
     document.getElementById("rp-add-absent").checked = false;
   }
+}
+
+// Stan zatwierdzenia nad tabelą okna raportu
+function rpRenderDetailStatus(rep) {
+  const box = document.getElementById("rp-detail-status");
+  if (!box) return;
+  const status = rpStatus(rep);
+  if (!status) {
+    box.style.display = "none";
+    return;
+  }
+  const who = (id, iso) => `<b>${rtEsc(id ? rpUserName(id) : "-")}</b>${iso ? `, ${rtEsc(rpDateTime(iso))}` : ""}`;
+  let icon, html;
+  if (status === "approved") {
+    icon = "fa-circle-check";
+    html = rep.approvedBy || rep.approvedAt
+      ? `Zatwierdzony: ${who(rep.approvedBy, rep.approvedAt)}. Raportu nie można zmienić ani usunąć, dopóki zatwierdzenie nie zostanie cofnięte.`
+      : "Zatwierdzony (raport sprzed wprowadzenia zatwierdzania). Raportu nie można zmienić ani usunąć, dopóki zatwierdzenie nie zostanie cofnięte.";
+  } else if (status === "rejected") {
+    icon = "fa-rotate-left";
+    html = `Odesłany do poprawy: ${who(rep.rejectedBy, rep.rejectedAt)}.<br>Powód: <b>${rtEsc(rep.reason || "nie podano")}</b>`;
+  } else {
+    icon = "fa-hourglass-half";
+    html = `W oczekiwaniu na zatwierdzenie${rep.submittedAt ? ` (wysłano ${rtEsc(rpDateTime(rep.submittedAt))})` : ""}.` +
+      (rep.rejectedAt ? `<br>Wcześniej odesłany do poprawy przez ${who(rep.rejectedBy, rep.rejectedAt)}. Powód: <b>${rtEsc(rep.reason || "nie podano")}</b>` : "");
+  }
+  box.className = `rp-status-box ${status}`;
+  box.innerHTML = `<i class="fa-solid ${icon}"></i><div>${html}</div>`;
+  box.style.display = "";
+}
+
+// Przyciski zatwierdzania na dole okna raportu (zależne od stanu i uprawnień)
+function rpRenderDetailActions(rep) {
+  const el = document.getElementById("rp-detail-actions");
+  if (!el) return;
+  const n = Number(rep.number);
+  const status = rpStatus(rep);
+  const locked = rpLockedKeys.has(opPeriodKeyFromPl(rep.date));
+  const approver = rpaCanApprove();
+  const b = (cls, icon, text, onclick) =>
+    `<button type="button" class="${cls}" style="width: auto; padding: 11px 20px;" onclick="${onclick}"><i class="fa-solid ${icon}"></i> ${text}</button>`;
+  // W trybie edycji: przy raporcie do poprawy - zapis zmian i od razu ponowne wysłanie do zatwierdzenia;
+  // pozostałe przyciski dopiero po zapisie (inaczej pominęłyby niezapisane zmiany)
+  if (rpCurrent && rpCurrent.edit) {
+    el.innerHTML = status === "rejected" && canModifyReport(rep.creatorId) && !locked
+      ? b("btn-primary", "fa-paper-plane", "Zapisz i wyślij do zatwierdzenia", "rpSaveAndResubmit()")
+      : "";
+    return;
+  }
+  let html = "";
+  if (status === "pending" && approver) {
+    html += b("btn-danger", "fa-reply", "Odeślij do poprawy", `rpOpenAction('reject', ${n})`);
+    html += b("btn-primary rp-btn-approve", "fa-check", "Zatwierdź", `rpApprove([${n}])`);
+  }
+  if (status === "rejected" && canModifyReport(rep.creatorId) && !locked) {
+    html += b("btn-primary", "fa-paper-plane", "Wyślij ponownie do zatwierdzenia", `rpOpenAction('resubmit', ${n})`);
+  }
+  if (status === "approved" && approver && !locked) {
+    html += b("btn-secondary", "fa-lock-open", "Cofnij zatwierdzenie", `rpOpenAction('unapprove', ${n})`);
+  }
+  el.innerHTML = html;
 }
 
 // ---------- Zmiana daty raportu ----------
@@ -796,7 +1165,8 @@ function rpSyncSaveAll() {
   // zmienione wiersze + ewentualna zmiana daty raportu
   const count = rep && rpCurrent.edit ? rpPendingEdits(rep).length + (rpDateEdit ? 1 : 0) : 0;
 
-  btn.style.display = rpCurrent && rpCurrent.edit ? "" : "none";
+  // raport do poprawy zapisuje się przyciskiem "Zapisz i wyślij" (rpRenderDetailActions)
+  btn.style.display = rpCurrent && rpCurrent.edit && !(rep && rpStatus(rep) === "rejected") ? "" : "none";
   btn.disabled = count === 0 || rpBusy;
   btn.innerHTML = `<i class="fa-solid fa-floppy-disk"></i> ${count ? `Zapisz zmiany (${count})` : "Zapisz zmiany"}`;
 }
@@ -828,7 +1198,7 @@ function rpOnRowTime(recordId) {
 // Zapis wszystkich zmienionych wierszy raportu jednym przyciskiem
 async function rpSaveAll() {
   const rep = rpCurrent && rpFindReport(rpCurrent.number);
-  if (!rep || rpBusy || !canModifyReport(rep.creatorId)) return;
+  if (!rep || rpBusy || !rpCanEdit(rep)) return;
 
   const edits = rpPendingEdits(rep);
   const dateIso = rpDateEdit;
@@ -931,9 +1301,11 @@ async function rpSaveAll() {
         (newDate ? `, zmiana daty na ${newDate}` : "") +
         (edits.length ? `, zmienionych wierszy: ${edits.length}` : ""));
       rpCloseDetail();
-      rpShowBanner("success", newDate
+      rpShowBanner("success", (newDate
         ? `Zapisano zmiany w raporcie nr ${rep.number}. Raport został przeniesiony z ${rep.date} na ${newDate}.`
-        : `Zapisano zmiany w raporcie nr ${rpLabel(rep)}.`);
+        : `Zapisano zmiany w raporcie nr ${rpLabel(rep)}.`) +
+        (rpStatus(rep) === "rejected" ? " Gdy raport jest już poprawiony, wyślij go ponownie do zatwierdzenia." : ""));
+      return true;
     }
   } catch (err) {
     console.error("Błąd zapisu zmian w raporcie:", err);
@@ -942,6 +1314,34 @@ async function rpSaveAll() {
     rpBusy = false;
     rpSyncSaveAll();
   }
+}
+
+// Raport do poprawy w trybie edycji: zapis zmian (jeśli są) i ponowne wysłanie do zatwierdzenia
+async function rpSaveAndResubmit() {
+  const rep = rpCurrent && rpFindReport(rpCurrent.number);
+  if (!rep || rpBusy || rpStatus(rep) !== "rejected") return;
+  const number = Number(rep.number);
+
+  if (rpPendingEdits(rep).length || rpDateEdit) {
+    // przy błędzie zapisu komunikat jest już w oknie, a raport nie zostaje wysłany
+    if (!(await rpSaveAll())) return;
+  }
+
+  rpBusy = true;
+  try {
+    const { error } = await supabaseClient.rpc("app_report_resubmit", { p_number: number });
+    if (error) throw error;
+    rpaAdjust(1, -1);
+    rpCloseDetail();
+    rpShowBanner("success", `Raport nr ${number} został wysłany ponownie do zatwierdzenia.`);
+  } catch (err) {
+    console.error("Błąd ponownego wysłania raportu:", err);
+    if (rpCurrent) rpShowDetailMsg("Nie udało się wysłać raportu do zatwierdzenia: " + (err.message || err));
+    else rpShowBanner("warning", `Zmiany zapisano, ale nie udało się wysłać raportu nr ${number} do zatwierdzenia: ${err.message || err}`);
+  } finally {
+    rpBusy = false;
+  }
+  await rpReloadAfterEdit();
 }
 
 // Po zmianie w bazie: odśwież listę i otwarte okno (zamknij je, jeśli raport zniknął)
@@ -1015,7 +1415,7 @@ function rpPickEmployee(id) {
 // Dodanie pracownika do raportu
 async function rpAddEmployee() {
   const rep = rpCurrent && rpFindReport(rpCurrent.number);
-  if (!rep || rpBusy || !canModifyReport(rep.creatorId)) return;
+  if (!rep || rpBusy || !rpCanEdit(rep)) return;
 
   const from = rpTimeVal("rp-add-from");
   const to = rpTimeVal("rp-add-to");

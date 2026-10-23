@@ -203,12 +203,21 @@
 #auth-overlay.lv2 .progress-bar-bg { background: rgba(255, 255, 255, 0.12); }
 #auth-overlay.lv2 .status-subtext { color: rgba(255, 255, 255, 0.65); }
 
-/* ---------- Telefon i wąskie okna: sama karta ---------- */
+/* ---------- Telefon i wąskie okna: zegar (jak na komputerze) nad kartą ---------- */
 @media (max-width: 900px) {
   .lv2-wrap { grid-template-columns: minmax(0, 430px); padding: 6px 16px 110px; }
-  .lv2-left { display: none; }
+  .lv2-left { display: flex; flex-direction: column; align-items: center; text-align: center; }
+  .lv2-left .eyebrow, .lv2-left .timeline, .lv2-left .hint { display: none; }
+  .lv2-left .big { justify-content: center; font-size: clamp(3.4rem, 17vw, 5.2rem); }
+  .lv2-left .date { margin: 6px 0 16px; font-size: 0.9rem; }
   .lv2-top { padding: 18px 16px; justify-content: center; }
   .lv2-crane { top: 80px; }
+}
+/* niski ekran telefonu: mniejszy zegar bez daty, żeby karta mieściła się bez przewijania */
+@media (max-width: 900px) and (max-height: 760px) {
+  .lv2-left .big { font-size: clamp(2.8rem, 14vw, 3.6rem); }
+  .lv2-left .date { display: none; }
+  .lv2-left { margin-bottom: 10px; }
 }
 @media (max-width: 480px) {
   #auth-overlay.lv2 .unified-auth-card { padding: 24px 20px 22px; }

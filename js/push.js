@@ -184,7 +184,9 @@ if ("serviceWorker" in navigator) {
     const msg = e.data || {};
     if (msg.type !== "open-view") return;
     if (typeof currentUser !== "undefined" && currentUser && typeof canOpenView === "function" && canOpenView(msg.view)) {
-      navigateTo(msg.view);
+      // raport odesłany do poprawy: od razu zakładka "Do poprawy"
+      if (msg.view === "reports" && msg.tab && typeof rpaOpenTab === "function") rpaOpenTab(msg.tab);
+      else navigateTo(msg.view);
     } else if (typeof epEmployee !== "undefined" && epEmployee && typeof abPortalLoad === "function") {
       abPortalLoad();
       if (typeof epLoadSchedule === "function") epLoadSchedule();

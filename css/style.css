@@ -552,3 +552,10 @@ input[type="checkbox"] {
 .pr-tip .tag.work { background: rgba(8, 88, 75, 0.1); color: var(--primary); }
 .pr-tip .tag.absence { background: rgba(217, 56, 58, 0.12); color: var(--danger); }
 .pr-tip .tag.off { background: #F3F4F6; color: #6B7280; }
+
+/* Reset hasła przy edycji użytkownika i pracownika (js/app.js, resetAccountPassword):
+   pierwsze kliknięcie pyta "Na pewno?", po resecie przycisk jest zielony */
+.account-reset-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 42px; padding: 0 14px; }
+.account-reset-btn.armed { border-color: var(--danger); color: var(--danger); background: #FDECEC; }
+.account-reset-btn.done { border-color: #10B981; color: #0b7a57; background: rgba(16, 185, 129, 0.1); }
+.account-reset-btn:disabled:not(.done) { opacity: 0.6; cursor: not-allowed; }

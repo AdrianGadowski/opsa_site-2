@@ -21,6 +21,7 @@
     min-width: 230px; height: 44px; display: inline-flex; align-items: center; justify-content: center; padding: 0 14px;
     border-radius: 12px; background: rgba(255, 255, 255, 0.95); color: var(--primary); font-weight: 700; font-size: 0.92rem; white-space: nowrap;
   }
+  .sh-week-label .dot { margin: 0 6px; }
 
   .sh-toolbar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; padding: 12px 20px; border-bottom: 1px solid var(--border-color); }
   .sh-toolbar .info { font-size: 0.86rem; color: var(--text-muted); }
@@ -46,7 +47,8 @@
   .sh-col-btn:hover { background: rgba(8, 88, 75, 0.08); color: var(--primary); }
   .sh-day-th.today .sh-col-btn { background: var(--primary); color: #fff; }
   .sh-day-th.today .sh-col-btn span { color: rgba(255, 255, 255, 0.85); }
-  .sh-day-td { padding: 4px 3px !important; }
+  /* kratki dni wyrównane do góry (dzień z dwiema zmianami jest wyższy) */
+  .sh-day-td { padding: 4px 3px !important; vertical-align: top !important; }
   .sh-day-td.we, .sh-day-th.we { background: rgba(0, 0, 0, 0.025); }
 
   /* Kratka dnia */
@@ -115,7 +117,11 @@
   @media (max-width: 768px) {
     .sh-filters > :first-child { grid-column: 1 / -1; }
     .sh-weekpick { width: 100%; }
-    .sh-week-label { flex: 1; min-width: 0; font-size: 0.82rem; }
+    /* numer tygodnia nad datami, żeby całość mieściła się w ramce */
+    .sh-week-label { flex: 1; min-width: 0; font-size: 0.82rem; flex-direction: column; line-height: 1.15; padding: 0 6px; }
+    .sh-week-label .dot { display: none; }
+    .sh-week-label .dates { font-size: 0.72rem; font-weight: 600; opacity: 0.85; }
+    .sh-weekpick button { min-width: 38px; padding: 0 10px; }
     .sh-toolbar { padding: 12px; }
     .sh-toolbar button { width: 100%; }
     /* karta pracownika: dni w jednej siatce */
@@ -127,11 +133,30 @@
     #main-content .sh-table tbody td.sh-day-td { flex: 0 0 calc((100% - 36px) / 7); background: none; }
     #main-content .sh-table tbody td.sh-tools { flex: 0 0 100%; }
     .sh-pair { display: flex; width: 100%; }
-    .sh-cell { width: 100%; height: 44px; }
+    .sh-cell { width: 100%; height: auto; min-height: 44px; padding: 4px 1px; }
     .sh-cell .s { max-width: 100%; }
+    /* godziny jedna pod drugą: u góry zmiana, pod nią rozpoczęcie, niżej zakończenie */
+    .sh-cell .s.hrs { display: flex; flex-direction: column; align-items: center; line-height: 1.15; font-size: 0.62rem; }
+    .sh-cell .s.hrs .dash { display: none; }
+    .sh-cell.slot2.empty, .sh-cell.empty.off2 { min-height: 24px; }
+    /* "Wolne" i "Nieob." mniejszą czcionką, żeby nie łamały się w wąskim kafelku */
+    .sh-cell.off .m, .sh-cell.absence .m { font-size: 0.6rem; white-space: nowrap; }
+    /* kafelki dni wyrównane do góry (dzień z dwiema zmianami jest wyższy) */
+    #main-content .sh-table tbody td.sh-day-td { align-self: flex-start; }
     .sh-actions { gap: 8px; padding: 10px; }
     .sh-actions .sep { display: none; }
     .sh-actions .count { min-width: 0; flex: 1 1 100%; }
+    /* równe rzędy na całą szerokość: I II III / od – do Ustaw / Wolne Wyczyść / Nieobecność + powód */
+    .sh-actions .grp { flex: 1 1 100%; display: flex; }
+    .sh-actions .grp > .sh-act, .sh-actions .grp > .sh-act-time, .sh-actions .grp > .sh-act-note { flex: 1 1 0; min-width: 0; width: auto; }
+    .sh-actions > .sh-act.off, .sh-actions > .sh-act.clear { flex: 1 1 calc(50% - 4px); }
+    .sh-actions .count { order: 0; }
+    .sh-actions .grp[aria-label="Zmiana"] { order: 1; }
+    .sh-actions .grp[aria-label="Własne godziny"] { order: 2; }
+    .sh-actions > .sh-act.off { order: 3; }
+    .sh-actions > .sh-act.clear { order: 4; }
+    .sh-actions .grp.absence-grp { order: 5; }
+    .sh-act, .sh-act-time, .sh-act-note { height: 40px; }
   }
 </style>
 
@@ -250,7 +275,7 @@
   <span class="sep" aria-hidden="true"></span>
 
   <button type="button" class="sh-act off" data-needs-sel onclick="shAction('off')">Wolne</button>
-  <span class="grp">
+  <span class="grp absence-grp" role="group" aria-label="Nieobecność">
     <button type="button" class="sh-act absence" data-needs-sel onclick="shAction('absence')">Nieobecność</button>
     <input type="text" id="sh-act-note" class="sh-act-note" maxlength="80" placeholder="powód (opcj.)" aria-label="Powód nieobecności, np. urlop, L4" />
   </span>

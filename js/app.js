@@ -48,7 +48,7 @@ const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
 
 // Numer wydania doklejany do adresów plików, żeby przeglądarka nie używała starych kopii.
 // Zmieniaj przy każdej publikacji - tutaj i w index.html (?v=...).
-const APP_BUILD = "20261204";
+const APP_BUILD = "20261226";
 
 let currentUser = null;
 let cachedUsers = [];
@@ -156,6 +156,8 @@ function applyLoginTabs() {
 function canOpenView(viewKey) {
   // zgłoszenia nieobecności: mistrzowie (rola "Mistrz") i administrator (absences.js)
   if (viewKey === "absences") return typeof abCanReview === "function" && abCanReview();
+  // lista raportów: archiwum ("Lista raportów"), zatwierdzanie albo własne raporty do poprawy (report_approval.js)
+  if (viewKey === "reports" && typeof rpaTabs === "function") return rpaTabs().length > 0;
   const info = permissionMap[viewKey];
   if (info && !hasPermission(info.column)) return false;
   return true;
@@ -662,9 +664,12 @@ function initDashboardApp(startView) {
   document.getElementById("app-container").style.display = "flex";
 
   // widok z adresu (np. kliknięte powiadomienie: ?view=absences) ma pierwszeństwo; adres wraca do czystego
-  const urlView = new URLSearchParams(location.search).get("view");
+  const urlParams = new URLSearchParams(location.search);
+  const urlView = urlParams.get("view");
   if (urlView) {
     startView = urlView;
+    // zakładka Listy raportów (np. powiadomienie o raporcie do poprawy: ?view=reports&tab=rejected)
+    if (urlParams.get("tab") && typeof rpaTab !== "undefined") rpaTab = urlParams.get("tab");
     history.replaceState(null, "", location.pathname);
   }
   
@@ -688,6 +693,7 @@ function initDashboardApp(startView) {
   if (typeof abStartBadge === "function") abStartBadge(); // dymek z liczbą zgłoszeń nieobecności
   if (typeof pushSync === "function") pushSync();         // to urządzenie dostaje powiadomienia tej osoby
   if (typeof msgStart === "function") msgStart();         // komunikaty: wyskakujące okno i skrzynka
+  if (typeof rpaStart === "function") rpaStart();         // liczniki raportów do zatwierdzenia i do poprawy
 
   // Po odświeżeniu strony wróć do ostatnio otwartego widoku, jeśli nadal jest dozwolony
   if (startView && viewTitles[startView] && canOpenView(startView)) {
@@ -724,6 +730,7 @@ async function navigateTo(viewName) {
   document.querySelectorAll(".menu-item").forEach(item => item.classList.remove("active"));
   const activeNav = document.querySelector(`.menu-item[data-tab="${viewName}"]`);
   if (activeNav) activeNav.classList.add("active");
+  if (typeof rpaSyncMenu === "function") rpaSyncMenu(viewName); // zakładki Listy raportów
 
   topbarTitle.innerText = viewTitles[viewName] || "Moduł";
   writeSession(viewName);
@@ -893,9 +900,8 @@ async function openCreateUserModal() {
   const passField = document.getElementById("form-user-password");
   passField.required = true;
   passField.placeholder = "••••••••";
-
-  const passHint = document.getElementById("password-hint");
-  if (passHint) passHint.style.display = "none";
+  document.getElementById("user-pass-group").style.display = "";
+  document.getElementById("user-reset-group").style.display = "none";
 
   const msgBox = document.getElementById("user-form-msg");
   if (msgBox) msgBox.style.display = "none";
@@ -925,13 +931,21 @@ async function openEditUserModal(login) {
   loginField.value = user.login;
   loginField.disabled = true;
 
+  // przy edycji hasła nie da się wpisać - tylko reset na hasło startowe (resetAccountPassword)
   const passField = document.getElementById("form-user-password");
   passField.required = false;
   passField.value = "";
-  passField.placeholder = "Wpisz, aby zmienić hasło";
-
-  const passHint = document.getElementById("password-hint");
-  if (passHint) passHint.style.display = "block";
+  document.getElementById("user-pass-group").style.display = "none";
+  document.getElementById("user-reset-group").style.display = "";
+  const resetBtn = document.getElementById("btn-reset-user-password");
+  const resetHint = document.getElementById("user-reset-hint");
+  accountResetSetup(resetBtn, "user", user.id, `${user.name || ""} ${user.last_name || ""}`.trim() || user.login, user.login, "Resetuj hasło");
+  // własne hasło zmienia się w "Moje konto" (reset własnego konta nie wymusiłby zmiany przy logowaniu)
+  const own = currentUser && Number(currentUser.id) === Number(user.id);
+  resetBtn.disabled = own;
+  resetHint.textContent = own
+    ? "To Twoje konto - swoje hasło zmienisz w „Moje konto” (kliknij swoje imię w menu)."
+    : "Hasło zostanie ustawione na „123456”, a przy logowaniu trzeba będzie ustawić nowe.";
 
   await loadRoleAndDepartmentDropdowns(user.role_id, user.department_id);
 
@@ -946,6 +960,8 @@ async function openEditUserModal(login) {
   document.getElementById("perm-logs").checked = !!(user.allow_logs);
   const permMsg = document.getElementById("perm-messages");
   if (permMsg) permMsg.checked = !!(user.allow_messages);
+  const permApprove = document.getElementById("perm-report-approve");
+  if (permApprove) permApprove.checked = !!(user.allow_report_approve);
 
   const msgBox = document.getElementById("user-form-msg");
   if (msgBox) msgBox.style.display = "none";
@@ -1096,7 +1112,8 @@ async function loadUsersList() {
         { label: "Aktualizacje", active: u.allow_updates },
         { label: "Opcje", active: u.allow_options },
         { label: "Logi", active: u.allow_logs },
-        { label: "Komunikaty", active: u.allow_messages }
+        { label: "Komunikaty", active: u.allow_messages },
+        { label: "Zatwierdzanie raportów", active: u.allow_report_approve }
       ];
 
       const activeBadges = permissions
@@ -1177,16 +1194,19 @@ async function handleSaveUser(e) {
     allow_logs: document.getElementById("perm-logs") ? document.getElementById("perm-logs").checked : false,
     // kolumna allow_messages istnieje dopiero po sql/33 - bez niej zapis by się nie udał
     ...(currentUser && "allow_messages" in currentUser && document.getElementById("perm-messages")
-      ? { allow_messages: document.getElementById("perm-messages").checked } : {})
+      ? { allow_messages: document.getElementById("perm-messages").checked } : {}),
+    // kolumna allow_report_approve istnieje dopiero po sql/34
+    ...(currentUser && "allow_report_approve" in currentUser && document.getElementById("perm-report-approve")
+      ? { allow_report_approve: document.getElementById("perm-report-approve").checked } : {})
   };
 
   try {
     saveBtn.disabled = true;
     saveBtn.innerText = "Zapisywanie...";
 
-    // Hasło trzyma Supabase Auth; ustawia je funkcja bazy app_set_password (wymaga min. 6 znaków)
-    const passwordGiven = !!(password && password.trim() !== "");
-    if ((mode === "create" || passwordGiven) && password.length < 6) {
+    // Hasło trzyma Supabase Auth; ustawia je funkcja bazy app_set_password (wymaga min. 6 znaków).
+    // Przy edycji hasła się nie wpisuje - jest tylko przycisk "Resetuj hasło".
+    if (mode === "create" && password.length < 6) {
       msgBox.innerText = "Hasło musi mieć co najmniej 6 znaków.";
       msgBox.style.color = "var(--danger, #ef4444)";
       msgBox.style.display = "block";
@@ -1239,21 +1259,10 @@ async function handleSaveUser(e) {
 
       if (updateError) throw updateError;
       if (!updated || !updated[0]) throw new Error("Zmiany nie zostały zapisane (brak uprawnień w bazie).");
-
-      // hasło nadane komuś przez administratora jest tymczasowe (wymusi zmianę przy logowaniu);
-      // przy zmianie własnego hasła baza tego nie wymusza
-      if (passwordGiven) {
-        const { error: passwordError } = await supabaseClient.rpc("app_set_password", {
-          p_kind: "user",
-          p_id: updated[0].id,
-          p_password: password
-        });
-        if (passwordError) throw new Error("Dane zapisane, ale hasło nie zostało zmienione: " + passwordError.message);
-      }
     }
 
     logAction(mode === "create" ? "Dodanie użytkownika" : "Edycja użytkownika",
-      `${name} ${last_name} (login: ${mode === "create" ? login : originalLogin})${passwordGiven && mode !== "create" ? ", ustawiono hasło" : ""}`);
+      `${name} ${last_name} (login: ${mode === "create" ? login : originalLogin})`);
     toggleModal("modal-user-form", false);
     await loadUsersList();
 
@@ -1266,6 +1275,77 @@ async function handleSaveUser(e) {
     saveBtn.disabled = false;
     saveBtn.innerText = "Zapisz";
   }
+}
+
+// ---------- Reset hasła (Użytkownicy i Baza pracowników) ----------
+// Hasło wraca do startowego "123456" (EMPLOYEE_DEFAULT_PASSWORD). Funkcja bazy app_set_password
+// przy nadaniu hasła komuś innemu ustawia must_change_password - przy logowaniu trzeba ustawić nowe.
+// Konto bez logowania (pracownik bez konta) zostaje przy tym utworzone.
+// Dwa kliknięcia: pierwsze uzbraja przycisk, drugie (w ciągu 4 s) resetuje.
+// Przycisk niesie: data-kind ("user" / "employee"), data-id, data-name, data-login.
+let accountResetTimer = null;
+
+function accountResetDisarm(btn, label) {
+  clearTimeout(accountResetTimer);
+  btn.dataset.armed = "";
+  btn.disabled = false;
+  btn.classList.remove("armed", "done");
+  btn.innerHTML = `<i class="fa-solid fa-key"></i> ${label || btn.dataset.label || "Resetuj hasło"}`;
+  if (label) btn.dataset.label = label;
+}
+
+async function resetAccountPassword(btn) {
+  const user = btn.dataset.kind === "user";
+  const msgBox = document.getElementById(user ? "user-form-msg" : "employee-form-msg");
+  if (btn.dataset.armed !== "1") {
+    btn.dataset.armed = "1";
+    btn.classList.add("armed");
+    btn.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> Na pewno? Kliknij ponownie`;
+    clearTimeout(accountResetTimer);
+    accountResetTimer = setTimeout(() => accountResetDisarm(btn), 4000);
+    return;
+  }
+
+  clearTimeout(accountResetTimer);
+  btn.disabled = true;
+  btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Resetowanie...`;
+  try {
+    const { error } = await supabaseClient.rpc("app_set_password", {
+      p_kind: btn.dataset.kind,
+      p_id: Number(btn.dataset.id),
+      p_password: EMPLOYEE_DEFAULT_PASSWORD
+    });
+    if (error) throw error;
+    logAction(user ? "Reset hasła użytkownika" : "Reset hasła pracownika", `${btn.dataset.name} (login: ${btn.dataset.login})`);
+    btn.dataset.armed = "";
+    btn.classList.remove("armed");
+    btn.classList.add("done");
+    btn.innerHTML = `<i class="fa-solid fa-check"></i> Hasło zresetowane`;
+    msgBox.innerText = `Zresetowano hasło: ${btn.dataset.name} (login: ${btn.dataset.login}). Hasło to teraz „${EMPLOYEE_DEFAULT_PASSWORD}” - przy logowaniu trzeba będzie ustawić własne.`;
+    msgBox.style.color = "#0b7a57";
+    msgBox.style.display = "block";
+    if (!user) {
+      // pracownik mógł dopiero dostać konto - odśwież dane, żeby formularz o tym wiedział
+      const emp = cachedEmployees.find(e => String(e.id) === String(btn.dataset.id));
+      if (emp && !emp.auth_id) emp.auth_id = "set";
+    }
+    accountResetTimer = setTimeout(() => accountResetDisarm(btn, "Resetuj hasło"), 4000);
+  } catch (err) {
+    console.error("Błąd resetu hasła:", err);
+    accountResetDisarm(btn);
+    msgBox.innerText = "Nie udało się zresetować hasła: " + (err.message || err);
+    msgBox.style.color = "var(--danger, #ef4444)";
+    msgBox.style.display = "block";
+  }
+}
+
+// Przygotowanie przycisku resetu w otwieranym formularzu edycji
+function accountResetSetup(btn, kind, id, name, login, label) {
+  btn.dataset.kind = kind;
+  btn.dataset.id = String(id);
+  btn.dataset.name = name;
+  btn.dataset.login = login || "";
+  accountResetDisarm(btn, label);
 }
 
 // ==========================================
@@ -1611,6 +1691,8 @@ async function openCreateEmployeeModal() {
   document.getElementById("form-emp-login").value = "";
   document.getElementById("form-emp-password").value = EMPLOYEE_DEFAULT_PASSWORD;
   document.getElementById("form-emp-password").placeholder = "";
+  document.getElementById("emp-pass-group").style.display = "";
+  document.getElementById("emp-reset-group").style.display = "none";
   document.getElementById("form-emp-login-hint").textContent =
     "Uzupełnia się z imienia i nazwiska. Zajęty login dostanie kolejny numer.";
 
@@ -1639,13 +1721,24 @@ async function openEditEmployeeModal(empId) {
   document.getElementById("form-emp-last-name").value = emp.last_name || "";
   document.getElementById("form-emp-phone").value = emp.phone_number || "";
 
-  // Przy edycji login i hasło zmienia się tylko ręcznie
+  // Przy edycji login zmienia się tylko ręcznie, a hasła nie da się wpisać - jest tylko reset na "123456"
   if (form) form.dataset.loginAuto = "0";
   document.getElementById("form-emp-login").value = emp.login || "";
-  // hasła nie da się odczytać (trzyma je Supabase Auth): puste pole = bez zmiany
   document.getElementById("form-emp-password").value = "";
-  document.getElementById("form-emp-password").placeholder = emp.auth_id ? "Wpisz, aby zmienić hasło" : "Ustaw hasło, aby utworzyć konto";
   document.getElementById("form-emp-login-hint").textContent = "";
+  document.getElementById("emp-pass-group").style.display = "none";
+  document.getElementById("emp-reset-group").style.display = "";
+  const resetBtn = document.getElementById("btn-reset-emp-password");
+  const resetHint = document.getElementById("emp-reset-hint");
+  accountResetSetup(resetBtn, "employee", emp.id, `${emp.first_name || ""} ${emp.last_name || ""}`.trim(), emp.login,
+    emp.auth_id ? "Resetuj hasło" : "Utwórz konto (hasło 123456)");
+  // reset działa na zapisanym loginie - bez niego nie ma konta, do którego można by się zalogować
+  resetBtn.disabled = !emp.login;
+  resetHint.textContent = !emp.login
+    ? "Pracownik nie ma loginu. Wpisz login i zapisz - konto powstanie z hasłem „123456”."
+    : emp.auth_id
+      ? "Hasło zostanie ustawione na „123456”, a przy logowaniu trzeba będzie ustawić nowe."
+      : "Pracownik nie ma jeszcze konta. Zostanie utworzone z hasłem „123456”, które trzeba zmienić przy logowaniu.";
 
   await populateEmployeeModalDropdowns(emp.business_id, emp.department_id);
 
@@ -1730,7 +1823,8 @@ async function handleSaveEmployee(e) {
   const business_id = parseInt(document.getElementById("form-emp-business-id").value, 10);
   const department_id = parseInt(document.getElementById("form-emp-dept-id").value, 10);
   let login = document.getElementById("form-emp-login").value.trim().toLowerCase();
-  const password = document.getElementById("form-emp-password").value;
+  // hasło wpisuje się tylko przy dodawaniu; przy edycji jest przycisk "Resetuj hasło"
+  const password = mode === "create" ? document.getElementById("form-emp-password").value : "";
 
   const payload = {
     first_name,
@@ -1742,11 +1836,11 @@ async function handleSaveEmployee(e) {
   };
 
   // Hasło trzyma Supabase Auth; ustawia je funkcja bazy app_set_password
-  const setAccountPassword = async (id) => {
+  const setAccountPassword = async (id, pass) => {
     const { error } = await supabaseClient.rpc("app_set_password", {
       p_kind: "employee",
       p_id: id,
-      p_password: password
+      p_password: pass
     });
     return error;
   };
@@ -1784,7 +1878,7 @@ async function handleSaveEmployee(e) {
       if (!inserted || !inserted[0]) throw new Error("Pracownik nie został dodany (brak uprawnień w bazie).");
 
       // konto logowania z hasłem startowym; pracownik zmienia je przy pierwszym logowaniu
-      const accountError = await setAccountPassword(inserted[0].id);
+      const accountError = await setAccountPassword(inserted[0].id, password);
       if (accountError) {
         await loadEmployeesList();
         applyEmployeeFilters();
@@ -1798,15 +1892,6 @@ async function handleSaveEmployee(e) {
         showError(`Login „${login}” jest już zajęty przez innego pracownika.`);
         return;
       }
-      if (password && !login) {
-        showError("Żeby ustawić hasło, pracownik musi mieć login.");
-        return;
-      }
-      if (login && !password && before && !before.auth_id) {
-        showError("Ten pracownik nie ma jeszcze konta logowania. Podaj hasło, żeby je utworzyć.");
-        return;
-      }
-
       const { data: updated, error } = await supabaseClient
         .from("employees")
         .update({ ...payload, login: login || null })
@@ -1816,15 +1901,15 @@ async function handleSaveEmployee(e) {
       if (error) throw error;
       if (!updated || !updated[0]) throw new Error("Zmiany nie zostały zapisane (brak uprawnień w bazie).");
 
-      // hasło wpisane w kartotece jest tymczasowe: pracownik ustawi własne przy logowaniu
-      if (password) {
-        const accountError = await setAccountPassword(empId);
-        if (accountError) throw new Error("Dane zapisane, ale hasło nie zostało zmienione: " + accountError.message);
+      // pracownik dostał login, a nie ma jeszcze konta: konto z hasłem startowym (zmiana przy logowaniu)
+      if (login && before && !before.auth_id) {
+        const accountError = await setAccountPassword(empId, EMPLOYEE_DEFAULT_PASSWORD);
+        if (accountError) throw new Error("Dane zapisane, ale nie udało się utworzyć konta logowania: " + accountError.message);
       }
     }
 
     logAction(mode === "create" ? "Dodanie pracownika" : "Edycja pracownika",
-      `${first_name} ${last_name}${login ? ` (login: ${login})` : ""}${password && mode !== "create" ? ", ustawiono hasło" : ""}`);
+      `${first_name} ${last_name}${login ? ` (login: ${login})` : ""}`);
     toggleModal("modal-employee-form", false);
     await loadEmployeesList();
     applyEmployeeFilters();

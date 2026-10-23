@@ -4,6 +4,8 @@
 // z nagłówkiem x-push-secret i treścią { request_id, event }.
 //   event "new" / "cancelled"     -> mistrzowie działu pracownika (brak mistrza -> administratorzy)
 //   event "approved" / "rejected" -> pracownik
+// Także: { announcement_id } - komunikat (sql/33); { report_number, event: "report_rejected" } -
+// raport odesłany do poprawy, powiadomienie do autora z powodem (sql/34).
 //
 // Wdrożenie (panel Supabase): Edge Functions -> Deploy a new function -> Via Editor,
 // nazwa: absence-push, wklej ten plik, Deploy. Potem w ustawieniach funkcji WYŁĄCZ "Verify JWT"
@@ -115,6 +117,33 @@ async function announcementPush(db: Db, id: number) {
   return Response.json(await sendPush(db, subs, payload));
 }
 
+// Raport odesłany do poprawy (sql/34): powiadomienie do autora raportu, z powodem
+async function reportRejectedPush(db: Db, number: number) {
+  const { data: rows } = await db
+    .from("work_reports")
+    .select("number_report, report_date, shift, add_first_name_id, approval_status, reject_reason")
+    .eq("number_report", number)
+    .limit(1);
+  const r = rows?.[0];
+  if (!r || r.approval_status !== "rejected" || !r.add_first_name_id) return Response.json({ sent: 0 });
+
+  const { data: subs } = await db
+    .from("push_subscriptions")
+    .select("id, endpoint, p256dh, auth")
+    .eq("user_id", r.add_first_name_id);
+  if (!subs?.length) return Response.json({ sent: 0 });
+
+  const reason = String(r.reject_reason ?? "").trim();
+  const payload = JSON.stringify({
+    title: "Raport do poprawy",
+    body: `Raport nr ${r.number_report} z ${r.report_date} (${r.shift ?? "-"}) został odesłany do poprawy.` +
+      (reason ? ` Powód: ${reason}` : ""),
+    url: "./?view=reports&tab=rejected",
+    tag: `report-${r.number_report}`,
+  });
+  return Response.json(await sendPush(db, subs, payload));
+}
+
 Deno.serve(async (req) => {
   if (req.method !== "POST") return new Response("Method not allowed", { status: 405 });
   // Hasło wywołania (spacje / entery na końcach są pomijane). Odpowiedź mówi, co jest nie tak,
@@ -131,7 +160,7 @@ Deno.serve(async (req) => {
     );
   }
 
-  let body: { request_id?: number; event?: string; announcement_id?: number };
+  let body: { request_id?: number; event?: string; announcement_id?: number; report_number?: number };
   try {
     body = await req.json();
   } catch {
@@ -142,6 +171,11 @@ Deno.serve(async (req) => {
   if (body.announcement_id) {
     const db = createClient(env("SUPABASE_URL"), env("SUPABASE_SERVICE_ROLE_KEY"), { auth: { persistSession: false } });
     return await announcementPush(db, Number(body.announcement_id));
+  }
+  // Raport odesłany do poprawy (sql/34)
+  if (body.report_number && body.event === "report_rejected") {
+    const db = createClient(env("SUPABASE_URL"), env("SUPABASE_SERVICE_ROLE_KEY"), { auth: { persistSession: false } });
+    return await reportRejectedPush(db, Number(body.report_number));
   }
   const event = String(body.event ?? "");
   if (!body.request_id || !["new", "cancelled", "approved", "rejected"].includes(event)) {
