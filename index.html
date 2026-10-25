@@ -20,16 +20,16 @@
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
 
-  <link rel="stylesheet" href="css/style.css?v=20261226" />
-  <link rel="stylesheet" href="css/login.css?v=20261226" />
-  <link rel="stylesheet" href="css/menu.css?v=20261226" />
-  <link rel="stylesheet" href="css/mobile.css?v=20261226" />
-  <link rel="stylesheet" href="css/portal.css?v=20261226" />
-  <link rel="stylesheet" href="css/timepicker.css?v=20261226" />
-  <link rel="stylesheet" href="css/emp_lists.css?v=20261226" />
-  <link rel="stylesheet" href="css/absences.css?v=20261226" />
-  <link rel="stylesheet" href="css/messages.css?v=20261226" />
-  <link rel="stylesheet" href="css/login-v2.css?v=20261226" />
+  <link rel="stylesheet" href="css/style.css?v=20261347" />
+  <link rel="stylesheet" href="css/login.css?v=20261347" />
+  <link rel="stylesheet" href="css/menu.css?v=20261347" />
+  <link rel="stylesheet" href="css/mobile.css?v=20261347" />
+  <link rel="stylesheet" href="css/portal.css?v=20261347" />
+  <link rel="stylesheet" href="css/timepicker.css?v=20261347" />
+  <link rel="stylesheet" href="css/emp_lists.css?v=20261347" />
+  <link rel="stylesheet" href="css/absences.css?v=20261347" />
+  <link rel="stylesheet" href="css/messages.css?v=20261347" />
+  <link rel="stylesheet" href="css/login-v2.css?v=20261347" />
 </head>
 <body>
 
@@ -112,7 +112,7 @@
     <div class="lv2-wrap">
       <!-- Zegar, data i zmiany I / II / III (bieżąca w kolorze modułu, puls, końcówka zmiany) -->
       <section class="lv2-left" aria-label="Bieżąca zmiana">
-        <div class="eyebrow">Ewidencja czasu pracy</div>
+        <div class="eyebrow">Aktualna zmiana</div>
         <div class="big" id="lv2-clock">--:--</div>
         <div class="date" id="lv2-date"></div>
         <div class="timeline">
@@ -146,7 +146,7 @@
 
         <div id="step-login" class="card-body-step active">
           <h2>Witaj w <span>pracy</span></h2>
-          <div class="subtitle">Ewidencja czasu pracy</div>
+          <div class="subtitle"></div>
 
           <div class="login-tabs" role="tablist" aria-label="Rodzaj konta">
             <button type="button" id="login-tab-user" class="on" role="tab" aria-selected="true" onclick="setLoginMode('user')"><i class="fa-solid fa-user-gear"></i> Użytkownik</button>
@@ -255,6 +255,7 @@
             <i class="fa-solid fa-chevron-down menu-caret" aria-hidden="true"></i>
           </button>
           <ul class="menu-sub">
+            <li><button type="button" class="menu-sub-btn" data-rtab="mine" onclick="rpaOpenTab('mine')"><i class="fa-solid fa-user-pen"></i><span>Moje raporty</span></button></li>
             <li><button type="button" class="menu-sub-btn" data-rtab="archive" onclick="rpaOpenTab('archive')"><i class="fa-solid fa-box-archive"></i><span>Zatwierdzone</span></button></li>
             <li><button type="button" class="menu-sub-btn" data-rtab="pending" onclick="rpaOpenTab('pending')"><i class="fa-solid fa-hourglass-half"></i><span>W oczekiwaniu</span><span class="rpa-badge pending" style="display: none;"></span></button></li>
             <li><button type="button" class="menu-sub-btn" data-rtab="rejected" onclick="rpaOpenTab('rejected')"><i class="fa-solid fa-rotate-left"></i><span>Do poprawy</span><span class="rpa-badge rejected" style="display: none;"></span></button></li>
@@ -263,6 +264,11 @@
         <li class="menu-item" data-tab="absences" id="nav-absences" style="display: none;">
           <button class="menu-btn" onclick="navigateTo('absences')">
             <i class="fa-solid fa-user-clock"></i> Nieobecności <span class="ab-badge" style="display: none;"></span>
+          </button>
+        </li>
+        <li class="menu-item" data-tab="pour_plan" id="nav-pour_plan" style="display: none;">
+          <button class="menu-btn" onclick="navigateTo('pour_plan')">
+            <i class="fa-solid fa-fire-flame-curved"></i> Plan zalewu
           </button>
         </li>
         <li class="menu-item" data-tab="users" id="nav-users" style="display: none;">
@@ -351,6 +357,18 @@
           <h3 id="zw-name">Zalew</h3>
           <p>Co zalewamy z każdej kadzi na liniach Lora, HWS, HWS-D i SMS, oraz modele z wagą.</p>
         </div>
+        <!-- Dashboard: kadź z płynnym metalem - wykonanie planu tygodnia (js/zalew.js, zwRenderLadle) -->
+        <div class="page-hero-actions" id="zw-dash-hero" style="display: none;"><div class="zw-ladlebox" id="zw-dash-ladle"></div></div>
+        <!-- dzień i zmiana: strzałki jak w Harmonogramie (js/zalew.js, zwStepPeriod) -->
+        <div class="page-hero-actions" id="zw-period">
+          <div class="zw-periodpick">
+            <button type="button" id="zw-prev" onclick="zwStepPeriod(-1)" aria-label="Wcześniej"><i class="fa-solid fa-chevron-left"></i></button>
+            <span class="zw-period-label" id="zw-period-text" aria-live="polite">—</span>
+            <button type="button" id="zw-next" onclick="zwStepPeriod(1)" aria-label="Później"><i class="fa-solid fa-chevron-right"></i></button>
+            <button type="button" id="zw-now" class="txt" onclick="zwGoNow()" title="Wróć do bieżącej zmiany">Teraz</button>
+            <button type="button" id="zw-wholeday" class="txt" onclick="zwToggleWholeDay()" aria-pressed="false" title="Wszystkie zmiany dnia / jedna zmiana">Cała doba</button>
+          </div>
+        </div>
       </div>
 
       <!-- Zakładki: linie + Modele -->
@@ -362,31 +380,33 @@
           <div class="zw-toolbar">
             <div>
               <h4 id="zw-pours-title">Zalewy</h4>
-              <span class="zw-info">Wiersz to jeden model zalany z kadzi.</span>
+              <span class="zw-info" id="zw-pours-info">Wiersz to jeden model zalany z kadzi.</span>
             </div>
             <div class="zw-tools">
-              <input type="date" id="zw-date" class="form-control zw-date" aria-label="Dzień zalewów" onchange="zwOnDateChange()" />
-              <select id="zw-shift" class="form-control zw-date" aria-label="Zmiana" onchange="zwOnShiftChange()"></select>
-              <button type="button" class="btn-primary" style="width: auto; padding: 0 18px; height: 42px; white-space: nowrap;" onclick="zwOpenPour(null)">
+              <button type="button" id="zw-add-pour" class="btn-primary" style="width: auto; padding: 0 18px; height: 42px; white-space: nowrap;" onclick="zwOpenPour(null)">
                 <i class="fa-solid fa-plus"></i> Dodaj kadź
               </button>
             </div>
           </div>
 
+          <!-- realizacja: kafelki słupkowe względem liczby zadanej i aktualnie zalewany model (js/zalew.js, zwRenderProgress) -->
+          <div class="zw-progress" id="zw-progress"></div>
           <div class="zw-sum" id="zw-sum"></div>
 
           <div style="overflow-x: auto;">
-            <table class="zw-table">
+            <table class="zw-table zw-pours-table" id="zw-pours-table">
               <thead>
                 <tr>
                   <th>Godzina</th>
+                  <th class="zw-col-line">Linia</th>
                   <th>Nr kadzi</th>
                   <th>Temp. metalu</th>
                   <th>ACEL</th>
-                  <th>Metal w kadzi</th>
                   <th>Model</th>
                   <th>Waga modelu</th>
-                  <th>Ilość form</th>
+                  <th>Formy dobre</th>
+                  <th>Formy zabrak.</th>
+                  <th>Metal w kadzi</th>
                   <th>Razem</th>
                   <th>Próba</th>
                   <th>Uwagi</th>
@@ -395,6 +415,29 @@
               </thead>
               <tbody id="zw-pours-body"></tbody>
             </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== Dashboard: podsumowanie tygodnia (pn-niedz) z podziałem na zmiany (js/zalew.js, zwLoadDash) ===== -->
+      <div id="zw-dash-card" style="display: none;">
+        <div class="ep-card zw-card">
+          <div class="zw-toolbar">
+            <div>
+              <h4>Dashboard — podsumowanie tygodnia</h4>
+              <span class="zw-info">Kadzie, metal wlany do kadzi i formy dobre w każdym dniu i na każdej zmianie, względem liczby zadanej.</span>
+            </div>
+            <div class="zw-weekpick">
+              <button type="button" onclick="zwDashStep(-1)" title="Poprzedni tydzień" aria-label="Poprzedni tydzień"><i class="fa-solid fa-chevron-left"></i></button>
+              <span class="zw-week-label" id="zw-dash-week" aria-live="polite">—</span>
+              <button type="button" id="zw-dash-next" onclick="zwDashStep(1)" title="Następny tydzień" aria-label="Następny tydzień"><i class="fa-solid fa-chevron-right"></i></button>
+              <button type="button" id="zw-dash-now" class="txt" onclick="zwDashStep(0)" title="Wróć do bieżącego tygodnia">Ten tydzień</button>
+            </div>
+          </div>
+          <!-- linia: wszystkie albo jedna -->
+          <div class="zw-subtabs zw-dash-lines" id="zw-dash-lines" aria-label="Linia"></div>
+          <div style="overflow-x: auto;">
+            <table class="zw-dash-table" id="zw-dash-table"></table>
           </div>
         </div>
       </div>
@@ -452,30 +495,30 @@
               <label for="zw-pour-ladle">Numer kadzi (7 cyfr)</label>
               <div class="zw-stepper">
                 <button type="button" onclick="zwStepLadle(-1)" title="Numer kadzi o 1 mniejszy" aria-label="Numer kadzi o 1 mniejszy"><i class="fa-solid fa-minus"></i></button>
-                <input type="text" id="zw-pour-ladle" class="form-control" maxlength="7" inputmode="numeric" pattern="[0-9]{7}" title="Dokładnie 7 cyfr" placeholder="0000000" />
+                <input type="text" id="zw-pour-ladle" class="form-control" maxlength="7" inputmode="numeric" oninput="zwDigitsOnly(this)" pattern="[0-9]{7}" title="Dokładnie 7 cyfr" placeholder="np. 1000123" />
                 <button type="button" onclick="zwStepLadle(1)" title="Numer kadzi o 1 większy" aria-label="Numer kadzi o 1 większy"><i class="fa-solid fa-plus"></i></button>
               </div>
             </div>
             <div class="form-group">
               <label for="zw-pour-temp">Temperatura metalu (°C)</label>
-              <input type="text" id="zw-pour-temp" class="form-control" inputmode="numeric" />
+              <input type="text" id="zw-pour-temp" class="form-control" inputmode="numeric" oninput="zwDigitsOnly(this)" maxlength="4" pattern="[0-9]{4}" title="Dokładnie 4 cyfry" placeholder="np. 1420" />
             </div>
             <div class="form-group">
-              <label for="zw-pour-acel">ACEL</label>
-              <input type="text" id="zw-pour-acel" class="form-control" inputmode="decimal" />
+              <label for="zw-pour-acel">ACEL (np. 4,32; puste = 0,00)</label>
+              <input type="text" id="zw-pour-acel" class="form-control" inputmode="numeric" maxlength="4" placeholder="np. 4,32" oninput="zwAcelInput(this)" />
             </div>
             <div class="form-group">
               <label for="zw-pour-metal">Metal wlany do kadzi (kg)</label>
-              <input type="text" id="zw-pour-metal" class="form-control" inputmode="numeric" />
+              <input type="text" id="zw-pour-metal" class="form-control" inputmode="numeric" maxlength="4" title="Najwyżej 4 cyfry" placeholder="np. 1500" oninput="zwDigitsOnly(this)" />
             </div>
             <div class="form-group">
-              <label for="zw-pour-forms">Ilość form</label>
-              <input type="text" id="zw-pour-forms" class="form-control" inputmode="numeric" oninput="zwPourPreview()" />
+              <label for="zw-pour-forms">Ilość form dobrych</label>
+              <input type="text" id="zw-pour-forms" class="form-control" inputmode="numeric" placeholder="np. 12" oninput="zwDigitsOnly(this); zwPourPreview()" />
             </div>
-          </div>
-          <div class="form-group">
-            <span class="zw-label">Zmiana</span>
-            <div id="zw-pour-shift" class="zw-shiftinfo" aria-live="polite"></div>
+            <div class="form-group">
+              <label for="zw-pour-scrap">Ilość form zabrakowanych</label>
+              <input type="text" id="zw-pour-scrap" class="form-control" inputmode="numeric" placeholder="np. 2 (puste = 0)" oninput="zwDigitsOnly(this); zwPourPreview()" />
+            </div>
           </div>
           <div class="form-group">
             <label for="zw-pour-model-input">Model</label>
@@ -502,9 +545,9 @@
           </div>
           <div class="form-group" style="margin-top: 12px;">
             <label for="zw-pour-notes">Uwagi</label>
-            <textarea id="zw-pour-notes" class="form-control zw-notes" rows="2" maxlength="500" placeholder="Opcjonalnie, np. przyczyna przestoju, problem z formą"></textarea>
+            <textarea id="zw-pour-notes" class="form-control zw-notes" rows="2" maxlength="500" placeholder="Opcjonalnie, np. problem z formą"></textarea>
           </div>
-          <div id="zw-pour-msg" role="alert" style="display: none; font-size: 0.86rem; margin: 10px 0; color: var(--danger);"></div>
+          <div id="zw-pour-msg" role="alert" style="display: none; font-size: 0.86rem; margin: 10px 0; color: var(--danger); text-align: center;"></div>
           <div class="modal-btn-row" style="margin-top: 14px;">
             <button type="button" class="btn-secondary" onclick="zwClosePour()">Anuluj</button>
             <button type="submit" id="zw-pour-save" class="btn-primary">Zapisz</button>
@@ -542,16 +585,16 @@
       </div>
     </div>
 
-    <!-- Modal: ostrzeżenie o numerze kadzi (ta sama, pominięta albo cofnięta kadź) -->
+    <!-- Modal: ostrzeżenie przed zapisem kadzi - numer (ta sama, pominięta albo cofnięta kadź) i waga (zalew a metal w kadzi) -->
     <div id="modal-zw-warn" class="modal">
       <div class="modal-box" style="max-width: 440px; width: 92%; text-align: center; padding: 25px 20px;">
         <div style="width: 55px; height: 55px; border-radius: 50%; background: rgba(252, 212, 68, 0.3); color: #92590A; display: flex; align-items: center; justify-content: center; font-size: 1.6rem; margin: 0 auto 15px auto;">
           <i class="fa-solid fa-triangle-exclamation"></i>
         </div>
-        <h3 style="margin: 0 0 10px 0; font-size: 1.25rem;">Sprawdź numer kadzi</h3>
-        <p id="zw-warn-text" style="color: var(--text-dark); font-size: 0.95rem; margin-bottom: 24px; line-height: 1.5;"></p>
+        <h3 id="zw-warn-title" style="margin: 0 0 10px 0; font-size: 1.25rem;">Sprawdź numer kadzi</h3>
+        <div id="zw-warn-text" style="color: var(--text-dark); font-size: 0.95rem; margin-bottom: 24px; line-height: 1.5;"></div>
         <div class="modal-btn-row">
-          <button type="button" class="btn-secondary" onclick="zwCloseLadleWarning()">Popraw numer</button>
+          <button type="button" id="zw-warn-back" class="btn-secondary" onclick="zwCloseLadleWarning()">Popraw numer</button>
           <button type="button" class="btn-danger" onclick="zwConfirmLadleWarning()">Zapisz mimo to</button>
         </div>
       </div>
@@ -565,8 +608,10 @@
         </div>
         <h3 id="zw-delete-title" style="margin: 0 0 10px 0; font-size: 1.25rem;">Usuwanie</h3>
         <p style="color: var(--text-muted); font-size: 0.95rem; margin-bottom: 24px; line-height: 1.5;">
-          <span id="zw-delete-question"></span> <br/>
-          <strong id="zw-delete-target" style="color: var(--text-dark); font-size: 1.05rem;"></strong>?
+          <!-- pytanie, pod nim linia (np. "Linia: Lora"), a pod nią usuwany model / zalew -->
+          <span id="zw-delete-question" style="display: block;"></span>
+          <span id="zw-delete-line" style="display: block; margin-top: 8px;"></span>
+          <span id="zw-delete-target" class="zw-del-target" style="display: block;"></span>
         </p>
         <div class="modal-btn-row">
           <button type="button" class="btn-secondary" onclick="zwCloseDelete()">Nie</button>
@@ -851,29 +896,30 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="js/app.js?v=20261226"></script>
-  <script src="js/login-fx.js?v=20261226"></script>
-  <script src="js/login-v2.js?v=20261226"></script>
-  <script src="js/menu-fx.js?v=20261226"></script>
-  <script src="js/mobile.js?v=20261226"></script>
-  <script src="js/report_time.js?v=20261226"></script>
-  <script src="js/emp_lists.js?v=20261226"></script>
-  <script src="js/reports.js?v=20261226"></script>
-  <script src="js/report_approval.js?v=20261226"></script>
-  <script src="js/updates.js?v=20261226"></script>
-  <script src="js/dashboard.js?v=20261226"></script>
-  <script src="js/schedule.js?v=20261226"></script>
-  <script src="js/employee_presence.js?v=20261226"></script>
-  <script src="js/user.js?v=20261226"></script>
-  <script src="js/employee_hours.js?v=20261226"></script>
-  <script src="js/options.js?v=20261226"></script>
-  <script src="js/logs.js?v=20261226"></script>
-  <script src="js/employee_portal.js?v=20261226"></script>
-  <script src="js/absences.js?v=20261226"></script>
-  <script src="js/push.js?v=20261226"></script>
-  <script src="js/messages.js?v=20261226"></script>
-  <script src="js/zalew.js?v=20261226"></script>
-  <script src="js/password.js?v=20261226"></script>
-  <script src="js/pwa.js?v=20261226"></script>
+  <script src="js/app.js?v=20261347"></script>
+  <script src="js/login-fx.js?v=20261347"></script>
+  <script src="js/login-v2.js?v=20261347"></script>
+  <script src="js/menu-fx.js?v=20261347"></script>
+  <script src="js/mobile.js?v=20261347"></script>
+  <script src="js/report_time.js?v=20261347"></script>
+  <script src="js/emp_lists.js?v=20261347"></script>
+  <script src="js/reports.js?v=20261347"></script>
+  <script src="js/report_approval.js?v=20261347"></script>
+  <script src="js/updates.js?v=20261347"></script>
+  <script src="js/dashboard.js?v=20261347"></script>
+  <script src="js/schedule.js?v=20261347"></script>
+  <script src="js/employee_presence.js?v=20261347"></script>
+  <script src="js/user.js?v=20261347"></script>
+  <script src="js/employee_hours.js?v=20261347"></script>
+  <script src="js/options.js?v=20261347"></script>
+  <script src="js/logs.js?v=20261347"></script>
+  <script src="js/employee_portal.js?v=20261347"></script>
+  <script src="js/absences.js?v=20261347"></script>
+  <script src="js/push.js?v=20261347"></script>
+  <script src="js/messages.js?v=20261347"></script>
+  <script src="js/zalew.js?v=20261347"></script>
+  <script src="js/pour_plan.js?v=20261347"></script>
+  <script src="js/password.js?v=20261347"></script>
+  <script src="js/pwa.js?v=20261347"></script>
 </body>
 </html>

@@ -107,12 +107,17 @@ function dbTabSaved() {
 function dbSetTab(tab) {
   const zalewBtn = document.getElementById("db-tab-zalew");
   if (tab === "zalew" && zalewBtn && zalewBtn.hidden) tab = "time";
+  const wasZalew = !!document.querySelector('.db-tab.on[data-dtab="zalew"]');
   document.querySelectorAll(".db-tab").forEach(b => {
     const on = b.dataset.dtab === tab;
     b.classList.toggle("on", on);
     b.setAttribute("aria-selected", String(on));
   });
   document.querySelectorAll(".db-pane").forEach(p => { p.hidden = p.dataset.pane !== tab; });
+  // nagłówek: miesiąc dla ewidencji, tydzień dla Zalewu
+  document.querySelectorAll("[data-only]").forEach(el => { el.hidden = el.dataset.only !== tab; });
+  // przejście z ewidencji na Zalew: kadź spada z góry na swoje miejsce
+  if (tab === "zalew" && !wasZalew && typeof zwDropLadle === "function") zwDropLadle();
   try { localStorage.setItem(DB_TAB_KEY, tab); } catch (e) { /* bez zapamiętania */ }
 }
 
@@ -135,6 +140,10 @@ async function initDashboardView() {
   dbSyncPeriodArrows();
   dbSetTab(dbTabSaved());
   dbInitTooltip();
+  // tydzień zalewu ma własny wybór tygodnia - nie zależy od miesiąca pulpitu
+  if (typeof zwDashOpenInApp === "function" && (typeof moduleEnabled !== "function" || moduleEnabled("zalew"))) {
+    zwDashOpenInApp();
+  }
 
   try {
     const [employees, depts] = await Promise.all([
@@ -184,7 +193,7 @@ async function dbLoad() {
     if (token !== dbLoadToken) return; // w międzyczasie zmieniono okres
 
     dbRender(rows, year, month);
-    dbLoadZalew(year, month, token); // osobno: błąd Zalewu (np. brak uprawnień) nie psuje reszty pulpitu
+    dbSyncZalewModule(token);
     dbRenderYear(yearOnly || rows, year, month);
   } catch (err) {
     if (token !== dbLoadToken) return;
@@ -550,269 +559,13 @@ function dbInitTooltip() {
   root.addEventListener("focusout", hide);
 }
 
-// ---------- Zalew: podsumowanie zalewów w wybranym okresie ----------
-// Tabela zalewy (moduł Zalew). Podział na zmiany I, II, III i ogółem,
-// a pod spodem waga w rozbiciu na linie i zmiany.
-const DB_ZW_SHIFTS = ["Zmiana I", "Zmiana II", "Zmiana III"];
-const DB_ZW_LINES = ["Lora", "HWS", "HWS-D", "SMS"];
-const DB_ZW_TOP_MODELS = 10;  // ile modeli pokazać w tabeli "Zalane modele"
-
-function dbKg(value) {
-  return `${dbNum(value, 0)} kg`;
-}
-
-async function dbLoadZalew(year, month, token) {
-  const el = document.getElementById("db-zalew");
-  const sub = document.getElementById("db-zalew-sub");
-  if (!el) return;
-
-  // Moduł Zalew wyłączony w Opcjach: panel w ogóle się nie pokazuje.
-  // Ustawienia modułów pobierane od nowa, żeby zmiana w Opcjach działała bez przelogowania.
-  const panel = document.getElementById("db-zalew-panel");
-  if (panel) panel.style.display = moduleEnabled("zalew") ? "" : "none"; // od razu, bez mignięcia
-  dbSyncZalewTab(moduleEnabled("zalew"));
+// ---------- Zalew ----------
+// Zakładka Zalew pokazuje tylko tydzień zalewu (js/zalew.js, zwDashOpenInApp).
+// Moduł Zalew wyłączony w Opcjach: zakładka znika. Ustawienia modułów pobierane od nowa,
+// żeby zmiana w Opcjach działała bez przelogowania.
+async function dbSyncZalewModule(token) {
+  dbSyncZalewTab(moduleEnabled("zalew")); // od razu, bez mignięcia
   await loadModules();
   if (token !== dbLoadToken) return;
-  const zalewOn = moduleEnabled("zalew");
-  if (panel) panel.style.display = zalewOn ? "" : "none";
-  dbSyncZalewTab(zalewOn);
-  if (!zalewOn) {
-    el.innerHTML = "";
-    return;
-  }
-
-  const pad = n => String(n).padStart(2, "0");
-  const from = month ? `${year}-${month}-01` : `${year}-01-01`;
-  const to = month
-    ? `${year}-${month}-${pad(new Date(Number(year), Number(month), 0).getDate())}`
-    : `${year}-12-31`;
-  if (sub) {
-    sub.textContent = month
-      ? `${RP_MONTHS[Number(month) - 1]} ${year} — kadzie, formy i waga zalana na wszystkich liniach`
-      : `Rok ${year} — kadzie, formy i waga zalana na wszystkich liniach`;
-  }
-  el.innerHTML = `<div class="db-empty"><i class="fa-solid fa-spinner fa-spin"></i>Ładowanie zalewów...</div>`;
-
-  let rows;
-  try {
-    rows = await rpFetchAll(() => supabaseClient
-      .from("zalewy")
-      .select("id, data_zalewu, zmiana, linia, numer_kadzi, nr_modelu, ilosc_form, waga_razem")
-      .gte("data_zalewu", from)
-      .lte("data_zalewu", to));
-  } catch (err) {
-    if (token !== dbLoadToken) return;
-    console.error("Błąd pobierania zalewów do pulpitu:", err);
-    el.innerHTML = dbEmptyHtml("Nie udało się pobrać zalewów: " + (err.message || err));
-    return;
-  }
-  if (token !== dbLoadToken) return;
-
-  const sums = rowsOf => ({
-    ladles: new Set(rowsOf.map(r => `${r.zmiana}|${r.linia}|${String(r.numer_kadzi || "").trim()}`)).size,
-    forms: rowsOf.reduce((s, r) => s + (Number(r.ilosc_form) || 0), 0),
-    weight: rowsOf.reduce((s, r) => s + (Number(r.waga_razem) || 0), 0)
-  });
-
-  if (rows.length === 0) {
-    el.innerHTML = dbEmptyHtml("Brak zalewów w wybranym okresie.");
-    return;
-  }
-
-  const total = sums(rows);
-  const tile = (title, s, cls) => `
-    <div class="db-zw-tile ${cls}">
-      <div class="lbl">${rtEsc(title)}</div>
-      <div class="val">${dbKg(s.weight)}</div>
-      <div class="note">Kadzi: <b>${dbNum(s.ladles, 0)}</b> • Form: <b>${dbNum(s.forms, 0)}</b></div>
-    </div>`;
-
-  const shiftTiles = DB_ZW_SHIFTS.map((shift, i) => tile(shift, sums(rows.filter(r => r.zmiana === shift)), `z${i + 1}`)).join("");
-  const other = rows.filter(r => !DB_ZW_SHIFTS.includes(r.zmiana));
-
-  // Linie x zmiany: w każdej komórce waga, kadzie i formy
-  const cellSums = (line, shift) =>
-    sums(rows.filter(r => (!line || r.linia === line) && (!shift || r.zmiana === shift)));
-  const cellHtml = s => s.weight || s.forms
-    ? `<div class="w">${dbKg(s.weight)}</div><div class="kf">Kadzi: <b>${dbNum(s.ladles, 0)}</b> • Form: <b>${dbNum(s.forms, 0)}</b></div>`
-    : `<div class="none">—</div>`;
-
-  const lineRows = DB_ZW_LINES.map(line => `
-    <tr>
-      <td class="ln">${rtEsc(line)}</td>
-      ${DB_ZW_SHIFTS.map(shift => `<td>${cellHtml(cellSums(line, shift))}</td>`).join("")}
-      <td class="tot">${cellHtml(cellSums(line, null))}</td>
-    </tr>`).join("");
-
-  // Modele zalane w okresie: od największej wagi
-  const byModel = new Map();
-  rows.forEach(r => {
-    const key = `${r.linia}|${String(r.nr_modelu || "").trim() || "-"}`;
-    if (!byModel.has(key)) byModel.set(key, { line: r.linia, model: String(r.nr_modelu || "").trim() || "-", rows: [] });
-    byModel.get(key).rows.push(r);
-  });
-  const models = [...byModel.values()]
-    .map(m => ({ ...m, s: sums(m.rows) }))
-    .sort((a, b) => b.s.weight - a.s.weight || b.s.forms - a.s.forms);
-  const topModels = models.slice(0, DB_ZW_TOP_MODELS);
-
-  el.innerHTML = `
-    <div class="db-zw-tiles">
-      ${tile("Ogółem", total, "main")}
-      ${shiftTiles}
-    </div>
-    ${dbZalewChart(rows, year, month)}
-    ${dbZalewLineCharts(rows, year, month)}
-    ${other.length ? `<p class="db-zw-other">Wpisy bez przypisanej zmiany: ${dbNum(other.length, 0)} (${dbKg(sums(other).weight)}) — są wliczone tylko do „Ogółem”.</p>` : ""}
-
-    <h5 class="db-zw-h">Linie i zmiany</h5>
-    <div style="overflow-x: auto;">
-      <table class="db-zw-table">
-        <thead>
-          <tr>
-            <th>Linia</th>
-            ${DB_ZW_SHIFTS.map((s, i) => `<th><i class="db-zw-dot z${i + 1}"></i>${rtEsc(s)}</th>`).join("")}
-            <th>Razem</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${lineRows}
-          <tr class="sum">
-            <td class="ln">Wszystkie linie</td>
-            ${DB_ZW_SHIFTS.map(shift => `<td>${cellHtml(cellSums(null, shift))}</td>`).join("")}
-            <td class="tot">${cellHtml(total)}</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-
-    <h5 class="db-zw-h">Zalane modele${models.length > DB_ZW_TOP_MODELS ? ` — ${DB_ZW_TOP_MODELS} największych z ${models.length}` : ""}</h5>
-    <div style="overflow-x: auto;">
-      <table class="db-zw-table models">
-        <thead>
-          <tr>
-            <th>Model</th>
-            <th>Linia</th>
-            <th>Kadzi</th>
-            <th>Form</th>
-            <th>Waga</th>
-            <th>Udział</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${topModels.map(m => {
-            const share = total.weight > 0 ? (m.s.weight / total.weight) * 100 : 0;
-            return `
-              <tr>
-                <td class="ln">${rtEsc(m.model)}</td>
-                <td>${rtEsc(m.line || "-")}</td>
-                <td>${dbNum(m.s.ladles, 0)}</td>
-                <td>${dbNum(m.s.forms, 0)}</td>
-                <td class="tot">${dbKg(m.s.weight)}</td>
-                <td class="share"><span class="bar"><span style="width: ${Math.min(share, 100)}%;"></span></span>${dbNum(share)}%</td>
-              </tr>`;
-          }).join("")}
-        </tbody>
-      </table>
-    </div>`;
-}
-
-// Wykres zalewów: dzień po dniu (albo miesiąc po miesiącu przy "Cały rok"),
-// kolumna podzielona na zmiany: I zielona, II żółta, III czerwona
-// opts.max - wspólna skala (wykresy linii porównywalne między sobą), opts.small - niższy wykres
-function dbZalewChart(rows, year, month, opts = {}) {
-  const count = month ? new Date(Number(year), Number(month), 0).getDate() : 12;
-  const points = Array.from({ length: count }, (_, i) => {
-    const key = i + 1;
-    const mm = month || String(key).padStart(2, "0");
-    const prefix = month ? `${year}-${month}-${String(key).padStart(2, "0")}` : `${year}-${mm}`;
-    const inPoint = rows.filter(r => String(r.data_zalewu || "").startsWith(prefix));
-    const perShift = DB_ZW_SHIFTS.map(s =>
-      inPoint.filter(r => r.zmiana === s).reduce((sum, r) => sum + (Number(r.waga_razem) || 0), 0));
-    return {
-      key,
-      axis: month ? String(key) : RP_MONTHS[i].slice(0, 3),
-      full: month ? `${String(key).padStart(2, "0")}.${month}.${year}` : `${RP_MONTHS[i]} ${year}`,
-      perShift,
-      total: perShift.reduce((a, b) => a + b, 0)
-    };
-  });
-
-  const maxTotal = Math.max(...points.map(p => p.total));
-  if (maxTotal <= 0 && !opts.small) return "";
-
-  const max = opts.max || dbNiceMax(maxTotal);
-  const ticks = [0, 1, 2, 3, 4].map(i => (max / 4) * i);
-  // duże wartości na osi w tonach, żeby się mieściły
-  const tickLabel = t => (max >= 10000 ? `${dbNum(t / 1000)} t` : dbNum(t, 0));
-  const yAxis = ticks.map(t => `<span style="bottom: ${(t / max) * 100}%;">${tickLabel(t)}</span>`).join("");
-  const grid = ticks.map(t => `<i class="${t === 0 ? "base" : ""}" style="bottom: ${(t / max) * 100}%;"></i>`).join("");
-  const colors = ["var(--db-z1)", "var(--db-z2)", "var(--db-z3)"];
-
-  const cols = points.map(p => {
-    const weekday = month ? new Date(Number(year), Number(month) - 1, p.key).getDay() : -1;
-    const dayClass = weekday === 6 ? " sat" : weekday === 0 ? " sun" : "";
-    const minor = month && !(p.key === 1 || p.key % 5 === 0) ? " minor" : "";
-    // od góry: zmiana III, II, I (zmiana I przy osi)
-    const segs = [2, 1, 0]
-      .filter(i => p.perShift[i] > 0)
-      .map(i => `<span class="seg z${i + 1}" style="flex: ${p.perShift[i]} 0 0;"></span>`).join("");
-    const lines = DB_ZW_SHIFTS.map((s, i) => [colors[i], `${s}: ${dbKg(p.perShift[i])}`]);
-    lines.push(["transparent", `Razem: ${dbKg(p.total)}`]);
-    const label = `${p.full}: ` + DB_ZW_SHIFTS.map((s, i) => `${s} ${dbKg(p.perShift[i])}`).join(", ");
-
-    return `
-      <div class="db-col${dayClass}" tabindex="0" role="img" aria-label="${rtEsc(label)}"
-           data-tip="${dbTipAttr(p.full, lines)}">
-        <div class="area">${p.total > 0 ? `<div class="stack" style="height: ${(p.total / max) * 100}%;">${segs}</div>` : ""}</div>
-        <div class="xl${minor}">${rtEsc(p.axis)}</div>
-      </div>`;
-  }).join("");
-
-  return `
-    <div class="db-chart db-zw-chart${opts.small ? " small" : ""}">
-      <div class="db-yaxis" aria-hidden="true">${yAxis}</div>
-      <div class="db-plot">
-        <div class="db-gridlines">${grid}</div>
-        <div class="db-cols">${cols}</div>
-      </div>
-    </div>`;
-}
-
-// Najwyższa suma dnia (albo miesiąca) w podanych wierszach - do wspólnej skali wykresów linii
-function dbZalewMaxPoint(rows, year, month) {
-  const totals = new Map();
-  rows.forEach(r => {
-    const d = String(r.data_zalewu || "");
-    const key = month ? d.slice(0, 10) : d.slice(0, 7);
-    totals.set(key, (totals.get(key) || 0) + (Number(r.waga_razem) || 0));
-  });
-  return Math.max(0, ...totals.values());
-}
-
-// Osobny wykres dla każdej linii (Lora, HWS, HWS-D, SMS), z tą samą skalą,
-// żeby linie dało się porównać na oko; kolory zmian jak na wykresie ogólnym
-function dbZalewLineCharts(rows, year, month) {
-  const perLine = DB_ZW_LINES.map(line => ({ line, rows: rows.filter(r => r.linia === line) }));
-  const max = dbNiceMax(Math.max(...perLine.map(l => dbZalewMaxPoint(l.rows, year, month))));
-  if (max <= 0) return "";
-
-  return `
-    <h5 class="db-zw-h">Linie</h5>
-    <div class="db-zw-lines">
-      ${perLine.map(l => {
-        const weight = l.rows.reduce((s, r) => s + (Number(r.waga_razem) || 0), 0);
-        const forms = l.rows.reduce((s, r) => s + (Number(r.ilosc_form) || 0), 0);
-        return `
-          <div class="db-zw-line">
-            <div class="db-zw-line-head">
-              <span class="name">${rtEsc(l.line)}</span>
-              <span class="sum">${dbKg(weight)} • form: ${dbNum(forms, 0)}</span>
-            </div>
-            ${l.rows.length
-              ? dbZalewChart(l.rows, year, month, { max, small: true })
-              : `<div class="db-empty" style="padding: 30px 10px;">Brak zalewów na tej linii.</div>`}
-          </div>`;
-      }).join("")}
-    </div>`;
+  dbSyncZalewTab(moduleEnabled("zalew"));
 }

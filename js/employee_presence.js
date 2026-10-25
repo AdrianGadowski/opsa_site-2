@@ -1,6 +1,7 @@
 // ==========================================
-// MODUŁ: OBECNOŚĆ W BIEŻĄCYM TYGODNIU (lista pracowników -> kolumna "Obecność")
+// MODUŁ: OBECNOŚĆ W TYGODNIU (lista pracowników -> kolumna "Obecność")
 // Kafelki pn–niedz: plan dnia z Harmonogramu (schedule_days) porównany z raportami (work_reports).
+// Strzałki ‹ › przełączają tydzień (domyślnie bieżący).
 //   zielony kontur    - dzień zaplanowany do pracy (brak raportu)
 //   zielony           - obecny, godziny zgodne z harmonogramem
 //   żółty             - obecny, ale inaczej niż w harmonogramie (inne godziny albo dzień niezaplanowany)
@@ -18,11 +19,12 @@ let prSchedule = {};         // { [employeeId]: { [iso]: [wpisy schedule_days] }
 let prReports = {};          // { [employeeId]: { "dd.mm.rrrr": [wiersze] } }
 let prLoaded = false;
 let prLoadToken = 0;
+let prWeekOffset = 0;        // 0 = bieżący tydzień, -1 = poprzedni, 1 = następny (strzałki w kolumnie)
 
-// Dni bieżącego tygodnia (od poniedziałku do niedzieli)
+// Dni wybranego tygodnia (od poniedziałku do niedzieli)
 function prWeekDays() {
   const now = new Date();
-  const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - (now.getDay() + 6) % 7);
+  const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - (now.getDay() + 6) % 7 + prWeekOffset * 7);
   const p = n => String(n).padStart(2, "0");
   return Array.from({ length: 7 }, (_, i) => {
     const d = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + i);
@@ -40,15 +42,29 @@ function prWeekLabel() {
   return `${prDays[0].pl.slice(0, 5)}–${prDays[6].pl.slice(0, 5)}`;
 }
 
-// Pobiera harmonogram i raporty bieżącego tygodnia, potem uzupełnia kafelki w tabeli
+// Strzałki ‹ › w kolumnie "Obecność" (i w legendzie na telefonie): poprzedni / następny tydzień;
+// 0 ("Aktualny tydzień") wraca do bieżącego
+function prStepWeek(delta) {
+  prWeekOffset = delta === 0 ? 0 : prWeekOffset + delta;
+  prLoad();
+}
+
+// Napis tygodnia w nagłówku kolumny i w legendzie; "Aktualny tydzień" wyszarzony w bieżącym tygodniu
+function prSyncWeekNav() {
+  const label = prWeekLabel();
+  document.querySelectorAll("[data-pr-range]").forEach(el => { el.textContent = label; });
+  document.querySelectorAll("[data-pr-today]").forEach(el => { el.disabled = prWeekOffset === 0; });
+  const head = document.getElementById("emp-presence-head");
+  if (head) head.title = `Obecność: ${label}${prWeekOffset === 0 ? " (bieżący tydzień)" : ""}`;
+}
+
+// Pobiera harmonogram i raporty wybranego tygodnia, potem uzupełnia kafelki w tabeli
 async function prLoad() {
   const token = ++prLoadToken;
   prDays = prWeekDays();
   prLoaded = false;
-  const head = document.getElementById("emp-presence-head");
-  if (head) head.title = `Bieżący tydzień: ${prWeekLabel()}`;
-  const range = document.getElementById("emp-presence-range");
-  if (range) range.textContent = prWeekLabel();
+  prSyncWeekNav();
+  prFillCells();               // od razu kręciołek ładowania w kafelkach
 
   const [schedRes, reportsRes] = await Promise.allSettled([
     rpFetchAll(() => supabaseClient
@@ -113,9 +129,26 @@ function prDayShifts(plans, rows) {
   return [...planned, ...extra].sort((a, b) => rtToMin(a.time_from) - rtToMin(b.time_from));
 }
 
+// Czy zaplanowana zmiana już się skończyła (zmiana przez północ kończy się następnego dnia;
+// nieobecność na cały dzień - o północy). Dopiero wtedy brak raportu jest oznaczany na czerwono
+// ("missing"), a zgłoszona nieobecność wypełnia kafelek na czerwono ("absdone").
+function prShiftEnded(iso, p) {
+  if (!p.time_from || !p.time_to) {
+    if (p.kind !== "absence") return false;
+    const end = new Date(`${iso}T00:00:00`);
+    end.setDate(end.getDate() + 1);
+    return end <= new Date();
+  }
+  const to = String(p.time_to).slice(0, 5);
+  const end = new Date(`${iso}T${to}:00`);
+  if (isNaN(end)) return false;
+  if (rtToMin(to) <= rtToMin(String(p.time_from).slice(0, 5))) end.setDate(end.getDate() + 1);
+  return end <= new Date();
+}
+
 // Stan każdej z dwóch zmian osobno. Raport należy do zmiany, z którą pokrywa się godzinowo
 // (zmiana III liczy się do dnia, w którym się zaczyna - tak jak w harmonogramie i raportach).
-function prHalfStates(shifts, rows) {
+function prHalfStates(shifts, rows, iso) {
   const ranges = shifts.map(p => rtRange(p.time_from, p.time_to));
   const mine = shifts.map(() => []);
   const loose = [];   // raporty w godzinach poza obiema zmianami
@@ -133,7 +166,9 @@ function prHalfStates(shifts, rows) {
     }
     if (mine[k].length) return "absent";
     if (loose.some(r => r.at_work !== false)) return "diff";   // pracował, ale w innych godzinach
-    return p.kind === "absence" ? "absplan" : "plan";
+    // zgłoszona nieobecność: po czasie zmiany pełny czerwony, wcześniej czerwony kontur
+    if (p.kind === "absence") return prShiftEnded(iso, p) ? "absdone" : "absplan";
+    return prShiftEnded(iso, p) ? "missing" : "plan";          // zmiana minęła, a raportu brak
   });
 }
 
@@ -150,7 +185,7 @@ function prDayState(empId, day, index) {
   // każda ze stanem swojej zmiany (gdy obie mają ten sam stan, kafelek jest zwykły, jednokolorowy)
   const shifts = prDayShifts(plans, rows);
   if (shifts.length === 2) {
-    const halves = prHalfStates(shifts, rows);
+    const halves = prHalfStates(shifts, rows, day.iso);
     if (halves[0] !== halves[1]) {
       return {
         cls: "split", halves, shifts,
@@ -172,8 +207,18 @@ function prDayState(empId, day, index) {
       : { cls: "diff", text: `${head}: obecny ${hours(present)} — inaczej niż w harmonogramie (${planText})` };
   }
   if (absent.length) return { cls: "absent", text: `${head}: nieobecny (${planText})` };
-  if (works.length) return { cls: "plan", text: `${head}: ${planText}, brak raportu` };
-  if (plans.some(p => p.kind === "absence")) return { cls: "absplan", text: `${head}: ${planText}` };
+  // zaplanowana praca bez raportu: po końcu zmiany - "brak raportu" (czerwone paski), wcześniej - "zaplanowany"
+  if (works.length) {
+    return works.every(w => prShiftEnded(day.iso, w))
+      ? { cls: "missing", text: `${head}: ${planText} — brak raportu` }
+      : { cls: "plan", text: `${head}: ${planText}` };
+  }
+  const absences = plans.filter(p => p.kind === "absence");
+  if (absences.length) {
+    return absences.every(p => prShiftEnded(day.iso, p))
+      ? { cls: "absdone", text: `${head}: ${planText}` }
+      : { cls: "absplan", text: `${head}: ${planText}` };
+  }
   return { cls: "none", text: `${head}: ${planText}` };
 }
 
@@ -207,8 +252,10 @@ const PR_STATE_LABELS = {
   ok: "Obecny zgodnie z harmonogramem",
   diff: "Obecny inaczej niż w harmonogramie",
   absent: "Nieobecny (w raporcie)",
-  plan: "Zaplanowany, brak raportu",
-  absplan: "Zgłoszona nieobecność",
+  plan: "Zaplanowany (zmiana jeszcze się nie skończyła)",
+  missing: "Brak raportu - zmiana już się skończyła",
+  absplan: "Zgłoszona nieobecność (zmiana jeszcze się nie skończyła)",
+  absdone: "Zgłoszona nieobecność",
   none: "Brak zaplanowanych godzin"
 };
 

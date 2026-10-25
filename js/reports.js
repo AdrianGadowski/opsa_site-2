@@ -27,9 +27,13 @@ let rpDeleteTimer = null;
 let rpSelected = new Set();  // raporty zaznaczone do zatwierdzenia (zakładka "W oczekiwaniu")
 let rpAction = null;         // { type: "reject" | "unapprove" | "resubmit", number } - okno potwierdzenia
 
-// Zakładki widoku (report_approval.js): archive - zatwierdzone, pending - w oczekiwaniu, rejected - do poprawy
+let rpMineFilter = null;     // Moje raporty: filtr stanu z kafelków ("approved" / "pending" / "rejected"; null = wszystkie)
+
+// Zakładki widoku (report_approval.js): archive - zatwierdzone, mine - moje raporty,
+// pending - w oczekiwaniu, rejected - do poprawy
 const RP_TAB_HERO = {
   archive: ["Archiwum", "Lista raportów", "Archiwum zatwierdzonych raportów czasu pracy. Zatwierdzonego raportu nie można zmienić ani usunąć, dopóki osoba z uprawnieniem nie cofnie zatwierdzenia."],
+  mine: ["Raporty", "Moje raporty", "Wszystkie Twoje raporty z wybranego miesiąca: zatwierdzone, w oczekiwaniu na zatwierdzenie i do poprawy. Kliknij kafelek, żeby pokazać tylko raporty w danym stanie."],
   pending: ["Zatwierdzanie", "W oczekiwaniu na zatwierdzenie", "Raporty czekające na zatwierdzenie, z wszystkich miesięcy. Do czasu zatwierdzenia autor może je edytować; nie liczą się jeszcze w statystykach."],
   rejected: ["Poprawki", "Raporty do poprawy", "Raporty odesłane do poprawy, z powodem odrzucenia. Po poprawieniu autor wysyła raport ponownie do zatwierdzenia."]
 };
@@ -94,6 +98,7 @@ async function initReportsView() {
   rpCurrent = null;
   rpReports = [];
   rpSelected = new Set();
+  rpMineFilter = null;
 
   const now = new Date();
   rpSetPeriod(now.getFullYear(), now.getMonth() + 1);
@@ -140,11 +145,13 @@ async function initReportsView() {
 function rpSetTab(tab) {
   rpaTab = tab;
   rpSelected = new Set();
+  rpMineFilter = null;
   rpApplyTab();
   rpLoad();
 }
 
-// Nagłówek, wybór miesiąca (tylko w archiwum - kolejki pokazują wszystkie miesiące) i zaznaczona zakładka
+// Nagłówek, wybór miesiąca (archiwum i moje raporty - kolejki pokazują wszystkie miesiące),
+// kafelki stanu (moje raporty) i nagłówek tabeli
 function rpApplyTab() {
   const [eyebrow, title, desc] = RP_TAB_HERO[rpaTab] || RP_TAB_HERO.archive;
   const set = (id, text) => { const el = document.getElementById(id); if (el) el.textContent = text; };
@@ -154,7 +161,9 @@ function rpApplyTab() {
   set("rp-hero-desc", rpaInstalled() ? desc
     : "Raporty czasu pracy. Raport można podejrzeć, edytować (dodać lub usunąć pracownika) albo usunąć w całości.");
   const pick = document.getElementById("rp-periodpick");
-  if (pick) pick.style.display = rpaTab === "archive" ? "" : "none";
+  if (pick) pick.style.display = rpaTab === "archive" || rpaTab === "mine" ? "" : "none";
+  const tiles = document.getElementById("rp-mine-tiles");
+  if (tiles) tiles.hidden = rpaTab !== "mine";
   const tbody = document.getElementById("rp-table-body");
   if (tbody) {
     tbody.innerHTML = `<tr><td colspan="12" style="text-align: center; padding: 30px; color: var(--text-muted);">
@@ -221,6 +230,11 @@ function rpGroup(rows) {
 
   const num = r => Number(r.number) || 0;
   const reports = [...map.values()];
+
+  // Moje raporty: od najnowszego dnia, bez numeru w miesiącu (liczyłby tylko moje raporty)
+  if (rpaTab === "mine") {
+    return reports.sort((a, b) => rpDateKey(b.date).localeCompare(rpDateKey(a.date)) || num(b) - num(a));
+  }
 
   // Kolejki (w oczekiwaniu, do poprawy): od najstarszego raportu, bez numeru w miesiącu
   // (są w nich raporty z różnych miesięcy, więc numer w miesiącu byłby mylący)
@@ -303,11 +317,13 @@ async function rpLoad() {
   const tab = rpaTab;
 
   // Archiwum: wybrany miesiąc, tylko zatwierdzone (przed sql/34 - wszystkie raporty).
+  // Moje raporty: wybrany miesiąc, raporty zalogowanej osoby we wszystkich stanach.
   // Kolejki: wszystkie miesiące; zatwierdzający widzi raporty z całego zakładu, autor - swoje.
   const build = () => {
     // "*": działa też przed dodaniem kolumn id_department (sql/24) i statusu (sql/34)
     let q = supabaseClient.from("work_reports").select("*");
     if (tab === "archive") return rpaFilterApproved(q.like("report_date", pattern), rpaInstalled());
+    if (tab === "mine") return q.like("report_date", pattern).eq("add_first_name_id", currentUser.id);
     q = q.eq("approval_status", tab);
     return rpaCanApprove() ? q : q.eq("add_first_name_id", currentUser.id);
   };
@@ -350,19 +366,21 @@ function rpParseDateQuery(q) {
 }
 
 function rpVisibleReports() {
+  // Moje raporty: filtr stanu z kafelków podsumowania
+  const base = rpaTab === "mine" && rpMineFilter ? rpReports.filter(r => rpStatus(r) === rpMineFilter) : rpReports;
   const q = (document.getElementById("rp-filter-search")?.value || "").toLowerCase().trim();
-  if (!q) return rpReports;
+  if (!q) return base;
 
   const date = rpParseDateQuery(q);
   if (date) {
     // początek ("10.10") albo końcówka daty ("10.2026", "2026")
-    return rpReports.filter(r => {
+    return base.filter(r => {
       const d = String(r.date || "");
       return d.startsWith(date) || d.endsWith("." + date);
     });
   }
 
-  return rpReports.filter(r => {
+  return base.filter(r => {
     const u = rpUsersById[r.creatorId] || {};
     const n1 = `${u.name || ""} ${u.last_name || ""}`.toLowerCase();
     const n2 = `${u.last_name || ""} ${u.name || ""}`.toLowerCase();
@@ -383,7 +401,7 @@ function rpOnSearch() {
   const m = (rpParseDateQuery(q) || "").match(/^\d{2}\.(\d{2})\.(\d{4})$/);
   const { year, month } = rpPeriod();
 
-  if (rpaTab === "archive" && m && Number(m[1]) >= 1 && Number(m[1]) <= 12 && (year !== Number(m[2]) || month !== Number(m[1]))) {
+  if ((rpaTab === "archive" || rpaTab === "mine") && m && Number(m[1]) >= 1 && Number(m[1]) <= 12 && (year !== Number(m[2]) || month !== Number(m[1]))) {
     rpSetPeriod(Number(m[2]), Number(m[1]));
     rpLoad();
     return;
@@ -391,11 +409,14 @@ function rpOnSearch() {
   rpRenderTable();
 }
 
-// Kolumny tabeli w zakładce. Archiwum: kto zatwierdził; w oczekiwaniu: kiedy wysłano (i pole
-// zaznaczenia dla zatwierdzającego); do poprawy: kto odesłał i powód.
+// Kolumny tabeli w zakładce. Archiwum: kto zatwierdził; moje raporty: stan (bez autora - to zawsze ja);
+// w oczekiwaniu: kiedy wysłano (i pole zaznaczenia dla zatwierdzającego); do poprawy: kto odesłał i powód.
 function rpColumns() {
   const cols = [];
   if (rpaTab === "pending" && rpaCanApprove()) cols.push("check");
+  if (rpaTab === "mine") {
+    return ["num", "date", "shift", "dept", "people", "present", "absent", ...(rpaInstalled() ? ["status"] : []), "actions"];
+  }
   cols.push("num", "date", "shift", "author", "dept", "people", "present", "absent");
   if (rpaTab === "archive") cols.push("created", ...(rpaInstalled() ? ["approved"] : []));
   if (rpaTab === "pending") cols.push("submitted");
@@ -409,7 +430,8 @@ function rpRenderHead() {
   if (!head) return;
   const titles = {
     num: "Nr", date: "Data raportu", shift: "Zmiana", author: "Utworzył", dept: "Dział", people: "Pracowników",
-    created: "Data utworzenia", approved: "Zatwierdził", submitted: "Wysłano", rejected: "Odesłał", reason: "Powód odrzucenia"
+    created: "Data utworzenia", approved: "Zatwierdził", submitted: "Wysłano", rejected: "Odesłał", reason: "Powód odrzucenia",
+    status: "Stan"
   };
   head.innerHTML = `<tr>${rpColumns().map(c => {
     if (c === "check") {
@@ -468,6 +490,7 @@ function rpRenderTable() {
 
   const cols = rpColumns();
   const list = rpVisibleReports();
+  rpRenderMineTiles();
   if (info) {
     info.textContent = list.length === rpReports.length
       ? `Raportów: ${rpReports.length}`
@@ -478,6 +501,7 @@ function rpRenderTable() {
     const empty = rpReports.length
       ? "Brak raportów spełniających podane kryteria."
       : { archive: rpaInstalled() ? "Brak zatwierdzonych raportów w wybranym okresie." : "Brak raportów w wybranym okresie.",
+          mine: "Nie masz raportów w wybranym miesiącu.",
           pending: "Żaden raport nie czeka na zatwierdzenie.",
           rejected: "Brak raportów do poprawy." }[rpaTab];
     tbody.innerHTML = `<tr><td colspan="${cols.length}" style="text-align:center;color:var(--text-muted);padding:30px;">${empty}</td></tr>`;
@@ -504,11 +528,58 @@ function rpRenderTable() {
       submitted: `<td class="rp-c" style="color: var(--text-muted);">${rtEsc(rpDateTime(r.submittedAt) || r.created || "-")}</td>`,
       rejected: `<td class="rp-c">${rpWhoHtml(r.rejectedBy, r.rejectedAt, "-")}</td>`,
       reason: `<td class="rp-reason ${r.reason ? "" : "empty"}">${rtEsc(r.reason || "bez podanego powodu")}</td>`,
+      status: `<td class="rp-c">${rpStatusHtml(r)}</td>`,
       actions: `<td style="text-align: right; white-space: nowrap;">${rpActionsHtml(r)}</td>`
     };
     return `<tr class="${rpSelected.has(n) ? "rp-selected" : ""}">${cols.map(c => cells[c]).join("")}</tr>`;
   }).join("");
   rpSyncBulk();
+}
+
+// ---------- Moje raporty: stan raportu i kafelki podsumowania ----------
+// label - znaczek przy raporcie, tile - podpis kafelka z liczbą raportów
+const RP_STATUS_INFO = {
+  approved: { label: "Zatwierdzony", tile: "Zatwierdzone", icon: "fa-circle-check" },
+  pending: { label: "W oczekiwaniu", tile: "W oczekiwaniu", icon: "fa-hourglass-half" },
+  rejected: { label: "Do poprawy", tile: "Do poprawy", icon: "fa-rotate-left" }
+};
+
+// Znaczek stanu, a pod nim: kto zatwierdził / powód odrzucenia / kiedy wysłano
+function rpStatusHtml(r) {
+  const status = rpStatus(r);
+  const info = RP_STATUS_INFO[status];
+  if (!info) return "-";
+  const sub = status === "approved"
+    ? (r.approvedBy ? `${rpUserName(r.approvedBy)}, ${rpDateTime(r.approvedAt)}` : "")
+    : status === "rejected"
+      ? `Powód: ${r.reason || "nie podano"}`
+      : (r.submittedAt ? `wysłano ${rpDateTime(r.submittedAt)}` : "");
+  return `<span class="rp-status ${status}"><i class="fa-solid ${info.icon}"></i> ${info.label}</span>` +
+    (sub ? `<span class="rp-when rp-status-sub ${status}">${rtEsc(sub)}</span>` : "");
+}
+
+// Kafelki: liczba raportów w każdym stanie (kliknięcie filtruje listę) i podsumowanie miesiąca
+function rpRenderMineTiles() {
+  const box = document.getElementById("rp-mine-tiles");
+  if (!box || rpaTab !== "mine") return;
+  const count = s => rpReports.filter(r => rpStatus(r) === s).length;
+  const tile = s => `<button type="button" class="rp-mine-tile ${s}${rpMineFilter === s ? " on" : ""}" onclick="rpSetMineFilter('${s}')"
+      aria-pressed="${rpMineFilter === s}"><i class="fa-solid ${RP_STATUS_INFO[s].icon}"></i>
+      <span class="lbl">${RP_STATUS_INFO[s].tile}</span><b>${count(s)}</b></button>`;
+  const list = rpVisibleReports();
+  const people = new Set(list.flatMap(r => [...r.empIds])).size;
+  const present = list.reduce((sum, r) => sum + r.present, 0);
+  const absent = list.reduce((sum, r) => sum + r.absent, 0);
+  box.innerHTML = (rpaInstalled() ? `<div class="rp-mine-row">${["approved", "pending", "rejected"].map(tile).join("")}</div>` : "") +
+    `<div class="rp-mine-sum">${rpMineFilter ? `<b>${RP_STATUS_INFO[rpMineFilter].tile}</b> · ` : ""}Raportów: <b>${list.length}</b> · ` +
+    `osób: <b>${people}</b> · godz. obecne: <b class="rp-hours-ok">${rtFmtHours(present)}</b> · ` +
+    `nieobecne: <b class="rp-hours-absent">${rtFmtHours(absent)}</b></div>`;
+}
+
+// Kliknięcie kafelka: pokaż tylko raporty w tym stanie; drugie kliknięcie - wszystkie
+function rpSetMineFilter(status) {
+  rpMineFilter = rpMineFilter === status ? null : status;
+  rpRenderTable();
 }
 
 // ---------- Zaznaczanie i zatwierdzanie kilku raportów naraz ----------

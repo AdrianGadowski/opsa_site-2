@@ -22,7 +22,7 @@ let epLoadToken = 0;
 
 // ---------- Zakładki na ekranie logowania ----------
 const LOGIN_MODES = {
-  user: { tab: "login-tab-user", subtitle: "Ewidencja czasu pracy" },
+  user: { tab: "login-tab-user", subtitle: "" },   // pod "Witaj w pracy" bez podpisu
   employee: { tab: "login-tab-employee", subtitle: "Twoje godziny i harmonogram pracy" },
   zalew: { tab: "login-tab-zalew", subtitle: "Rejestracja zalewu na liniach" }
 };
@@ -42,7 +42,9 @@ function setLoginMode(mode) {
   overlay?.classList.toggle("mode-zalew", loginMode === "zalew");
 
   const subtitle = document.querySelector("#step-login .subtitle");
-  if (subtitle) subtitle.textContent = LOGIN_MODES[loginMode].subtitle;
+  if (subtitle) {
+    subtitle.textContent = LOGIN_MODES[loginMode].subtitle;
+  }
   if (!loginLockTimer) clearLoginError();
   document.getElementById("login-input")?.focus();
 }

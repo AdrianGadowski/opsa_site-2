@@ -190,6 +190,8 @@
 }
 .zw-table td { padding: 10px 14px; border-bottom: 1px solid #F0F0F0; text-align: center; vertical-align: middle; }
 .zw-table th:first-child, .zw-table td:first-child { text-align: left; }
+/* tabela zalewów: godzina (pierwsza kolumna) wyśrodkowana; wiersze sum zostają wyrównane do prawej */
+.zw-pours-table th:first-child, .zw-pours-table tbody tr:not(.zw-subtotal):not(.zw-grandtotal):not(.zw-shifttotal):not(.zw-shifthead) td:first-child { text-align: center; }
 .zw-table tbody tr:hover { background: #FAFAFA; }
 .zw-nr { font-weight: 700; color: var(--text-dark); }
 .zw-weight { font-weight: 600; font-variant-numeric: tabular-nums; }
@@ -222,8 +224,7 @@
 .zw-subtabs button:focus-visible { outline: 3px solid rgba(8, 88, 75, 0.35); outline-offset: 1px; }
 
 /* Zalewy: podsumowanie dnia i sumy kadzi */
-.zw-date { width: auto; }
-.zw-sum { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; padding: 14px 20px; border-bottom: 1px solid var(--border-color); }
+.zw-sum { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; padding: 14px 20px; border-bottom: 1px solid var(--border-color); }
 .zw-sum:empty { display: none; }
 .zw-tile { border-radius: 12px; padding: 12px 14px; background: #F5F5F7; }
 .zw-tile .lbl { font-size: 0.76rem; font-weight: 600; color: var(--text-muted); }
@@ -242,37 +243,27 @@
 .zw-table tr.zw-subtotal:hover, .zw-table tr.zw-grandtotal:hover { background: none; }
 
 /* Okno zalewu */
-.zw-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; }
-.zw-preview { padding: 12px 14px; border-radius: 10px; background: #E6F4EA; border: 1px solid #B7E0CB; color: #0B5D44; font-size: 0.92rem; }
+.zw-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; align-items: end; }   /* pola w rzędzie w jednej linii, nawet gdy podpis łamie się na dwie linie */
+.zw-preview { padding: 12px 14px; border-radius: 10px; background: #E6F4EA; border: 1px solid #B7E0CB; color: #0B5D44; font-size: 0.92rem; text-align: center; }
 .zw-preview strong { font-size: 1.1rem; }
 
 @media (max-width: 768px) {
   .zw-sum { grid-template-columns: 1fr 1fr; padding: 12px; }
   .zw-tile.main { grid-column: 1 / -1; }
-  .zw-date { width: 100% !important; }
   .zw-form-grid { grid-template-columns: 1fr; }
   .zw-tabs button.models { border-radius: 8px; margin-left: 0; border-left: none; flex-basis: 100%; }
 }
 
 /* Zalew: podział na zmiany (widok "Wszystkie zmiany") */
 .zw-table tr.zw-shifthead td {
-  background: #F3F4F6; color: var(--text-dark); font-weight: 800; text-align: left !important;
+  background: #F3F4F6; color: var(--text-dark); font-weight: 800; text-align: center !important;   /* zegar i nazwa zmiany na środku */
   font-size: 0.86rem; letter-spacing: 0.01em; border-top: 2px solid #E5E7EB;
 }
-.zw-table tr.zw-shifthead td i { color: #B52B2D; margin-right: 6px; }
+.zw-table tr.zw-shifthead td i { color: var(--primary); margin-right: 6px; }   /* zegar przy nagłówku zmiany - zielony */
 .zw-table tr.zw-shifttotal td { background: #DDF1E7; color: #0B5D44; font-weight: 800; border-bottom: 2px solid #B7E0CB; }
 .zw-table tr.zw-shifttotal .zw-total { color: #0B5D44; }
 .zw-table tr.zw-shifttotal td:first-child { text-align: right; }
 .zw-table tr.zw-shifthead:hover, .zw-table tr.zw-shifttotal:hover { background: none; }
-
-/* Zalew: zmiana w oknie zalewu - tylko informacja, bez wyboru */
-.zw-label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; color: var(--text-dark); }
-.zw-shiftinfo {
-  display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; padding: 11px 13px; border-radius: 6px;
-  background: #F5F5F7; border: 1.5px dashed #D9D9D9; font-size: 0.92rem; font-weight: 700; color: var(--text-dark);
-}
-.zw-shiftinfo i { color: var(--primary); }
-.zw-shiftinfo span { font-size: 0.76rem; font-weight: 500; color: var(--text-muted); }
 
 /* Zalew: numer kadzi z przyciskami -1 / +1 */
 .zw-stepper { display: flex; align-items: stretch; }
@@ -320,14 +311,14 @@
 }
 .zw-combo-list li .nr { font-weight: 700; color: var(--text-dark); }
 .zw-combo-list li .w { font-size: 0.8rem; color: var(--text-muted); white-space: nowrap; }
-.zw-combo-list li.active { background: #FDF1F1; }
-.zw-combo-list li.selected .nr { color: #B52B2D; }
+.zw-combo-list li.active { background: rgba(8, 88, 75, 0.08); }        /* podświetlony (strzałki, mysz) - jasnozielony */
+.zw-combo-list li.selected .nr { color: var(--primary); }               /* wybrany model - zielony z ptaszkiem */
 .zw-combo-list li.selected .nr::before { content: "\2713  "; }
 .zw-combo-list li.empty { cursor: default; color: var(--text-muted); justify-content: center; }
 
 /* Zalew: uwagi do zalewu */
 .zw-notes { resize: vertical; min-height: 60px; font-family: inherit; line-height: 1.4; }
-.zw-table td.zw-note { text-align: left !important; max-width: 220px; font-size: 0.82rem; color: #4B5563; }
+.zw-table td.zw-note { text-align: center !important; max-width: 220px; font-size: 0.82rem; color: #4B5563; }
 .zw-table td.zw-note span { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
 
 /* Zalew: próba przylana przy kadzi - suwak w oknie i oznaczenie w tabeli */
@@ -432,3 +423,272 @@
 /* Ikona kafla tygodnia: tło na całą wysokość kafla, ikona na środku */
 .ep-schedule .ep-shift { align-items: stretch; }
 .ep-schedule .ep-shift .ico { align-self: stretch; height: auto; min-height: 46px; width: 46px; display: flex; align-items: center; justify-content: center; }
+
+/* Zalew: formy zabrakowane (sql/35) - liczba > 0 na czerwono; w podglądzie dopisek, że nie wliczają się do wagi */
+.zw-scrap { color: var(--danger); font-weight: 700; }
+.zw-scrap-note { color: var(--danger); font-size: 0.85em; }
+
+/* Zalew - okno "Dodaj kadź": wpisywany tekst i podpowiedzi w polach wyśrodkowane
+   (w polu modelu równe odstępy z obu stron - lupa po lewej, strzałka po prawej) */
+#modal-zw-pour .form-control,
+#modal-zw-pour .form-control::placeholder { text-align: center; }
+#modal-zw-pour .zw-combo .form-control { padding-left: 40px; padding-right: 40px; }
+/* nagłówki pól i tytuł okna też wyśrodkowane */
+#modal-zw-pour .form-group > label { display: block; text-align: center; }
+#modal-zw-pour #zw-pour-title { text-align: center; padding: 0 30px; }
+
+/* Zalew - okno usuwania: "Model:" w kolorze jak "Linia:", wyróżniony tylko numer modelu (i opis zalewu) */
+.zw-del-target b { color: var(--text-dark); font-size: 1.05rem; }
+
+/* Zalew - zakładka "Wszystkie linie" (tylko podgląd): kolumna "Linia" widoczna tylko tam */
+.zw-pours-table:not(.zw-all) .zw-col-line { display: none; }
+.zw-pours-table td.zw-col-line { font-weight: 700; color: var(--primary); white-space: nowrap; }
+/* puste uwagi w tabeli zalewów: szary napis "brak" */
+.zw-table td.zw-note .zw-note-empty { color: #9CA3AF; font-style: italic; }
+
+/* ===== Zalew - realizacja: kafelki słupkowe (kadzie, metal, formy dobre) względem liczby zadanej ===== */
+.zw-progress { padding: 14px 20px 0; }
+.zw-progress:empty { display: none; }
+.zw-current {
+  display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 6px 10px; text-align: center; margin-bottom: 12px; padding: 10px 14px;
+  border-radius: 12px; background: linear-gradient(135deg, #FFF7E6, #FDEBD3); border: 1px solid #F5CF9A; font-size: 0.86rem;
+}
+.zw-current .lbl { color: #92400E; font-weight: 700; }
+.zw-current .lbl i { color: #E5552B; margin-right: 4px; }
+.zw-current .model { font-size: 1.1rem; color: var(--text-dark); }
+.zw-current .cnt { color: var(--text-muted); }
+.zw-current .cnt b { color: #0b7a57; font-size: 1rem; }
+.zw-current .cnt.bad b { color: var(--danger); }
+.zw-current .cnt.sum b { color: var(--text-dark); }
+.zw-progress-groups { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px; }
+.zw-progress-group { border: 1px solid var(--border-color); border-radius: 12px; padding: 10px 12px 12px; background: #fff; }
+.zw-progress-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 8px; font-size: 0.84rem; font-weight: 800; color: var(--primary); }
+.zw-progress-head span { font-weight: 500; color: var(--text-muted); font-size: 0.78rem; }
+.zw-progress-head span b { color: var(--text-dark); }
+.zw-progress-tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.zw-bar-tile { display: flex; align-items: stretch; gap: 8px; padding: 9px 10px; border-radius: 10px; background: #F5F5F7; min-width: 0; }
+.zw-bar-tile .txt { flex: 1; min-width: 0; }
+.zw-bar-tile .lbl { font-size: 0.72rem; font-weight: 600; color: var(--text-muted); }
+.zw-bar-tile .val { margin-top: 2px; font-size: 1.15rem; font-weight: 800; color: var(--text-dark); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.zw-bar-tile .val .of { font-size: 0.78rem; font-weight: 600; color: var(--text-muted); }
+.zw-bar-tile .pct { margin-top: 2px; font-size: 0.7rem; color: var(--text-muted); }
+/* słupek: wysokość = procent liczby zadanej */
+.zw-bar-tile .col { position: relative; flex: none; width: 14px; border-radius: 7px; background: #E2E5E9; overflow: hidden; min-height: 52px; }
+.zw-bar-tile .col i { position: absolute; left: 0; right: 0; bottom: 0; border-radius: 7px; background: linear-gradient(0deg, #08584B, #1E9A7F); transition: height 0.5s ease; }
+.zw-bar-tile.done { background: #E6F4EA; }
+.zw-bar-tile.done .col i { background: linear-gradient(0deg, #0B7A57, #34C796); }
+.zw-bar-tile.done .pct { color: #0b7a57; font-weight: 700; }
+.zw-bar-tile.none .col { opacity: 0.4; }
+@media (max-width: 768px) {
+  .zw-progress { padding: 12px 12px 0; }
+  .zw-progress-groups { grid-template-columns: 1fr; }
+  .zw-bar-tile .val { font-size: 1rem; }
+}
+.zw-current .sep { color: #D6B98A; }
+.zw-current .cnt { color: var(--text-dark); }
+.zw-current .weight { color: var(--text-muted); font-weight: 600; margin-left: -4px; }
+
+/* "Wszystkie linie": w kafelkach linii wszystkie napisy wyśrodkowane (nazwa linii nad "aktualnie: model") */
+.zw-progress-head { flex-direction: column; align-items: center; justify-content: center; gap: 2px; text-align: center; }
+.zw-bar-tile .txt { text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+/* brak aktualnie zalewanego modelu */
+.zw-current .zw-none, .zw-progress-head .zw-none { color: var(--danger); }
+/* liczby w kafelkach na tej samej wysokości: podpis i procent zawsze na dwie linie, treść od góry */
+.zw-bar-tile .txt { justify-content: flex-start; }
+.zw-bar-tile .lbl, .zw-bar-tile .pct { min-height: 2.5em; line-height: 1.25; display: flex; align-items: center; justify-content: center; }
+.zw-bar-tile .val { line-height: 1.2; }
+
+/* ===== Zalew - zakładki: pływające zaznaczenie (js/zalew.js, zwPlaceTabIndicator), jak wskaźnik w menu ===== */
+.zw-tabs { position: relative; }
+.zw-tabs button { position: relative; z-index: 1; transition: color 0.3s, background 0.2s; }
+.zw-tabs button.on, .zw-tabs button.models.on { background: transparent; box-shadow: none; }
+.zw-tab-indicator {
+  position: absolute; left: 0; top: 0; z-index: 0; border-radius: 8px; overflow: hidden; pointer-events: none; opacity: 0;
+  background: linear-gradient(90deg, #0B6B5B, #08584B); box-shadow: 0 3px 10px rgba(8, 88, 75, 0.3);
+  transition: transform 0.5s cubic-bezier(0.34, 1.35, 0.5, 1), width 0.3s ease, height 0.3s ease, opacity 0.3s ease;
+}
+.zw-tab-indicator.visible { opacity: 1; }
+.zw-tab-indicator.no-anim { transition: none; }
+/* wolny połysk przebiegający po zaznaczeniu */
+.zw-tab-indicator::after {
+  content: ""; position: absolute; inset: 0;
+  background: linear-gradient(100deg, transparent 30%, rgba(255, 255, 255, 0.3) 50%, transparent 70%);
+  background-size: 250% 100%; background-position: 130% 0; animation: zwTabShine 5s ease-in-out infinite;
+}
+@keyframes zwTabShine { 0%, 55% { background-position: 130% 0; } 100% { background-position: -130% 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .zw-tab-indicator { transition: none; }
+  .zw-tab-indicator::after { animation: none; }
+}
+
+/* ===== Zalew - dzień i zmiana w zielonym nagłówku: strzałki ‹ › jak w Harmonogramie ===== */
+.zw-periodpick { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.zw-periodpick button {
+  height: 48px; min-width: 42px; padding: 0 12px; border-radius: 12px; cursor: pointer; font-family: inherit; font-size: 0.9rem; font-weight: 700;
+  border: 1px solid rgba(255, 255, 255, 0.25); background: rgba(255, 255, 255, 0.12); color: #fff;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.zw-periodpick button:hover:not(:disabled) { background: rgba(255, 255, 255, 0.22); }
+.zw-periodpick button:disabled { opacity: 0.4; cursor: default; }
+.zw-periodpick button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.zw-periodpick button.on { background: #FCD444; border-color: #FCD444; color: #03241E; }   /* "Cała doba" włączona */
+.zw-period-label {
+  min-width: 230px; height: 48px; display: inline-flex; flex-direction: column; align-items: center; justify-content: center; padding: 0 14px;
+  border-radius: 12px; background: rgba(255, 255, 255, 0.95); color: var(--primary); line-height: 1.2; text-align: center;
+}
+.zw-period-label b { font-size: 0.98rem; }
+.zw-period-label span { font-size: 0.76rem; font-weight: 600; color: #3F6F66; }
+@media (max-width: 768px) {
+  .zw-periodpick { width: 100%; }
+  .zw-period-label { flex: 1 1 calc(100% - 108px); min-width: 0; }   /* ‹ dzień i zmiana › w pierwszym rzędzie */
+  .zw-periodpick button.txt { flex: 1 1 calc(50% - 3px); }
+}
+/* "z 90 · 59%" zawsze w jednej linii (napis "bez liczby zadanej" może się łamać) */
+.zw-bar-tile .pct.one { white-space: nowrap; }   /* w pionie wyśrodkowane jak "bez liczby zadanej" */
+/* "Łącznie" (wszystkie linie razem) - pod kafelkami linii, na całą szerokość, wyróżnione */
+.zw-progress-group.total { grid-column: 1 / -1; background: #F0F8F4; border-color: #B7E0CB; }
+.zw-progress-group.total .zw-progress-tiles { max-width: 720px; margin: 0 auto; }
+.zw-progress-group.total .zw-bar-tile { background: #fff; }
+.zw-progress { padding-bottom: 14px; }
+
+/* ===== Zalew - Dashboard (podsumowanie tygodnia) ===== */
+/* zakładka oddzielona kreską, jak Modele po drugiej stronie */
+.zw-tabs button.dash { border-right: 1px solid #D1D5DB; border-radius: 8px 0 0 8px; margin-right: 4px; }
+@media (max-width: 768px) {
+  .zw-tabs button.dash { border-radius: 8px; margin-right: 0; border-right: none; flex-basis: 100%; }
+}
+/* wybór tygodnia */
+.zw-weekpick { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.zw-weekpick button {
+  height: 42px; min-width: 40px; padding: 0 12px; border-radius: 10px; cursor: pointer; font-family: inherit; font-size: 0.86rem; font-weight: 700;
+  border: 1.5px solid #D9D9D9; background: #fff; color: var(--primary); display: inline-flex; align-items: center; justify-content: center;
+}
+.zw-weekpick button:hover:not(:disabled) { border-color: var(--primary); background: rgba(8, 88, 75, 0.06); }
+.zw-weekpick button:disabled { opacity: 0.4; cursor: default; }
+.zw-week-label {
+  min-width: 200px; height: 42px; display: inline-flex; flex-direction: column; align-items: center; justify-content: center; padding: 0 12px;
+  border-radius: 10px; background: linear-gradient(90deg, #0B6B5B, #08584B); color: #fff; line-height: 1.2;
+}
+.zw-week-label b { font-size: 0.9rem; }
+.zw-week-label span { font-size: 0.74rem; opacity: 0.85; }
+.zw-dash-lines { padding: 12px 20px 0; }
+/* tabela tygodnia */
+.zw-dash-table { width: 100%; border-collapse: separate; border-spacing: 6px; padding: 6px 14px 14px; font-size: 0.84rem; min-width: 900px; table-layout: fixed; }
+/* stałe kolumny i wysokość: zmiana linii (np. Lora -> SMS bez liczby zadanej) nie zmienia rozmiaru kafelków */
+.zw-dash-table th:first-child { width: 130px; }
+/* stała wysokość kafelków, także w tygodniu bez danych (krzyżyk, zegar) - jak kafelek z liczbami */
+.zw-dash-table tbody td, .zw-dash-table tfoot td, .zw-dash-table th.zw-dc-day { height: 67px; box-sizing: border-box; }
+.zw-dc-bar.none { visibility: hidden; }
+/* nagłówki kolumn: ciemne kafle, żeby odróżniały się od komórek */
+.zw-dash-table thead th { padding: 10px 8px; font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.03em; color: #fff; text-align: center; border-radius: 10px; background: linear-gradient(135deg, #0B6B5B 0%, #08584B 50%, #053D34 100%); }
+.zw-dash-table td, .zw-dash-table th.zw-dc-day { border-radius: 10px; background: #F5F5F7; padding: 8px 10px; vertical-align: middle; }
+.zw-dash-table th.zw-dc-day { text-align: center; font-weight: 800; color: var(--primary); white-space: nowrap; }
+.zw-dash-table th.zw-dc-day span { display: block; font-size: 0.74rem; font-weight: 600; color: var(--text-muted); }
+.zw-dash-table tr.today th.zw-dc-day, .zw-dash-table tr.today td { box-shadow: inset 0 0 0 2px #1E9A7F; }
+.zw-dash-table td.zw-dc-future { text-align: center; color: #B8BDC4; background: #FAFAFB; }   /* zmiana jeszcze się nie odbyła: zegar */
+/* przyszła zmiana z planem: liczby zaplanowane, wyszarzone */
+.zw-dash-table td.zw-dc-plan .zw-dc-row b { color: #9AA1A9; }
+.zw-dash-table td.zw-dc-plan .zw-dc-row .t i { font-size: 0.62rem; }
+.zw-dash-table td:last-child { background: #EAF3EF; }              /* doba */
+.zw-dash-table tfoot td, .zw-dash-table tfoot th.zw-dc-day { background: #DDF1E7; }
+.zw-dc { display: grid; grid-template-columns: repeat(3, 1fr); }
+/* kadzie | metal | formy obok siebie, oddzielone pionową kreską */
+.zw-dc-item { display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 0; padding: 0 4px; }
+.zw-dc-item + .zw-dc-item { border-left: 1px solid rgba(3, 36, 30, 0.14); }
+.zw-dc-row { display: flex; flex-direction: column; align-items: center; line-height: 1.2; white-space: nowrap; }
+.zw-dc-row .k { font-size: 0.7rem; color: var(--text-muted); font-weight: 600; }
+.zw-dc-row b { font-variant-numeric: tabular-nums; color: var(--text-dark); }
+.zw-dc-row .t { font-size: 0.7rem; color: var(--text-muted); min-height: 1.2em; }
+.zw-dc-row .t.off { color: #EA8A4F; font-weight: 400; }   /* zalane poza planem */
+.zw-dc-row.done b { color: #0b7a57; }
+.zw-dc-row b.x { color: #B8BDC4; font-size: 0.8rem; }
+/* zmiana bez planu i bez zalewu */
+.zw-dash-table td.zw-dc-none { text-align: center; color: #B8BDC4; }
+.zw-dash-table td.zw-dc-none i, .zw-dash-table td.zw-dc-future i { display: block; font-size: 1.1rem; margin-bottom: 2px; }
+.zw-dash-table td.zw-dc-none span, .zw-dash-table td.zw-dc-future span { font-size: 0.7rem; font-weight: 600; }
+.zw-dc-bar { height: 4px; width: 100%; border-radius: 4px; background: #DDE1E6; overflow: hidden; margin-top: 2px; }
+.zw-dc-bar i { display: block; height: 100%; border-radius: 4px; background: linear-gradient(90deg, #08584B, #1E9A7F); }
+@media (max-width: 768px) {
+  .zw-weekpick { width: 100%; }
+  .zw-week-label { flex: 1; min-width: 0; }
+  .zw-dash-lines { padding: 12px 12px 0; }
+}
+/* Dashboard: sobota na żółto, niedziela na niebiesko (nazwa dnia i komórki zmian) */
+.zw-dash-table tr.sat th.zw-dc-day { background: #FCD444; color: #03241E; }
+.zw-dash-table tr.sat th.zw-dc-day span { color: rgba(3, 36, 30, 0.7); }
+.zw-dash-table tr.sat td { background: #FFF6D6; }
+.zw-dash-table tr.sun th.zw-dc-day { background: #2563EB; color: #fff; }
+.zw-dash-table tr.sun th.zw-dc-day span { color: rgba(255, 255, 255, 0.85); }
+.zw-dash-table tr.sun td { background: #E8EFFD; }
+/* Dashboard: zmiana, która właśnie trwa - pomarańczowa ramka i znaczek "Trwa" z pulsującą kropką */
+.zw-dash-table td.zw-dc-now, .zw-dash-table tr.today td.zw-dc-now { position: relative; padding-top: 13px; padding-bottom: 3px; box-shadow: inset 0 0 0 2px #F59E0B, 0 4px 14px rgba(245, 158, 11, 0.28); }
+.zw-dash-table td .zw-dc-live {
+  position: absolute; top: -8px; left: 50%; transform: translateX(-50%); z-index: 1;
+  display: inline-flex; align-items: center; gap: 5px; padding: 1px 9px; border-radius: 999px;
+  background: #F59E0B; color: #fff; font-size: 0.66rem; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; line-height: 1.5;
+}
+.zw-dash-table td .zw-dc-live i { display: inline-block; width: 6px; height: 6px; margin: 0; border-radius: 50%; background: #fff; font-size: 0; animation: zwLivePulse 1.4s ease-in-out infinite; }
+@keyframes zwLivePulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+@media (prefers-reduced-motion: reduce) { .zw-dash-table td .zw-dc-live i { animation: none; } }
+/* Tabele tygodnia (Dashboard Zalewu, Plan zalewu) na telefonie zostają tabelami przewijanymi w bok -
+   bez zamiany wierszy na karty z css/mobile.css */
+@media (max-width: 768px) {
+  #main-content .zw-dash-table, #main-content .pp-table { display: table; width: 100% !important; }
+  #main-content .zw-dash-table thead, #main-content .pp-table thead { display: table-header-group; }
+  #main-content .zw-dash-table tbody, #main-content .pp-table tbody { display: table-row-group; width: auto !important; }
+  #main-content .zw-dash-table tbody tr, #main-content .pp-table tbody tr { display: table-row; margin: 0; padding: 0; border: none !important; border-radius: 0; background: transparent; }
+  #main-content .zw-dash-table tbody td, #main-content .pp-table tbody td {
+    display: table-cell; min-height: 0; padding: 8px 10px !important; text-align: center !important; overflow-wrap: normal;
+  }
+  #main-content .zw-dash-table tbody td.zw-dc-now, #main-content .pp-table tbody td.pp-now { padding: 13px 10px 3px !important; }
+  #main-content .zw-dash-table tbody td::before, #main-content .pp-table tbody td::before { content: none; }
+}
+
+/* Dashboard Zalewu (portal i pulpit): kadź z płynnym metalem w nagłówku - wykonanie liczb zadanych tygodnia (js/zalew.js, zwRenderLadle) */
+.zw-ladlebox { display: flex; align-items: center; gap: 8px; }
+.zw-ladle { width: 56px; height: 66px; flex: none; overflow: visible; }
+.zw-ladle .shell { fill: rgba(0, 0, 0, 0.22); stroke: rgba(255, 255, 255, 0.85); stroke-width: 2.6; stroke-linejoin: round; }
+.zw-ladle .band { stroke: rgba(255, 255, 255, 0.28); stroke-width: 1.6; }   /* obręcze wzmacniające */
+.zw-ladle .eye { fill: none; stroke: rgba(255, 255, 255, 0.8); stroke-width: 2.6; }
+.zw-ladle .rim { stroke: #fff; stroke-width: 3.6; stroke-linecap: round; }
+.zw-ladle .bail { fill: none; stroke: rgba(255, 255, 255, 0.8); stroke-width: 4; stroke-linecap: round; }
+.zw-ladle .pin { fill: #DDE5E3; stroke: rgba(0, 0, 0, 0.25); stroke-width: 1.4; }
+.zw-ladle .shine { fill: none; stroke: rgba(255, 255, 255, 0.3); stroke-width: 2.5; stroke-linecap: round; }
+/* poziom metalu: przesunięcie w pionie (powierzchnia na wysokości y), płynnie przy zmianie tygodnia / linii */
+.zw-ladle .level { transition: transform 1.2s cubic-bezier(0.22, 1, 0.36, 1); }
+.zw-ladlebox:not(.hot) .zw-ladle .level { visibility: hidden; }
+.zw-ladlebox.hot .zw-ladle { filter: drop-shadow(0 0 7px rgba(255, 140, 0, 0.55)); }
+/* fala na powierzchni: wzór powtarza się co 20 jednostek, przesuwany w kółko */
+.zw-ladle .wave { animation: zwWave 2.2s linear infinite; }
+.zw-ladle .bubble { fill: rgba(255, 244, 214, 0.9); opacity: 0; animation: zwBubble 2.6s ease-in infinite; }
+.zw-ladle .bubble.b2 { animation-delay: 0.9s; animation-duration: 2.1s; }
+.zw-ladle .bubble.b3 { animation-delay: 1.6s; animation-duration: 3s; }
+@keyframes zwWave { from { transform: translateX(0); } to { transform: translateX(-20px); } }
+@keyframes zwBubble { 0% { transform: translateY(0); opacity: 0; } 20% { opacity: 1; } 100% { transform: translateY(-11px); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .zw-ladle .wave, .zw-ladle .bubble { animation: none; } .zw-ladle .bubble { display: none; } }
+.zw-ladletxt { display: flex; flex-direction: column; color: #fff; line-height: 1.25; min-width: 165px; }   /* kadź nie skacze przy krótszym podpisie */
+/* procent między kadzią a podsumowaniem; stała szerokość - kadź i podpis nie skaczą przy innych liczbach */
+.zw-ladlepct { width: 104px; text-align: center; color: #fff; font-size: 2.1rem; font-weight: 800; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
+/* procent mieni się na pomarańczowo - jasny połysk przesuwa się po gradiencie rozżarzonego metalu */
+.zw-ladlebox.hot .zw-ladlepct {
+  background: linear-gradient(100deg, #F25C05 0%, #FF9F1C 30%, #FFE7A3 45%, #FF9F1C 60%, #F25C05 100%);
+  background-size: 250% 100%; -webkit-background-clip: text; background-clip: text; color: transparent;
+  filter: drop-shadow(0 0 6px rgba(255, 140, 0, 0.35));
+  animation: zwPctShine 2.8s linear infinite;
+}
+@keyframes zwPctShine { from { background-position: 100% 0; } to { background-position: -150% 0; } }
+@media (prefers-reduced-motion: reduce) { .zw-ladlebox.hot .zw-ladlepct { animation: none; background-position: 50% 0; } }
+.zw-ladletxt span { font-size: 0.78rem; font-weight: 600; opacity: 0.9; }
+.zw-ladletxt small { margin-top: 2px; font-size: 0.74rem; opacity: 0.75; white-space: nowrap; }   /* podpis zawsze w jednym wierszu */
+/* kadź spada z góry na swoje miejsce i lekko się odbija (zwDropLadle - przejście na zakładkę Zalew) */
+.zw-ladle.drop { animation: zwLadleDrop 0.9s cubic-bezier(0.3, 0, 0.4, 1) both; }
+@keyframes zwLadleDrop {
+  0% { transform: translateY(-140px); opacity: 0; }
+  15% { opacity: 1; }
+  60% { transform: translateY(0); }
+  75% { transform: translateY(-10px); }
+  88% { transform: translateY(0); }
+  94% { transform: translateY(-3px); }
+  100% { transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) { .zw-ladle.drop { animation: none; } }

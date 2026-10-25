@@ -6,6 +6,24 @@
   /* Obecność w bieżącym tygodniu: kafelki pn–niedz (js/employee_presence.js) */
   .emp-table th.pr-head, .emp-table td.pr-cell { text-align: center; }
   .pr-head .range { display: block; font-weight: 500; font-size: 0.72rem; color: var(--text-muted); margin-top: 2px; }
+  /* wybór tygodnia: ‹ Obecność (daty) › oraz "Dziś" poza bieżącym tygodniem */
+  .pr-nav { display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+  .pr-nav-text { display: inline-flex; flex-direction: column; align-items: center; min-width: 92px; }
+  .pr-arrow, .pr-today {
+    height: 28px; min-width: 28px; padding: 0 8px; border-radius: 7px; border: 1.5px solid #D9D9D9; background: #fff;
+    color: var(--primary); font-family: inherit; font-size: 0.72rem; font-weight: 700; cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  .pr-arrow:hover, .pr-today:hover:not(:disabled) { border-color: var(--primary); background: rgba(8, 88, 75, 0.06); }
+  .pr-arrow:focus-visible, .pr-today:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+  /* "Aktualny tydzień" zawsze widoczny; w bieżącym tygodniu wyszarzony */
+  .pr-today { white-space: nowrap; }
+  .pr-today:disabled { color: #9CA3AF; border-color: #E5E7EB; background: #F3F4F6; cursor: default; }
+  .pr-nav-m { display: none; }
+  /* komputer: stała szerokość kolumny - nie skacze przy zmianie tygodnia i ładowaniu */
+  @media (min-width: 769px) {
+    .emp-table th.pr-head, .emp-table td.pr-cell { width: 330px; min-width: 330px; box-sizing: border-box; }
+  }
   .pr-week { display: inline-flex; gap: 4px; padding-bottom: 4px; }
   .pr-day {
     min-width: 38px; height: 28px; padding: 0 4px; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center;
@@ -14,9 +32,16 @@
   .pr-day.plan,   .pr-h.plan   { border-color: var(--primary); color: var(--primary); background: #fff; }
   .pr-day.ok,     .pr-h.ok     { background: var(--primary); border-color: var(--primary); color: #fff; }
   .pr-day.diff,   .pr-h.diff   { background: var(--accent); border-color: var(--accent-hover); color: #03241E; }
-  .pr-day.absent, .pr-h.absent { background: var(--danger); border-color: var(--danger); color: #fff; }
+  .pr-day.absent, .pr-h.absent,
+  .pr-day.absdone, .pr-h.absdone { background: var(--danger); border-color: var(--danger); color: #fff; }
   .pr-day.none,   .pr-h.none   { background: #E5E7EB; border-color: #E5E7EB; color: #6B7280; }
   .pr-day.absplan, .pr-h.absplan { border-color: var(--danger); color: var(--danger); background: #fff; }
+  /* brak raportu po końcu zaplanowanej zmiany: czerwone ukośne kreski (nieobecność w raporcie - pełny czerwony) */
+  .pr-day.missing, .pr-h.missing {
+    border-color: var(--danger); color: #9b1c1f;
+    background: repeating-linear-gradient(135deg, rgba(217, 56, 58, 0.55) 0 3px, #FDECEC 3px 7px);
+  }
+  .pr-day.missing { text-shadow: 0 0 3px #fff, 0 0 2px #fff; }
 
   /* Dwie zmiany w jednym dniu o różnym stanie: dwie połówki (lewa - wcześniejsza zmiana),
      każda w kolorze swojego stanu; napis dnia w kolorach obu połówek */
@@ -34,8 +59,10 @@
   .pr-day.l-ok { --lc: #fff; }               .pr-day.r-ok { --rc: #fff; }
   .pr-day.l-diff { --lc: #03241E; }          .pr-day.r-diff { --rc: #03241E; }
   .pr-day.l-absent { --lc: #fff; }           .pr-day.r-absent { --rc: #fff; }
+  .pr-day.l-absdone { --lc: #fff; }          .pr-day.r-absdone { --rc: #fff; }
   .pr-day.l-none { --lc: #6B7280; }          .pr-day.r-none { --rc: #6B7280; }
   .pr-day.l-absplan { --lc: var(--danger); } .pr-day.r-absplan { --rc: var(--danger); }
+  .pr-day.l-missing { --lc: #7f1517; }       .pr-day.r-missing { --rc: #7f1517; }
   /* dzisiaj: cienka ciemna kreska pod kafelkiem zamiast grubej obwódki */
   .pr-day.today  { position: relative; }
   .pr-day.today::after { content: ""; position: absolute; left: 25%; right: 25%; bottom: -5px; height: 2px; border-radius: 2px; background: #1F2937; }
@@ -49,7 +76,14 @@
   @media (max-width: 768px) {
     /* legenda: tytuł na całą szerokość, pod nim pozycje w dwóch równych kolumnach */
     .pr-legend { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 12px; padding: 12px 14px; align-items: start; }
-    .pr-legend b { grid-column: 1 / -1; }
+    .pr-legend > b { grid-column: 1 / -1; }
+    .pr-nav-m { display: flex; grid-column: 1 / -1; justify-content: space-between; padding-bottom: 8px; margin-bottom: 2px; border-bottom: 1px solid var(--border-color); }
+    .pr-nav-m .pr-nav-text { flex: 1; flex-direction: row; justify-content: center; gap: 6px; font-size: 0.85rem; color: var(--text-dark); }
+    .pr-nav-m .pr-arrow, .pr-nav-m .pr-today { height: 34px; min-width: 38px; font-size: 0.8rem; }
+    /* ‹ Tydzień 19.10–25.10 › w jednym rzędzie, "Aktualny tydzień" pod spodem na całą szerokość */
+    .pr-nav-m { flex-wrap: wrap; row-gap: 8px; }
+    .pr-nav-m .pr-nav-text { white-space: nowrap; }
+    .pr-nav-m .pr-today { order: 3; flex: 1 1 100%; }
     .pr-legend span { align-items: flex-start; line-height: 1.3; }
     .pr-legend span:last-child { grid-column: 1 / -1; }
     .pr-legend .pr-day { flex: none; margin-top: 1px; }
@@ -135,12 +169,20 @@
 <!-- Karta z tabelą pracowników -->
 <div class="card" style="padding: 0; overflow: hidden;">
   <div class="pr-legend" aria-label="Legenda kolumny Obecność">
-    <b>Obecność w bieżącym tygodniu:</b>
+    <!-- telefon: nagłówków tabeli nie widać, więc wybór tygodnia jest tutaj -->
+    <div class="pr-nav pr-nav-m">
+      <button type="button" class="pr-arrow" onclick="prStepWeek(-1)" aria-label="Poprzedni tydzień"><i class="fa-solid fa-chevron-left"></i></button>
+      <span class="pr-nav-text">Tydzień <b data-pr-range></b></span>
+      <button type="button" class="pr-arrow" onclick="prStepWeek(1)" aria-label="Następny tydzień"><i class="fa-solid fa-chevron-right"></i></button>
+      <button type="button" class="pr-today" data-pr-today disabled onclick="prStepWeek(0)">Aktualny tydzień</button>
+    </div>
+    <b>Obecność:</b>
     <span><i class="pr-day plan"></i> zaplanowany</span>
     <span><i class="pr-day ok"></i> obecny zgodnie z harmonogramem</span>
     <span><i class="pr-day diff"></i> obecny inaczej niż w harmonogramie</span>
-    <span><i class="pr-day absent"></i> nieobecny</span>
-    <span><i class="pr-day absplan"></i> zgłoszona nieobecność</span>
+    <span><i class="pr-day absent"></i> nieobecny / zgłoszona nieobecność</span>
+    <span><i class="pr-day missing"></i> brak raportu</span>
+    <span><i class="pr-day absplan"></i> zgłoszona nieobecność (przed zmianą)</span>
     <span><i class="pr-day none"></i> brak zaplanowanych godzin</span>
     <span><i class="pr-day split"><i class="pr-h plan"></i><i class="pr-h absplan"></i></i> dwie zmiany w dniu - każda połówka osobno</span>
   </div>
@@ -152,7 +194,15 @@
           <th style="padding: 14px 18px;">Telefon</th>
           <th style="padding: 14px 18px;">Firma</th>
           <th style="padding: 14px 18px;">Dział</th>
-          <th id="emp-presence-head" class="pr-head" style="padding: 10px 12px;">Obecność<span class="range" id="emp-presence-range"></span></th>
+          <th id="emp-presence-head" class="pr-head" style="padding: 10px 12px;">
+            <!-- strzałki: poprzedni / następny tydzień (js/employee_presence.js, prStepWeek) -->
+            <div class="pr-nav">
+              <button type="button" class="pr-arrow" onclick="prStepWeek(-1)" title="Poprzedni tydzień" aria-label="Poprzedni tydzień"><i class="fa-solid fa-chevron-left"></i></button>
+              <span class="pr-nav-text">Obecność<span class="range" id="emp-presence-range" data-pr-range></span></span>
+              <button type="button" class="pr-arrow" onclick="prStepWeek(1)" title="Następny tydzień" aria-label="Następny tydzień"><i class="fa-solid fa-chevron-right"></i></button>
+              <button type="button" class="pr-today" data-pr-today disabled onclick="prStepWeek(0)" title="Wróć do bieżącego tygodnia">Aktualny tydzień</button>
+            </div>
+          </th>
           <th style="padding: 14px 18px; text-align: center; width: 150px;">Akcje</th>
         </tr>
       </thead>

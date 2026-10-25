@@ -1,7 +1,7 @@
 // ==========================================
 // ZATWIERDZANIE RAPORTÓW: zakładki "Listy raportów" w menu i liczniki
-// Zakładki: archive - Lista raportów (tylko zatwierdzone), pending - W oczekiwaniu na zatwierdzenie,
-//           rejected - Do poprawy.
+// Zakładki: archive - Zatwierdzone, mine - Moje raporty (wszystkie stany, raporty zalogowanej osoby),
+//           pending - W oczekiwaniu na zatwierdzenie, rejected - Do poprawy.
 // Zatwierdza, odsyła do poprawy i cofa zatwierdzenie osoba z uprawnieniem "Zatwierdzanie raportów"
 // (users.allow_report_approve) - raporty z całego zakładu. Autor widzi swoje raporty w oczekiwaniu
 // i do poprawy. Liczniki w menu: zatwierdzający - wszystkie raporty, pozostali - swoje do poprawy.
@@ -10,13 +10,8 @@
 // ==========================================
 
 const RPA_POLL_MS = 60000;   // jak często odświeżać liczniki
-const RPA_TAB_LABELS = {
-  archive: "Lista raportów",
-  pending: "W oczekiwaniu na zatwierdzenie",
-  rejected: "Raporty do poprawy"
-};
 
-let rpaTab = "archive";
+let rpaTab = "mine";            // wybrana zakładka; domyślnie Moje raporty (niedostępna - pierwsza dostępna)
 let rpaPollTimer = null;
 let rpaCounts = { pending: 0, rejected: 0 };   // liczby widoczne teraz w menu
 let rpaCountsToken = 0;
@@ -36,6 +31,8 @@ function rpaTabs() {
   if (typeof currentUser === "undefined" || !currentUser) return [];
   const approve = rpaCanApprove();
   const tabs = [];
+  // Moje raporty: każdy, kto tworzy raporty; pierwsza w menu i otwierana po kliknięciu "Lista raportów"
+  if (hasPermission("allow_time_reporting") || hasPermission("allow_reports")) tabs.push("mine");
   if (hasPermission("allow_reports") || approve) tabs.push("archive");
   if (rpaInstalled() && (approve || hasPermission("allow_reports") || hasPermission("allow_time_reporting"))) {
     tabs.push("pending", "rejected");

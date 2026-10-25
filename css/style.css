@@ -541,9 +541,10 @@ input[type="checkbox"] {
 .pr-tip .state { display: block; width: fit-content; margin: 0 auto 4px; padding: 3px 10px; border-radius: 999px; font-size: 0.74rem; font-weight: 700; text-align: center; }
 .pr-tip .state.ok { background: var(--primary); color: #fff; }
 .pr-tip .state.diff { background: var(--accent); color: #03241E; }
-.pr-tip .state.absent { background: var(--danger); color: #fff; }
+.pr-tip .state.absent, .pr-tip .state.absdone { background: var(--danger); color: #fff; }
 .pr-tip .state.plan { border: 1.5px solid var(--primary); color: var(--primary); }
 .pr-tip .state.absplan { border: 1.5px solid var(--danger); color: var(--danger); }
+.pr-tip .state.missing { border: 1.5px solid var(--danger); color: #9b1c1f; background: repeating-linear-gradient(135deg, rgba(217, 56, 58, 0.25) 0 3px, #FDECEC 3px 7px); }
 .pr-tip .state.none { background: #E5E7EB; color: #4B5563; }
 .pr-tip .sec { margin: 8px 0 4px; font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: #6B7280; }
 .pr-tip .row { display: flex; align-items: center; justify-content: center; gap: 8px; flex-wrap: wrap; padding: 2px 0; font-variant-numeric: tabular-nums; }

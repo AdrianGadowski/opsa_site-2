@@ -1,0 +1,234 @@
+<style>
+  /* ===== Plan zalewu (js/pour_plan.js) ===== */
+  .pp-banner { display: none; align-items: center; gap: 10px; padding: 12px 16px; border-radius: 10px; margin-bottom: 16px; font-size: 0.9rem; font-weight: 500; }
+  .pp-banner.visible { display: flex; }
+  .pp-banner.success { background: rgba(16, 185, 129, 0.1); color: #0b7a57; border: 1px solid rgba(16, 185, 129, 0.35); }
+  .pp-banner.warning { background: rgba(252, 212, 68, 0.25); color: #7a5c00; border: 1px solid rgba(224, 188, 60, 0.6); }
+
+  /* wybór tygodnia w zielonym nagłówku (jak w Harmonogramie) */
+  .pp-weekpick { display: flex; align-items: center; gap: 6px; }
+  .pp-weekpick button {
+    height: 44px; min-width: 42px; padding: 0 12px; border-radius: 12px; cursor: pointer; font-size: 0.9rem; font-family: inherit; font-weight: 700;
+    border: 1px solid rgba(255, 255, 255, 0.25); background: rgba(255, 255, 255, 0.12); color: #fff;
+  }
+  .pp-weekpick button:hover:not(:disabled) { background: rgba(255, 255, 255, 0.22); }
+  .pp-weekpick button:disabled { opacity: 0.4; cursor: default; }
+  .pp-week-label {
+    min-width: 220px; height: 44px; display: inline-flex; flex-direction: column; align-items: center; justify-content: center; padding: 0 14px;
+    border-radius: 12px; background: rgba(255, 255, 255, 0.95); color: var(--primary); line-height: 1.2;
+  }
+  .pp-week-label b { font-size: 0.92rem; }
+  .pp-week-label span { font-size: 0.74rem; font-weight: 600; color: #3F6F66; }
+
+  .pp-toolbar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; padding: 14px 18px; border-bottom: 1px solid var(--border-color); }
+  .pp-lines, .pp-fill-lines { display: flex; gap: 6px; flex-wrap: wrap; }
+  .pp-fill-lines { justify-content: center; margin-bottom: 16px; }
+  /* suwaki zmian pod sobą: nazwa po lewej, suwak po prawej */
+  .pp-fill-shifts { display: flex; flex-direction: column; gap: 10px; width: 200px; margin: 0 auto; }
+  .pp-fill-shifts .zw-switch { gap: 8px; justify-content: space-between; }
+  .pp-fill-shifts .zw-switch .txt { font-weight: 700; font-size: 0.88rem; }
+  .pp-lines button, .pp-fill-lines button {
+    height: 38px; padding: 0 16px; border-radius: 999px; border: 1.5px solid #D9D9D9; background: #fff; cursor: pointer;
+    font-family: inherit; font-size: 0.86rem; font-weight: 700; color: #4B5563;
+  }
+  .pp-lines button.on, .pp-fill-lines button.on { border-color: var(--primary); background: var(--primary); color: #fff; }
+  .pp-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .pp-btn {
+    height: 40px; padding: 0 14px; border-radius: 10px; border: 1.5px solid #D9D9D9; background: #fff; cursor: pointer;
+    font-family: inherit; font-size: 0.84rem; font-weight: 700; color: var(--primary); display: inline-flex; align-items: center; gap: 8px;
+  }
+  .pp-btn:hover:not(:disabled) { border-color: var(--primary); background: rgba(8, 88, 75, 0.06); }
+  .pp-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+  .pp-clear { color: var(--danger); }
+  .pp-clear:hover:not(:disabled) { border-color: var(--danger); background: rgba(217, 56, 58, 0.06); }
+  .pp-save { width: auto; height: 40px; padding: 0 18px; display: inline-flex; align-items: center; gap: 8px; }
+  .pp-hint { padding: 10px 18px 0; font-size: 0.82rem; color: var(--text-muted); }
+  .pp-hint i { margin-right: 6px; }
+
+  /* tabela tygodnia: dni x zmiany */
+  .pp-table { width: 100%; border-collapse: separate; border-spacing: 6px; padding: 6px 12px 14px; font-size: 0.84rem; min-width: 900px; table-layout: fixed; }
+  /* równe kolumny zmian; dzień i doba o stałej szerokości */
+  .pp-table thead th:first-child { width: 120px; }
+  .pp-table thead th:last-child { width: 220px; }
+  /* nagłówki kolumn: ciemne kafle jak w Dashboardzie Zalewu */
+  .pp-table thead th { padding: 10px 8px; font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.03em; color: #fff; text-align: center; border-radius: 10px; background: linear-gradient(135deg, #0B6B5B 0%, #08584B 50%, #053D34 100%); }
+  .pp-table td, .pp-table th.pp-day { border-radius: 10px; background: #F5F5F7; padding: 8px 10px; vertical-align: middle; }
+  .pp-table th.pp-day { text-align: center; font-weight: 800; color: var(--primary); white-space: nowrap; }
+  .pp-table th.pp-day span { display: block; font-size: 0.74rem; font-weight: 600; color: var(--text-muted); }
+  .pp-table tr.sat th.pp-day { background: #FCD444; color: #03241E; }
+  .pp-table tr.sat th.pp-day span { color: rgba(3, 36, 30, 0.7); }
+  .pp-table tr.sat td { background: #FFF6D6; }
+  .pp-table tr.sun th.pp-day { background: #2563EB; color: #fff; }
+  .pp-table tr.sun th.pp-day span { color: rgba(255, 255, 255, 0.85); }
+  .pp-table tr.sun td { background: #E8EFFD; }
+  .pp-table tr.today th.pp-day, .pp-table tr.today td { box-shadow: inset 0 0 0 2px #1E9A7F; }
+  .pp-table td.pp-sum { background: #EAF3EF; }
+  /* zmiana, która właśnie trwa - pomarańczowa ramka i znaczek "Trwa" z pulsującą kropką (jak w Dashboardzie Zalewu) */
+  .pp-table td.pp-now, .pp-table tr.today td.pp-now { position: relative; padding-top: 13px; box-shadow: inset 0 0 0 2px #F59E0B, 0 4px 14px rgba(245, 158, 11, 0.28); }
+  .pp-table td .pp-live {
+    position: absolute; top: -8px; left: 50%; transform: translateX(-50%); z-index: 1;
+    display: inline-flex; align-items: center; gap: 5px; padding: 1px 9px; border-radius: 999px;
+    background: #F59E0B; color: #fff; font-size: 0.66rem; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; line-height: 1.5;
+  }
+  .pp-table td .pp-live i { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #fff; animation: zwLivePulse 1.4s ease-in-out infinite; }
+  @media (prefers-reduced-motion: reduce) { .pp-table td .pp-live i { animation: none; } }
+  .pp-table tfoot td, .pp-table tfoot th.pp-day { background: #DDF1E7; }
+
+  .pp-cell { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .pp-in { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+  .pp-in label { font-size: 0.66rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.02em; }
+  .pp-in input {
+    width: 100%; height: 34px; padding: 0 4px; border-radius: 8px; border: 1.5px solid #D9D9D9; background: #fff; text-align: center;
+    font-family: inherit; font-size: 0.9rem; font-weight: 700; color: var(--text-dark); font-variant-numeric: tabular-nums;
+  }
+  /* pole zmienione albo to, w którym się pisze: żółta obwódka jak zaznaczona kratka w Harmonogramie.
+     Obwódka to ::before za polem (klasa hl z js/pour_plan.js, ppSyncRings); sąsiednie podświetlone pola
+     tej samej zmiany (jl / jr) mają jedną wspólną obwódkę - spotykają się na środku odstępu między polami */
+  .pp-in { position: relative; }
+  .pp-in input { position: relative; z-index: 1; }
+  .pp-in input:focus { outline: none; border-color: var(--accent-hover); }
+  .pp-in input.dirty { border-color: var(--accent-hover); }
+  .pp-in.hl::before {
+    content: ""; position: absolute; left: -4px; right: -4px; bottom: -4px; height: 42px; box-sizing: border-box;
+    background: var(--accent); border: 1px solid var(--accent-hover); border-radius: 12px;
+  }
+  .pp-in.hl.jl::before { left: -3px; border-left: none; border-top-left-radius: 0; border-bottom-left-radius: 0; }
+  .pp-in.hl.jr::before { right: -3px; border-right: none; border-top-right-radius: 0; border-bottom-right-radius: 0; }
+  /* znaczek ✓ - na ostatnim zmienionym polu wspólnej obwódki */
+  .pp-in.ck::after {
+    content: "\2713"; position: absolute; top: 9px; right: -6px; width: 16px; height: 16px; border-radius: 50%;
+    background: var(--accent-hover); color: #03241E; font-size: 0.62rem; font-weight: 800;
+    display: flex; align-items: center; justify-content: center; pointer-events: none; z-index: 2;
+  }
+  .pp-in .ro { height: 34px; display: flex; align-items: center; font-weight: 800; color: var(--text-dark); font-variant-numeric: tabular-nums; }
+  .pp-in .ro.empty { color: #C4C8CE; font-weight: 600; }
+  /* wykonanie: trzy kolumny pod polami Kadzie | Metal | Formy */
+  .pp-real { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 7px; text-align: center; font-size: 0.72rem; color: var(--text-muted); white-space: nowrap; }
+  .pp-real .pp-before { grid-column: 1 / -1; }
+  .pp-real b { color: var(--text-dark); }
+  .pp-real .done b { color: #0b7a57; }
+  /* kłódka na samym dole kafelka */
+  .pp-lockrow { margin-top: 5px; text-align: center; line-height: 1; font-size: 0.68rem; color: #9CA3AF; }
+  .pp-lock { color: #9CA3AF; font-size: 0.68rem; margin-right: 3px; }
+  /* doba i tydzień: same liczby (plan / wykonanie) */
+  .pp-totals { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; text-align: center; }
+  .pp-totals .k { display: block; font-size: 0.66rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; }
+  .pp-totals b { display: block; font-size: 0.95rem; color: var(--text-dark); font-variant-numeric: tabular-nums; }
+  .pp-totals small { display: block; font-size: 0.72rem; color: var(--text-muted); white-space: nowrap; }
+
+  @media (max-width: 768px) {
+    .pp-weekpick { width: 100%; }
+    .pp-weekpick { flex-wrap: wrap; }
+    .pp-week-label { flex: 1; min-width: 0; white-space: nowrap; }
+    /* "Ten tydzień" w osobnym wierszu - napis tygodnia nie jest ściśnięty */
+    #pp-this-week { flex-basis: 100%; }
+    .pp-toolbar { padding: 12px; }
+    .pp-actions { width: 100%; }
+    .pp-actions > * { flex: 1 1 auto; justify-content: center; }
+  }
+</style>
+
+<div class="page-hero">
+  <div>
+    <div class="eyebrow">Planowanie</div>
+    <h3>Plan zalewu</h3>
+    <p>Plan każdej zmiany na liniach: ile kadzi, ile metalu w kadziach i ile form do zalania. Pod planem widać wykonanie z Zalewu.</p>
+  </div>
+  <div class="page-hero-actions">
+    <div class="pp-weekpick">
+      <button type="button" onclick="ppStepWeek(-1)" title="Poprzedni tydzień" aria-label="Poprzedni tydzień"><i class="fa-solid fa-chevron-left"></i></button>
+      <span class="pp-week-label" id="pp-week-label" aria-live="polite">—</span>
+      <button type="button" onclick="ppStepWeek(1)" title="Następny tydzień" aria-label="Następny tydzień"><i class="fa-solid fa-chevron-right"></i></button>
+      <button type="button" id="pp-this-week" onclick="ppStepWeek(0)" title="Wróć do bieżącego tygodnia">Ten tydzień</button>
+    </div>
+  </div>
+</div>
+
+<div id="pp-banner" class="pp-banner" role="status"></div>
+
+<div class="card" style="padding: 0; overflow: hidden;">
+  <div class="pp-toolbar">
+    <div class="pp-lines" id="pp-lines" role="tablist" aria-label="Linia"></div>
+    <div class="pp-actions" id="pp-actions">
+      <button type="button" class="pp-btn" onclick="ppCopyPrevWeek()" title="Wpisz plan z poprzedniego tygodnia (trzeba zapisać)"><i class="fa-solid fa-copy"></i> Skopiuj poprzedni tydzień</button>
+      <button type="button" class="pp-btn" onclick="ppOpenFill()" title="Te same liczby na wiele zmian naraz (trzeba zapisać)"><i class="fa-solid fa-fill-drip"></i> Wypełnij tydzień</button>
+      <button type="button" class="pp-btn pp-clear" onclick="ppAskClearAll()" title="Usuń plan wszystkich zmian tygodnia na tej linii (zapis od razu)"><i class="fa-solid fa-eraser"></i> Wyczyść wszystko</button>
+      <button type="button" id="pp-save" class="btn-primary pp-save" disabled onclick="ppSave()"><i class="fa-solid fa-floppy-disk"></i> Zapisz plan</button>
+    </div>
+  </div>
+  <div class="pp-hint" id="pp-hint"></div>
+  <div style="overflow-x: auto;">
+    <table class="pp-table" id="pp-table"></table>
+  </div>
+</div>
+
+<!-- Okno: wypełnij tydzień -->
+<div id="modal-pp-fill" class="modal">
+  <div class="modal-box" style="max-width: 460px; width: 92%; position: relative;">
+    <h3 style="color: var(--primary); margin: 0 0 6px 0; font-size: 1.2rem; text-align: center;">Wypełnij tydzień</h3>
+    <p id="pp-fill-info" style="text-align: center; color: var(--text-muted); font-size: 0.86rem; margin: 0 0 16px;"></p>
+    <!-- linia do wypełnienia (domyślnie oglądana); inna linia - plan przełącza się na nią -->
+    <div style="margin: 0 0 6px; font-size: 0.82rem; font-weight: 700; color: var(--text-muted); text-align: center;">Linia</div>
+    <div class="pp-fill-lines" id="pp-fill-lines" role="radiogroup" aria-label="Linia"></div>
+    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
+      <div class="form-group" style="margin-bottom: 0; text-align: center;">
+        <label for="pp-fill-ladles">Kadzie</label>
+        <input type="text" id="pp-fill-ladles" class="form-control" inputmode="numeric" maxlength="4" placeholder="np. 30" style="text-align: center;" oninput="ppDigits(this)" />
+      </div>
+      <div class="form-group" style="margin-bottom: 0; text-align: center;">
+        <label for="pp-fill-metal">Metal (t)</label>
+        <input type="text" id="pp-fill-metal" class="form-control" inputmode="decimal" maxlength="6" placeholder="np. 30" style="text-align: center;" oninput="ppDecimal(this)" />
+      </div>
+      <div class="form-group" style="margin-bottom: 0; text-align: center;">
+        <label for="pp-fill-forms">Formy</label>
+        <input type="text" id="pp-fill-forms" class="form-control" inputmode="numeric" maxlength="5" placeholder="np. 600" style="text-align: center;" oninput="ppDigits(this)" />
+      </div>
+    </div>
+    <div style="margin: 16px 0 6px; font-size: 0.82rem; font-weight: 700; color: var(--text-muted); text-align: center;">Zmiany</div>
+    <!-- zmiany: suwaki (styl .zw-switch z css/portal.css) -->
+    <div class="pp-fill-shifts">
+      <label class="zw-switch"><span class="txt">Zmiana I</span><input type="checkbox" class="pp-fill-shift" value="Zmiana I" checked /><span class="track"></span></label>
+      <label class="zw-switch"><span class="txt">Zmiana II</span><input type="checkbox" class="pp-fill-shift" value="Zmiana II" checked /><span class="track"></span></label>
+      <label class="zw-switch"><span class="txt">Zmiana III</span><input type="checkbox" class="pp-fill-shift" value="Zmiana III" checked /><span class="track"></span></label>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 8px; margin: 14px 0 6px; font-size: 0.88rem; align-items: center;">
+      <label><input type="checkbox" id="pp-fill-weekend" checked /> Pomiń sobotę i niedzielę</label>
+      <label><input type="checkbox" id="pp-fill-empty" /> Tylko zmiany bez planu</label>
+    </div>
+    <div id="pp-fill-msg" style="display: none; color: var(--danger); font-size: 0.86rem; text-align: center; margin-top: 8px;"></div>
+    <div class="modal-btn-row" style="margin-top: 18px;">
+      <button type="button" class="btn-secondary" onclick="toggleModal('modal-pp-fill', false)">Anuluj</button>
+      <button type="button" class="btn-primary" onclick="ppApplyFill()">Wypełnij</button>
+    </div>
+  </div>
+</div>
+
+<!-- Okno: niezapisane zmiany przy zmianie tygodnia / linii (js/pour_plan.js, ppConfirmDiscard) - styl jak ostrzeżenia w Zalewie -->
+<div id="modal-pp-discard" class="modal">
+  <div class="modal-box" style="max-width: 440px; width: 92%; text-align: center; padding: 25px 20px;">
+    <div style="width: 55px; height: 55px; border-radius: 50%; background: rgba(252, 212, 68, 0.3); color: #92590A; display: flex; align-items: center; justify-content: center; font-size: 1.6rem; margin: 0 auto 15px auto;">
+      <i class="fa-solid fa-triangle-exclamation"></i>
+    </div>
+    <h3 style="margin: 0 0 10px 0; font-size: 1.25rem;">Niezapisane zmiany</h3>
+    <div id="pp-discard-text" style="color: var(--text-dark); font-size: 0.95rem; margin-bottom: 24px; line-height: 1.5;"></div>
+    <div class="modal-btn-row">
+      <button type="button" class="btn-secondary" onclick="ppCloseDiscard(false)">Wróć do planu</button>
+      <button type="button" class="btn-danger" onclick="ppCloseDiscard(true)">Przejdź bez zapisu</button>
+    </div>
+  </div>
+</div>
+
+<!-- Okno: potwierdzenie "Wyczyść wszystko" - "Tak" aktywne po 3 s (js/pour_plan.js, ppAskClearAll) -->
+<div id="modal-pp-clear" class="modal">
+  <div class="modal-box" style="max-width: 440px; width: 92%; text-align: center; padding: 25px 20px;">
+    <div style="width: 55px; height: 55px; border-radius: 50%; background: rgba(217, 56, 58, 0.1); color: var(--danger); display: flex; align-items: center; justify-content: center; font-size: 1.6rem; margin: 0 auto 15px auto;">
+      <i class="fa-solid fa-eraser"></i>
+    </div>
+    <h3 style="margin: 0 0 10px 0; font-size: 1.25rem;">Wyczyść wszystko</h3>
+    <div id="pp-clear-text" style="color: var(--text-dark); font-size: 0.95rem; margin-bottom: 24px; line-height: 1.5;"></div>
+    <div class="modal-btn-row">
+      <button type="button" class="btn-secondary" onclick="ppCloseClear(false)">Anuluj</button>
+      <button type="button" id="pp-clear-confirm" class="btn-danger" disabled onclick="ppCloseClear(true)">Tak (3s)</button>
+    </div>
+  </div>
+</div>

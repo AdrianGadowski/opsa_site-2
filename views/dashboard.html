@@ -22,6 +22,12 @@
   .db-panel h4 { margin: 0; font-size: 0.98rem; font-weight: 700; color: var(--db-ink); }
   .db-panel .sub { margin: 3px 0 0 0; font-size: 0.8rem; color: var(--db-ink-3); }
   .db-panel-head { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; }
+  /* tydzień zalewu: panel ma już własny margines, więc bez dodatkowych odstępów z portalu */
+  .db-zwd-panel .zw-dash-lines { padding: 0; margin: 0; }
+  /* tytuł "Tydzień zalewu" na środku, filtr linii wyśrodkowany pod nim */
+  .db-zwd-panel .db-panel-head { flex-direction: column; align-items: center; text-align: center; }
+  .db-zwd-panel .zw-dash-lines { justify-content: center; }
+  .db-zwd-panel .zw-dash-table { padding: 0; }
 
   /* --- Kafelki --- */
   .db-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px; margin-bottom: 16px; }
@@ -111,61 +117,6 @@
   .db-mgroup.selected .mn { color: var(--primary); font-weight: 700; }
 
 
-  /* --- Zalew: kolory zmian (I zielona, II żółta, III czerwona) --- */
-  .db-root { --db-z1: #0E8A6C; --db-z2: #F2BE2E; --db-z3: #D9383A; }
-  .db-legend .z1 { background: var(--db-z1); }
-  .db-legend .z2 { background: var(--db-z2); }
-  .db-legend .z3 { background: var(--db-z3); }
-  .db-col .seg.z1 { background: var(--db-z1); }
-  .db-col .seg.z2 { background: var(--db-z2); }
-  .db-col .seg.z3 { background: var(--db-z3); }
-  .db-zw-tile.z1 { border-top: 4px solid var(--db-z1); }
-  .db-zw-tile.z2 { border-top: 4px solid var(--db-z2); }
-  .db-zw-tile.z3 { border-top: 4px solid var(--db-z3); }
-  .db-zw-chart { margin: 4px 0 18px 0; }
-  /* Zalew: wykresy osobno dla każdej linii (2 x 2) */
-  .db-zw-lines { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 6px; }
-  .db-zw-line { border: 1px solid var(--border-color); border-radius: 12px; padding: 12px 12px 4px 4px; }
-  .db-zw-line-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; padding: 0 0 8px 10px; }
-  .db-zw-line-head .name { font-weight: 800; color: var(--db-ink); }
-  .db-zw-line-head .sum { font-size: 0.78rem; color: var(--db-ink-3); white-space: nowrap; }
-  .db-zw-chart.small { height: 180px; margin-bottom: 4px; }
-  .db-zw-chart.small .db-col .stack { max-width: 16px; }
-  .db-zw-chart.small .db-col .xl { font-size: 0.62rem; }
-
-  /* --- Zalew: kafelki zmian i tabela linii --- */
-  .db-zw-tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 14px; }
-  .db-zw-tile { border-radius: 12px; padding: 14px 16px; background: #F5F5F7; border: 1px solid var(--border-color); }
-  .db-zw-tile .lbl { font-size: 0.8rem; font-weight: 700; color: var(--db-ink-2); }
-  .db-zw-tile .val { margin-top: 6px; font-size: 1.4rem; font-weight: 700; color: var(--db-ink); letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
-  .db-zw-tile .note { margin-top: 4px; font-size: 0.78rem; color: var(--db-ink-3); }
-  .db-zw-tile .note b { color: var(--db-ink-2); }
-  .db-zw-tile.main { background: linear-gradient(135deg, #0B6B5B 0%, #08584B 50%, #053D34 100%); border-color: transparent; box-shadow: 0 8px 22px rgba(8, 88, 75, 0.25); }
-  .db-zw-tile.main .lbl, .db-zw-tile.main .note, .db-zw-tile.main .note b { color: rgba(255, 255, 255, 0.85); }
-  .db-zw-tile.main .val { color: #FFFFFF; }
-  .db-zw-other { margin: 0 0 12px 0; font-size: 0.8rem; color: #92590A; }
-  .db-zw-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
-  .db-zw-table th { padding: 10px 12px; text-align: center; font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.03em; color: #4B5563; background: #F9FAFB; border-bottom: 1px solid var(--border-color); }
-  .db-zw-table th:first-child, .db-zw-table td.ln { text-align: left; }
-  .db-zw-table td { padding: 9px 12px; text-align: center; border-bottom: 1px solid #F0F0F0; font-variant-numeric: tabular-nums; }
-  .db-zw-table td.ln { font-weight: 700; color: var(--db-ink); }
-  .db-zw-table td.tot { font-weight: 700; color: #0B5D44; }
-  .db-zw-table tr.sum td { background: #DDF1E7; font-weight: 700; color: #0B5D44; border-bottom: none; }
-  .db-zw-h { margin: 18px 0 8px 0; font-size: 0.9rem; font-weight: 700; color: var(--db-ink); }
-  .db-zw-table td .w { font-weight: 700; color: var(--db-ink); }
-  .db-zw-table td .kf { margin-top: 2px; font-size: 0.74rem; color: var(--db-ink-3); white-space: nowrap; }
-  .db-zw-table td .kf b { color: var(--db-ink-2); }
-  .db-zw-table td .none { color: #C9CED4; }
-  .db-zw-table td.tot .w { color: #0B5D44; }
-  .db-zw-table tr.sum td .w, .db-zw-table tr.sum td .kf, .db-zw-table tr.sum td .kf b { color: #0B5D44; }
-  .db-zw-dot { display: inline-block; width: 9px; height: 9px; border-radius: 3px; margin-right: 6px; vertical-align: middle; }
-  .db-zw-dot.z1 { background: var(--db-z1); }
-  .db-zw-dot.z2 { background: var(--db-z2); }
-  .db-zw-dot.z3 { background: var(--db-z3); }
-  .db-zw-table.models td.share { white-space: nowrap; text-align: left; }
-  .db-zw-table.models .bar { display: inline-block; width: 70px; height: 7px; margin-right: 8px; border-radius: 999px; background: var(--db-track); overflow: hidden; vertical-align: middle; }
-  .db-zw-table.models .bar span { display: block; height: 100%; border-radius: 999px; background: var(--db-present); }
-
   /* --- Listy słupków poziomych --- */
   .db-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; margin-top: 16px; }
   .db-bars { display: flex; flex-direction: column; gap: 12px; }
@@ -215,11 +166,6 @@
     .db-col .wk { visibility: hidden; }  /* numery tygodni się nie mieszczą - są w dymku */
     .db-mgroup .mn { font-size: 0.62rem; }
     .db-grid { grid-template-columns: 1fr; }
-    .db-zw-tiles { grid-template-columns: 1fr 1fr; gap: 10px; }
-    .db-zw-tile.main { grid-column: 1 / -1; }
-    .db-zw-tile .val { font-size: 1.15rem; }
-    .db-zw-lines { grid-template-columns: 1fr; }
-    .db-zw-chart.small { height: 160px; }
   }
 
   /* Wybór okresu w zielonym nagłówku: strzałki ‹ › jak w Harmonogramie */
@@ -237,9 +183,18 @@
   }
   /* strzałki i "Cały rok": treść zawsze na środku kafelka; stała szerokość - kafelki nie skaczą przy zmianie okresu */
   .db-periodpick button { display: inline-flex; align-items: center; justify-content: center; text-align: center; }
+  /* tydzień zalewu: dwie linijki (numer tygodnia i daty) i przycisk "Ten tydzień" */
+  .db-weekpick .db-period-label { flex-direction: column; line-height: 1.15; width: 140px; }   /* węższy niż miesiąc - obok jest kadź */
+  .db-weekpick .db-period-label b { font-size: 0.92rem; }
+  .db-weekpick .db-period-label span { font-size: 0.74rem; font-weight: 600; opacity: 0.8; }
+  .db-weekpick button.txt { width: auto; padding: 0 14px; font-family: inherit; font-size: 0.84rem; font-weight: 700; }
+  [data-only][hidden] { display: none !important; }
   @media (max-width: 768px) {
     .db-periodpick { width: 100%; }
+    .db-weekpick { flex-wrap: wrap; }
+    .db-weekpick button.txt { flex-basis: 100%; }
     .db-period-label { flex: 1; width: auto; min-width: 0; font-size: 0.88rem; }
+    .db-weekpick .db-period-label { width: auto; }
   }
 
   /* Zakładki pulpitu: Ewidencja czasu pracy / Zalew */
@@ -259,10 +214,20 @@
     <div>
       <div class="eyebrow">Podsumowanie</div>
       <h3>Pulpit główny</h3>
-      <p id="db-period-label">Podsumowanie czasu pracy z raportów.</p>
+      <p id="db-period-label" data-only="time">Podsumowanie czasu pracy z raportów.</p>
+      <p data-only="zalew" hidden>Kadzie, metal i formy dobre względem liczby zadanej.</p>
     </div>
     <div class="page-hero-actions">
-      <div class="db-periodpick">
+      <!-- zakładka Zalew: wybór tygodnia zalewu (js/zalew.js, zwDashStep) zamiast miesiąca -->
+      <!-- kadź z płynnym metalem: wykonanie planu tygodnia (js/zalew.js, zwRenderLadle) -->
+      <div class="zw-ladlebox" id="db-zwd-ladle" data-only="zalew" hidden></div>
+      <div class="db-periodpick db-weekpick" data-only="zalew" hidden>
+        <button type="button" onclick="zwDashStep(-1)" title="Poprzedni tydzień" aria-label="Poprzedni tydzień"><i class="fa-solid fa-chevron-left"></i></button>
+        <span class="db-period-label" id="db-zwd-week" aria-live="polite">—</span>
+        <button type="button" id="db-zwd-next" onclick="zwDashStep(1)" title="Następny tydzień" aria-label="Następny tydzień"><i class="fa-solid fa-chevron-right"></i></button>
+        <button type="button" id="db-zwd-now" class="txt" onclick="zwDashStep(0)" title="Wróć do bieżącego tygodnia">Ten tydzień</button>
+      </div>
+      <div class="db-periodpick" data-only="time">
         <button type="button" id="db-prev" onclick="dbStepPeriod(-1)" title="Poprzedni miesiąc" aria-label="Poprzedni okres"><i class="fa-solid fa-chevron-left"></i></button>
         <input type="hidden" id="db-filter-year" />
         <input type="hidden" id="db-filter-month" />
@@ -279,20 +244,18 @@
   </div>
 
   <section class="db-pane" data-pane="zalew" hidden>
-  <!-- Zalew: podsumowanie zalewów w wybranym okresie -->
-  <div class="db-panel" id="db-zalew-panel" style="margin-bottom: 16px;">
+  <!-- Zalew: tydzień (pn-niedz) z podziałem na zmiany - ten sam co w portalu Zalewu (js/zalew.js, zwDashOpenInApp) -->
+  <div class="db-panel db-zwd-panel" style="margin-bottom: 16px;">
     <div class="db-panel-head">
       <div>
-        <h4><i class="fa-solid fa-fire-flame-curved" style="color: #B52B2D; margin-right: 6px;"></i>Zalew</h4>
-        <p class="sub" id="db-zalew-sub"></p>
+        <h4><i class="fa-solid fa-calendar-week" style="color: #B52B2D; margin-right: 6px;"></i>Tydzień zalewu</h4>
       </div>
-      <div class="db-legend">
-        <span><i class="z1"></i> Zmiana I</span>
-        <span><i class="z2"></i> Zmiana II</span>
-        <span><i class="z3"></i> Zmiana III</span>
-      </div>
+      <!-- linia: wszystkie albo jedna -->
+      <div class="zw-subtabs zw-dash-lines" id="db-zwd-lines" aria-label="Linia"></div>
     </div>
-    <div id="db-zalew"></div>
+    <div style="overflow-x: auto;">
+      <table class="zw-dash-table" id="db-zwd-table"></table>
+    </div>
   </div>
 
   </section>

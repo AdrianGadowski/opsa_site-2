@@ -48,7 +48,7 @@ const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
 
 // Numer wydania doklejany do adresów plików, żeby przeglądarka nie używała starych kopii.
 // Zmieniaj przy każdej publikacji - tutaj i w index.html (?v=...).
-const APP_BUILD = "20261226";
+const APP_BUILD = "20261347";
 
 let currentUser = null;
 let cachedUsers = [];
@@ -67,7 +67,8 @@ const viewTitles = {
   options: "Opcje systemu",
   logs: "Logi systemu",
   absences: "Zgłoszenia nieobecności",
-  messages: "Komunikaty"
+  messages: "Komunikaty",
+  pour_plan: "Plan zalewu"
 };
 
 // Kliknięcie w awatar lub dane użytkownika w stopce menu otwiera "Moje konto"
@@ -85,7 +86,8 @@ const permissionMap = {
   updates: { elementId: "nav-updates", column: "allow_updates" },
   options: { elementId: "nav-options", column: "allow_options" },
   logs: { elementId: "nav-logs", column: "allow_logs" },
-  messages: { elementId: "nav-messages", column: "allow_messages" }
+  messages: { elementId: "nav-messages", column: "allow_messages" },
+  pour_plan: { elementId: "nav-pour_plan", column: "allow_pour_plan_view" }
 };
 
 function hasPermission(columnName) {
@@ -158,6 +160,8 @@ function canOpenView(viewKey) {
   if (viewKey === "absences") return typeof abCanReview === "function" && abCanReview();
   // lista raportów: archiwum ("Lista raportów"), zatwierdzanie albo własne raporty do poprawy (report_approval.js)
   if (viewKey === "reports" && typeof rpaTabs === "function") return rpaTabs().length > 0;
+  // plan zalewu: podgląd albo edycja (edycja daje też podgląd)
+  if (viewKey === "pour_plan") return hasPermission("allow_pour_plan_view") || hasPermission("allow_pour_plan_edit");
   const info = permissionMap[viewKey];
   if (info && !hasPermission(info.column)) return false;
   return true;
@@ -803,6 +807,9 @@ async function onViewLoaded(viewName) {
     case 'absences':
       await initAbsencesView();
       break;
+    case 'pour_plan':
+      await initPourPlanView();
+      break;
     case 'logs':
       await initLogsView();
       break;
@@ -962,6 +969,10 @@ async function openEditUserModal(login) {
   if (permMsg) permMsg.checked = !!(user.allow_messages);
   const permApprove = document.getElementById("perm-report-approve");
   if (permApprove) permApprove.checked = !!(user.allow_report_approve);
+  const permPlanView = document.getElementById("perm-pour-plan-view");
+  if (permPlanView) permPlanView.checked = !!(user.allow_pour_plan_view);
+  const permPlanEdit = document.getElementById("perm-pour-plan-edit");
+  if (permPlanEdit) permPlanEdit.checked = !!(user.allow_pour_plan_edit);
 
   const msgBox = document.getElementById("user-form-msg");
   if (msgBox) msgBox.style.display = "none";
@@ -1113,7 +1124,9 @@ async function loadUsersList() {
         { label: "Opcje", active: u.allow_options },
         { label: "Logi", active: u.allow_logs },
         { label: "Komunikaty", active: u.allow_messages },
-        { label: "Zatwierdzanie raportów", active: u.allow_report_approve }
+        { label: "Zatwierdzanie raportów", active: u.allow_report_approve },
+        { label: "Plan zalewu", active: u.allow_pour_plan_view && !u.allow_pour_plan_edit },
+        { label: "Plan zalewu (edycja)", active: u.allow_pour_plan_edit }
       ];
 
       const activeBadges = permissions
@@ -1197,7 +1210,13 @@ async function handleSaveUser(e) {
       ? { allow_messages: document.getElementById("perm-messages").checked } : {}),
     // kolumna allow_report_approve istnieje dopiero po sql/34
     ...(currentUser && "allow_report_approve" in currentUser && document.getElementById("perm-report-approve")
-      ? { allow_report_approve: document.getElementById("perm-report-approve").checked } : {})
+      ? { allow_report_approve: document.getElementById("perm-report-approve").checked } : {}),
+    // kolumny planu zalewu istnieją dopiero po sql/42; edycja planu daje też podgląd
+    ...(currentUser && "allow_pour_plan_view" in currentUser && document.getElementById("perm-pour-plan-view")
+      ? {
+          allow_pour_plan_view: document.getElementById("perm-pour-plan-view").checked || document.getElementById("perm-pour-plan-edit").checked,
+          allow_pour_plan_edit: document.getElementById("perm-pour-plan-edit").checked
+        } : {})
   };
 
   try {
@@ -1358,6 +1377,7 @@ let employeeToDeleteId = null;
 let deleteEmployeeCountdownTimer = null;
 
 async function initEmployeeListView() {
+  if (typeof prWeekOffset !== "undefined") prWeekOffset = 0;   // kolumna Obecność zaczyna od bieżącego tygodnia
   await Promise.all([
     loadEmployeeFilterDictionaries(),
     loadEmployeesList()
