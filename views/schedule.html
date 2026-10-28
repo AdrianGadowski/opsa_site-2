@@ -160,8 +160,12 @@
   }
   /* ===== Wydruk harmonogramu: okno wyboru (js/schedule.js, shOpenPrint) ===== */
   .sh-print-btn { height: 40px; padding: 0 16px; font-size: 0.85rem; display: inline-flex; align-items: center; gap: 8px; width: auto; }
-  .sh-print-box { max-width: 520px; width: 94%; }
-  .sh-print-range { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .sh-print-box { max-width: 600px; width: 94%; }
+  #modal-sh-print .modal-btn-row { gap: 8px; }
+  #modal-sh-print .modal-btn-row > button { white-space: nowrap; padding-left: 8px; padding-right: 8px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; }
+  @media (max-width: 560px) { #modal-sh-print .modal-btn-row { flex-wrap: wrap; } #modal-sh-print .modal-btn-row > button { flex: 1 1 40%; } }
+  .sh-print-range { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; }
+  .sh-print-range .form-control { min-width: 0; width: 100%; }   /* pola dat mieszczą się też na telefonie */
   .sh-print-range label, .sh-print-filters label { font-size: 0.8rem; color: var(--text-muted); }
   .sh-print-filters { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 14px; }
   @media (max-width: 560px) { .sh-print-filters { grid-template-columns: 1fr; } }
@@ -181,6 +185,28 @@
   .sh-print-list label:hover { background: #F5F7F6; }
   .sh-print-list label small { margin-left: auto; color: var(--text-muted); font-size: 0.74rem; }
   .sh-print-list .empty { padding: 14px; text-align: center; color: var(--text-muted); font-size: 0.85rem; }
+  /* ===== Podgląd harmonogramu (js/schedule.js, shPreviewFit) ===== */
+  .sh-pv-box { max-width: 1400px; width: 96vw; height: 92vh; max-height: 92vh; padding: 0; display: flex; flex-direction: column; overflow: hidden; }
+  .sh-pv-head { position: relative; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; padding: 14px 18px; border-bottom: 1px solid var(--border-color); }
+  .sh-pv-head h3 { margin: 0; font-size: 1.1rem; color: var(--primary); }
+  #sh-pv-range { font-size: 0.82rem; color: var(--text-muted); }
+  .sh-pv-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .sh-pv-actions .btn-secondary, .sh-pv-actions .btn-primary { width: auto; height: 40px; padding: 0 16px; font-size: 0.86rem; display: inline-flex; align-items: center; gap: 8px; }
+  .sh-pv-close { width: 40px; height: 40px; border-radius: 10px; border: 1.5px solid #D9D9D9; background: #fff; cursor: pointer; color: var(--text-muted); font-size: 1rem; }
+  .sh-pv-close:hover { border-color: var(--danger); color: var(--danger); }
+  .sh-pv-msg { padding: 10px 18px; color: var(--danger); font-size: 0.86rem; background: #FDF1F1; }
+  /* szare tło z kartką papieru na środku */
+  .sh-pv-body { flex: 1; overflow: auto; background: #E5E8E7; padding: 16px; }
+  .sh-pv-page { width: max-content; margin: 0 auto; background: #fff; padding: 22px; box-shadow: 0 6px 24px rgba(0, 0, 0, 0.18); border-radius: 2px; }
+  .sh-pv-scale { overflow: hidden; }
+  @media (max-width: 768px) {
+    .sh-pv-box { width: 100%; height: 100%; max-height: 100%; border-radius: 0; }
+    .sh-pv-head { padding-right: 62px; }
+    .sh-pv-close { position: absolute; top: 12px; right: 12px; }
+    .sh-pv-actions { width: calc(100% + 44px); }
+    .sh-pv-actions .btn-secondary, .sh-pv-actions .btn-primary { flex: 1; justify-content: center; padding: 0 10px; }
+    .sh-pv-page { padding: 8px; }
+  }
 </style>
 
 <div class="page-hero">
@@ -362,8 +388,32 @@
     <div id="sh-print-msg" style="display: none; color: var(--danger); font-size: 0.86rem; text-align: center; margin-top: 10px;"></div>
     <div class="modal-btn-row" style="margin-top: 16px;">
       <button type="button" class="btn-secondary" onclick="toggleModal('modal-sh-print', false)">Anuluj</button>
+      <button type="button" id="sh-preview-go" class="btn-secondary" onclick="shPrint('preview')"><i class="fa-solid fa-eye"></i> Podgląd</button>
       <button type="button" id="sh-print-go" class="btn-secondary" onclick="shPrint('print')"><i class="fa-solid fa-print"></i> Drukuj</button>
       <button type="button" id="sh-pdf-go" class="btn-primary" onclick="shPrint('pdf')"><i class="fa-solid fa-file-pdf"></i> Zapisz PDF</button>
+    </div>
+  </div>
+</div>
+
+<!-- Okno: podgląd harmonogramu przed wydrukiem / zapisem PDF (js/schedule.js, shPrint('preview')) -->
+<div id="modal-sh-preview" class="modal">
+  <div class="modal-box sh-pv-box">
+    <div class="sh-pv-head">
+      <div>
+        <h3>Podgląd harmonogramu</h3>
+        <span id="sh-pv-range"></span>
+      </div>
+      <div class="sh-pv-actions">
+        <button type="button" class="btn-secondary" onclick="shPreviewBack()" title="Wróć do wyboru dat i pracowników"><i class="fa-solid fa-sliders"></i> Zmień wybór</button>
+        <button type="button" class="btn-secondary" onclick="shPreviewPrint()"><i class="fa-solid fa-print"></i> Drukuj</button>
+        <button type="button" id="sh-pv-pdf" class="btn-primary" onclick="shPreviewPdf()"><i class="fa-solid fa-file-pdf"></i> Zapisz PDF</button>
+        <button type="button" class="sh-pv-close" onclick="shPreviewClose()" title="Zamknij podgląd" aria-label="Zamknij podgląd"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+    </div>
+    <div id="sh-pv-msg" class="sh-pv-msg" style="display: none;"></div>
+    <!-- kartka A4 w poziomie, pomniejszona do szerokości okna -->
+    <div class="sh-pv-body" id="sh-pv-body">
+      <div class="sh-pv-page" id="sh-pv-page"><div id="sh-pv-scale" class="sh-pv-scale"></div></div>
     </div>
   </div>
 </div>

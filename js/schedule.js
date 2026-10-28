@@ -906,7 +906,7 @@ function shPdfOptions(filename) {
   };
 }
 
-// mode: "print" - okno drukowania przeglądarki, "pdf" - od razu plik PDF do pobrania
+// mode: "preview" - podgląd kartki, "print" - okno drukowania przeglądarki, "pdf" - od razu plik PDF do pobrania
 async function shPrint(mode = "print") {
   const msg = document.getElementById("sh-print-msg");
   const show = text => { msg.textContent = text; msg.style.display = "block"; };
@@ -917,8 +917,12 @@ async function shPrint(mode = "print") {
   if (!emps.length) return show("Zaznacz co najmniej jednego pracownika.");
   msg.style.display = "none";
 
-  const buttons = { print: document.getElementById("sh-print-go"), pdf: document.getElementById("sh-pdf-go") };
-  const labels = { print: `<i class="fa-solid fa-print"></i> Drukuj`, pdf: `<i class="fa-solid fa-file-pdf"></i> Zapisz PDF` };
+  const buttons = { preview: document.getElementById("sh-preview-go"), print: document.getElementById("sh-print-go"), pdf: document.getElementById("sh-pdf-go") };
+  const labels = {
+    preview: `<i class="fa-solid fa-eye"></i> Podgląd`,
+    print: `<i class="fa-solid fa-print"></i> Drukuj`,
+    pdf: `<i class="fa-solid fa-file-pdf"></i> Zapisz PDF`
+  };
   const busy = on => Object.entries(buttons).forEach(([k, b]) => {
     if (!b) return;
     b.disabled = on;
@@ -957,7 +961,7 @@ async function shPrint(mode = "print") {
   const head = days.map((d, i) =>
     `<th class="d${weekdays[i] === 5 ? " sat" : weekdays[i] === 6 ? " sun" : ""}"><b>${SH_DAY_SHORT[weekdays[i]]}</b><span>${dm(d)}</span></th>`).join("");
   const body = emps.map(e => `<tr>
-      <th class="n">${rtEsc(`${e.first_name || ""} ${e.last_name || ""}`.trim())}</th>
+      <th class="n"><span class="fn">${rtEsc(e.first_name || "")}</span><span class="ln">${rtEsc(e.last_name || "")}</span></th>
       ${isoDays.map((iso, i) => shPrintCell((plan[e.id] || {})[iso], weekdays[i])).join("")}
     </tr>`).join("");
   const shifts = SH_PRESETS.map(s => `<b>${s.label}</b> ${s.from}–${s.to}`).join(" · ");
@@ -966,17 +970,19 @@ async function shPrint(mode = "print") {
     @page { size: A4 landscape; margin: 9mm; }
     * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     body { margin: 0; font-family: "Segoe UI", Arial, sans-serif; color: #1F2328; }
-    h1 { margin: 0 0 2px; font-size: 15pt; color: #08584B; }
-    .meta { font-size: 8.5pt; color: #5B616B; margin-bottom: 8px; }
+    h1 { margin: 0 0 2px; font-size: 15pt; color: #08584B; text-align: center; }
+    .meta { font-size: 9.5pt; font-weight: 600; color: #5B616B; margin-bottom: 8px; text-align: center; }   /* pod tytułem tylko okres harmonogramu */
     table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 8pt; }
     th, td { border: 0.6pt solid #9AA1A9; text-align: center; vertical-align: middle; padding: 2px 1px; }
     thead th { background: #08584B; color: #fff; font-weight: 700; }
-    thead th.corner { text-align: left; padding: 4px 6px; width: 42mm; vertical-align: bottom; }
+    thead th.corner { text-align: center; padding: 4px 6px; width: 42mm; vertical-align: middle; }
     th.d { padding: 4px 1px; line-height: 1.15; }   /* dzień tygodnia u góry, data pod nim - poziomo */
     th.d b { display: block; font-size: 8.5pt; } th.d span { display: block; font-size: 7pt; font-weight: 600; opacity: 0.9; white-space: nowrap; }
     .compact th.d b { font-size: 7pt; } .compact th.d span { font-size: 5.6pt; letter-spacing: -0.1pt; }
     th.d.sat { background: #FCD444; color: #03241E; } th.d.sun { background: #2563EB; }
-    th.n { text-align: left; padding: 3px 6px; font-weight: 600; background: #F3F5F4; overflow-wrap: anywhere; }   /* długie nazwisko - w dwóch linijkach */
+    th.n { text-align: left; padding: 3px 6px; font-weight: 600; background: #F3F5F4; overflow-wrap: anywhere; line-height: 1.2; }
+    th.n span { display: block; }   /* imię w górnej linijce, nazwisko w dolnej */
+    th.n .ln { font-weight: 700; }
     td[data-w="sat"] { background: #FFF3C2; } td[data-w="sun"] { background: #E8EFFD; }
     td.work { background: #E3F2EC; } td.off { background: #EEF0F2; color: #6B7280; } td.ab { background: #FDE8E8; color: #9B1C1C; }
     .e { display: flex; flex-direction: column; align-items: center; line-height: 1.1; }
@@ -991,55 +997,137 @@ async function shPrint(mode = "print") {
     .legend { margin-top: 6px; font-size: 7.5pt; color: #5B616B; }
   </style></head><body><div class="sheet${days.length > 16 ? " compact" : ""}">
     <h1>Harmonogram pracy</h1>
-    <div class="meta">${range} · pracowników: ${emps.length} · wydrukowano ${rtEsc(rtIsoToPl(shDayIso(new Date())))}</div>
+    <div class="meta">${range}</div>
     <table><thead><tr><th class="corner">Imię i nazwisko</th>${head}</tr></thead><tbody>${body}</tbody></table>
     <div class="legend">W kratkach godziny pracy od–do · ${shifts} · <b>W</b> wolne · <b>N</b> zgłoszona nieobecność · pusta kratka = nie zaplanowano</div>
   </div></body></html>`;
 
-  // ukryta ramka: drukowanie bez nowego okna (nie zatrzyma go blokada wyskakujących okien)
+  // Kartka w ramce: ukrytej (Drukuj, Zapisz PDF - bez nowego okna, nie zatrzyma go blokada wyskakujących okien)
+  // albo widocznej w oknie podglądu. Szerokość jak strona A4 w poziomie bez marginesów (297 - 2 × 9 mm),
+  // więc wiersze i kolumny wyglądają tak samo jak na wydruku.
   document.getElementById("sh-print-frame")?.remove();
   const frame = document.createElement("iframe");
   frame.id = "sh-print-frame";
-  frame.setAttribute("aria-hidden", "true");
-  // szerokość jak strona A4 w poziomie bez marginesów (297 - 2 × 9 mm) - pomiar wierszy zgadza się z wydrukiem
-  frame.style.cssText = "position: fixed; left: -10000px; top: 0; width: 279mm; height: 190mm; border: 0; visibility: hidden;";
-  document.body.appendChild(frame);
+  frame.title = "Podgląd harmonogramu";
+  if (mode === "preview") {
+    frame.style.cssText = "width: 279mm; height: 190mm; border: 0; display: block; transform-origin: 0 0; background: #fff;";
+    document.getElementById("sh-pv-scale").appendChild(frame);
+  } else {
+    frame.setAttribute("aria-hidden", "true");
+    frame.style.cssText = "position: fixed; left: -10000px; top: 0; width: 279mm; height: 190mm; border: 0; visibility: hidden;";
+    document.body.appendChild(frame);
+  }
   const doc = frame.contentWindow.document;
   doc.open();
   doc.write(html);
   doc.close();
+  shPrintJob = { frame, doc, range, emps, filename: `Harmonogram ${isoDays[0]} - ${isoDays[isoDays.length - 1]}.pdf` };
 
-  if (mode === "print") {
+  if (mode === "preview") {
+    busy(false);
     toggleModal("modal-sh-print", false);
-    logAction("Wydruk harmonogramu", `${range}, pracowników: ${emps.length}`);
-    setTimeout(() => {
-      shPrintEvenRows(doc);
-      frame.contentWindow.focus();
-      frame.contentWindow.print();
-    }, 250);
+    document.getElementById("sh-pv-range").textContent = `${range} · pracowników: ${emps.length}`;
+    document.getElementById("sh-pv-msg").style.display = "none";
+    toggleModal("modal-sh-preview", true);
+    setTimeout(() => { shPrintEvenRows(doc); shPreviewFit(); }, 50);
     return;
   }
-
-  // PDF: biblioteka w ramce (style tabeli zostają takie jak przy druku), plik pobiera się od razu
-  const filename = `Harmonogram ${isoDays[0]} - ${isoDays[isoDays.length - 1]}.pdf`;
-  const fail = err => {
-    console.error("Błąd zapisu harmonogramu do PDF:", err);
-    show("Nie udało się zapisać PDF" + (err?.message ? ": " + err.message : " (brak połączenia z internetem?)") + ". Możesz użyć „Drukuj” i wybrać „Zapisz jako PDF”.");
+  if (mode === "print") {
+    toggleModal("modal-sh-print", false);
+    setTimeout(shJobPrint, 250);
+    return;
+  }
+  shJobPdf(err => {
     busy(false);
-  };
-  const script = doc.createElement("script");
-  script.src = SH_PDF_LIB;
-  script.onerror = () => fail(null);
-  script.onload = () => {
+    if (err) show(shPdfError(err));
+    else toggleModal("modal-sh-print", false);
+  });
+}
+
+// Ostatnio przygotowana kartka (ramka z tabelą) - podgląd drukuje i zapisuje ją bez ponownego pobierania
+let shPrintJob = null;
+
+function shJobPrint() {
+  if (!shPrintJob) return;
+  const { frame, doc, range, emps } = shPrintJob;
+  shPrintEvenRows(doc);
+  logAction("Wydruk harmonogramu", `${range}, pracowników: ${emps.length}`);
+  frame.contentWindow.focus();
+  frame.contentWindow.print();
+}
+
+// PDF: biblioteka ładowana do ramki (style tabeli zostają takie jak przy druku), plik pobiera się od razu.
+// done(null) po zapisie, done(błąd) gdy się nie udało
+function shJobPdf(done) {
+  if (!shPrintJob) return;
+  const { frame, doc, range, emps, filename } = shPrintJob;
+  const run = () => {
     shPrintEvenRows(doc);
     frame.contentWindow.html2pdf().set(shPdfOptions(filename)).from(doc.querySelector(".sheet")).save()
       .then(() => {
-        busy(false);
-        toggleModal("modal-sh-print", false);
         logAction("Zapis harmonogramu do PDF", `${range}, pracowników: ${emps.length}`);
-      }, fail);
+        done(null);
+      }, err => { console.error("Błąd zapisu harmonogramu do PDF:", err); done(err || {}); });
   };
+  if (frame.contentWindow.html2pdf) return run();
+  const script = doc.createElement("script");
+  script.src = SH_PDF_LIB;
+  script.onerror = () => done({});
+  script.onload = run;
   doc.head.appendChild(script);
+}
+
+function shPdfError(err) {
+  return "Nie udało się zapisać PDF" + (err?.message ? ": " + err.message : " (brak połączenia z internetem?)") +
+    ". Możesz użyć „Drukuj” i wybrać „Zapisz jako PDF”.";
+}
+
+// ---------- Podgląd ----------
+// Kartka pomniejszona do szerokości okna (jak strona na ekranie); pełna wysokość tabeli
+function shPreviewFit() {
+  const frame = shPrintJob?.frame;
+  const wrap = document.getElementById("sh-pv-scale");
+  const page = document.getElementById("sh-pv-page");
+  if (!frame || !wrap || !page || frame.parentNode !== wrap) return;
+  const doc = shPrintJob.doc;
+  frame.style.height = `${doc.documentElement.scrollHeight}px`;
+  const pad = parseFloat(getComputedStyle(page).paddingLeft) * 2;
+  const area = document.getElementById("sh-pv-body").clientWidth - 32;
+  // na wąskim ekranie (telefon) nie mniej niż 55% - tabela czytelna, kartkę przewija się w bok
+  const scale = Math.max(0.55, Math.min(1.25, (area - pad) / frame.offsetWidth));
+  frame.style.transform = `scale(${scale})`;
+  wrap.style.width = `${frame.offsetWidth * scale}px`;
+  wrap.style.height = `${frame.offsetHeight * scale}px`;
+}
+window.addEventListener("resize", () => {
+  if (document.getElementById("modal-sh-preview")?.classList.contains("active")) shPreviewFit();
+});
+
+function shPreviewPrint() {
+  shJobPrint();
+}
+
+function shPreviewPdf() {
+  const btn = document.getElementById("sh-pv-pdf");
+  const msg = document.getElementById("sh-pv-msg");
+  btn.disabled = true;
+  btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Zapisywanie...`;
+  msg.style.display = "none";
+  shJobPdf(err => {
+    btn.disabled = false;
+    btn.innerHTML = `<i class="fa-solid fa-file-pdf"></i> Zapisz PDF`;
+    if (err) { msg.textContent = shPdfError(err); msg.style.display = "block"; }
+  });
+}
+
+// "Zmień wybór" - z powrotem do okna z datami i pracownikami
+function shPreviewBack() {
+  toggleModal("modal-sh-preview", false);
+  toggleModal("modal-sh-print", true);
+}
+
+function shPreviewClose() {
+  toggleModal("modal-sh-preview", false);
 }
 
 // Wszystkie wiersze tej samej wysokości - jak wiersz z dwoma wpisami godzin w jednym dniu
@@ -1047,7 +1135,7 @@ async function shPrint(mode = "print") {
 function shPrintEvenRows(doc) {
   const tbody = doc.querySelector("tbody");
   const first = tbody?.querySelector("tr");
-  if (!first) return;
+  if (!first || tbody.dataset.even) return;   // raz na kartkę (podgląd, potem druk lub PDF)
   // wiersz próbny: w każdym dniu dwa wpisy od–do
   const probe = first.cloneNode(true);
   probe.querySelectorAll("td").forEach(td => {
@@ -1058,4 +1146,5 @@ function shPrintEvenRows(doc) {
   const height = Math.max(...[...tbody.querySelectorAll("tr")].map(tr => tr.getBoundingClientRect().height));
   probe.remove();
   tbody.querySelectorAll("tr").forEach(tr => { tr.style.height = `${Math.ceil(height)}px`; });
+  tbody.dataset.even = "1";
 }
