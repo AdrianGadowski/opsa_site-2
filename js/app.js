@@ -48,7 +48,7 @@ const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
 
 // Numer wydania doklejany do adresów plików, żeby przeglądarka nie używała starych kopii.
 // Zmieniaj przy każdej publikacji - tutaj i w index.html (?v=...).
-const APP_BUILD = "20261347";
+const APP_BUILD = "20261358";
 
 let currentUser = null;
 let cachedUsers = [];
@@ -111,7 +111,7 @@ const APP_MODULES = [
   },
   {
     key: "zalew", label: "Zalew", icon: "fa-fire-flame-curved",
-    hint: "Zakładka „Zalew” na ekranie logowania"
+    hint: "Zakładka „Zalew” na ekranie logowania, moduł „Plan zalewu” i zakładka Zalew na pulpicie"
   }
 ];
 const LOGIN_TAB_MODULES = { employee: "employee_portal", zalew: "zalew" };
@@ -135,6 +135,7 @@ async function loadModules() {
     appModules = {};
   }
   applyLoginTabs();
+  if (currentUser) applyNavVisibility();   // menu: np. "Plan zalewu" znika przy wyłączonym Zalewie
 }
 
 // Zakładki "Pracownik" i "Zalew" na ekranie logowania
@@ -160,8 +161,10 @@ function canOpenView(viewKey) {
   if (viewKey === "absences") return typeof abCanReview === "function" && abCanReview();
   // lista raportów: archiwum ("Lista raportów"), zatwierdzanie albo własne raporty do poprawy (report_approval.js)
   if (viewKey === "reports" && typeof rpaTabs === "function") return rpaTabs().length > 0;
-  // plan zalewu: podgląd albo edycja (edycja daje też podgląd)
-  if (viewKey === "pour_plan") return hasPermission("allow_pour_plan_view") || hasPermission("allow_pour_plan_edit");
+  // plan zalewu: podgląd albo edycja (edycja daje też podgląd); wyłączony moduł Zalew wyłącza też plan
+  if (viewKey === "pour_plan") {
+    return moduleEnabled("zalew") && (hasPermission("allow_pour_plan_view") || hasPermission("allow_pour_plan_edit"));
+  }
   const info = permissionMap[viewKey];
   if (info && !hasPermission(info.column)) return false;
   return true;

@@ -158,6 +158,29 @@
     .sh-actions .grp.absence-grp { order: 5; }
     .sh-act, .sh-act-time, .sh-act-note { height: 40px; }
   }
+  /* ===== Wydruk harmonogramu: okno wyboru (js/schedule.js, shOpenPrint) ===== */
+  .sh-print-btn { height: 40px; padding: 0 16px; font-size: 0.85rem; display: inline-flex; align-items: center; gap: 8px; width: auto; }
+  .sh-print-box { max-width: 520px; width: 94%; }
+  .sh-print-range { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .sh-print-range label, .sh-print-filters label { font-size: 0.8rem; color: var(--text-muted); }
+  .sh-print-filters { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 14px; }
+  @media (max-width: 560px) { .sh-print-filters { grid-template-columns: 1fr; } }
+  .sh-print-quick { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 10px 0 14px; }
+  .sh-print-quick button, .sh-print-emphead button {
+    height: 32px; padding: 0 12px; border-radius: 999px; border: 1.5px solid #D9D9D9; background: #fff; cursor: pointer;
+    font-family: inherit; font-size: 0.78rem; font-weight: 700; color: var(--primary);
+  }
+  .sh-print-quick button:hover, .sh-print-emphead button:hover { border-color: var(--primary); }
+  #sh-print-days { font-size: 0.78rem; color: var(--text-muted); margin-left: auto; }
+  .sh-print-emphead { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; font-size: 0.88rem; white-space: nowrap; }   /* liczba zaznaczonych nie przeskakuje do nowej linijki */
+  .sh-print-emphead button { padding: 0 10px; flex: none; }
+  #sh-print-count { color: var(--text-muted); font-size: 0.8rem; font-variant-numeric: tabular-nums; }
+  @media (max-width: 560px) { .sh-print-emphead { flex-wrap: wrap; } }   /* telefon: przyciski mogą zejść niżej, liczba zostaje w całości */
+  .sh-print-list { max-height: 260px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 10px; padding: 4px 0; }
+  .sh-print-list label { display: flex; align-items: center; gap: 10px; padding: 7px 12px; cursor: pointer; font-size: 0.88rem; }
+  .sh-print-list label:hover { background: #F5F7F6; }
+  .sh-print-list label small { margin-left: auto; color: var(--text-muted); font-size: 0.74rem; }
+  .sh-print-list .empty { padding: 14px; text-align: center; color: var(--text-muted); font-size: 0.85rem; }
 </style>
 
 <div class="page-hero">
@@ -235,6 +258,10 @@
         <span><i style="border: 1.5px dashed #C4C8CE;"></i> nie zaplanowano</span>
       </div>
     </div>
+    <!-- wydruk / PDF wybranych pracowników (js/schedule.js, shOpenPrint) -->
+    <button type="button" class="btn-secondary sh-print-btn" onclick="shOpenPrint()" title="Tabela harmonogramu wybranych pracowników do druku lub zapisu jako PDF">
+      <i class="fa-solid fa-print"></i> Drukuj / PDF
+    </button>
   </div>
 
   <div style="overflow-x: auto;">
@@ -282,4 +309,61 @@
   <span class="sep" aria-hidden="true"></span>
   <button type="button" class="sh-act clear" data-needs-sel onclick="shAction('clear')" title="Usuń wpisy z zaznaczonych dni"><i class="fa-solid fa-eraser"></i> Wyczyść</button>
 
+</div>
+
+<!-- Okno: wydruk harmonogramu (js/schedule.js, shOpenPrint / shPrint) -->
+<div id="modal-sh-print" class="modal">
+  <div class="modal-box sh-print-box">
+    <h3 style="color: var(--primary); margin: 0 0 4px 0; font-size: 1.2rem; text-align: center;">Drukuj harmonogram</h3>
+    <p style="text-align: center; color: var(--text-muted); font-size: 0.84rem; margin: 0 0 14px;">Tabela: u góry dni, z lewej pracownicy, w kratkach godziny pracy od–do. „Zapisz PDF” od razu pobiera plik, „Drukuj” otwiera okno drukowania.</p>
+
+    <div class="sh-print-range">
+      <div class="form-group" style="margin-bottom: 0;">
+        <label for="sh-print-from">Od</label>
+        <input type="date" id="sh-print-from" class="form-control" onchange="shPrintRangeInfo()" />
+      </div>
+      <div class="form-group" style="margin-bottom: 0;">
+        <label for="sh-print-to">Do</label>
+        <input type="date" id="sh-print-to" class="form-control" onchange="shPrintRangeInfo()" />
+      </div>
+    </div>
+    <div class="sh-print-quick">
+      <button type="button" onclick="shPrintPreset('week')">Tydzień z ekranu</button>
+      <button type="button" onclick="shPrintPreset('2weeks')">Dwa tygodnie</button>
+      <button type="button" onclick="shPrintPreset('month')">Cały miesiąc</button>
+      <span id="sh-print-days"></span>
+    </div>
+
+    <!-- filtry jak na ekranie Harmonogramu; zmiana filtra zaznacza pasujących pracowników -->
+    <div class="sh-print-filters">
+      <div class="form-group" style="margin-bottom: 0;">
+        <label for="sh-print-business">Firma</label>
+        <select id="sh-print-business" class="form-control" onchange="shPrintFilter()"></select>
+      </div>
+      <div class="form-group" style="margin-bottom: 0;">
+        <label for="sh-print-dept">Dział</label>
+        <select id="sh-print-dept" class="form-control" onchange="shPrintFilter()"></select>
+      </div>
+      <div class="form-group" style="margin-bottom: 0;">
+        <label for="sh-print-elist">Moja lista</label>
+        <select id="sh-print-elist" class="form-control" onchange="shPrintFilter()"></select>
+      </div>
+    </div>
+
+    <div class="sh-print-emphead">
+      <b>Pracownicy</b> <span id="sh-print-count"></span>
+      <span style="flex: 1;"></span>
+      <button type="button" onclick="shPrintCheckAll(true)">Zaznacz widocznych</button>
+      <button type="button" onclick="shPrintCheckAll(false)">Odznacz</button>
+    </div>
+    <input type="text" id="sh-print-search" class="form-control" placeholder="Szukaj na liście..." oninput="shPrintRenderList()" autocomplete="off" style="margin-bottom: 8px;" />
+    <div class="sh-print-list" id="sh-print-list"></div>
+
+    <div id="sh-print-msg" style="display: none; color: var(--danger); font-size: 0.86rem; text-align: center; margin-top: 10px;"></div>
+    <div class="modal-btn-row" style="margin-top: 16px;">
+      <button type="button" class="btn-secondary" onclick="toggleModal('modal-sh-print', false)">Anuluj</button>
+      <button type="button" id="sh-print-go" class="btn-secondary" onclick="shPrint('print')"><i class="fa-solid fa-print"></i> Drukuj</button>
+      <button type="button" id="sh-pdf-go" class="btn-primary" onclick="shPrint('pdf')"><i class="fa-solid fa-file-pdf"></i> Zapisz PDF</button>
+    </div>
+  </div>
 </div>

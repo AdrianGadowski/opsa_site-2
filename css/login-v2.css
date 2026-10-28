@@ -612,7 +612,7 @@
 @media (max-width: 480px) { .lv2-haze { bottom: 46px; } }
 @media (prefers-reduced-motion: reduce) { .lv2-haze, .lv2-giant.lv2-giant-glow { animation: none; } }
 
-/* Podpis pod "Witaj w pracy" ma stałą wysokość, także pusty (zakładka Użytkownik) - karta nie zmienia rozmiaru przy przełączaniu zakładek */
+/* Podpis pod "Zaloguj się" ma stałą wysokość, także pusty (zakładka Użytkownik) - karta nie zmienia rozmiaru przy przełączaniu zakładek */
 #auth-overlay.lv2 #step-login .subtitle { min-height: 1.4em; line-height: 1.4em; }
 
 /* Kafelki zmian I / II / III: numer zmiany i godziny wyśrodkowane */

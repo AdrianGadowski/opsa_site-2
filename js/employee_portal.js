@@ -22,7 +22,7 @@ let epLoadToken = 0;
 
 // ---------- Zakładki na ekranie logowania ----------
 const LOGIN_MODES = {
-  user: { tab: "login-tab-user", subtitle: "" },   // pod "Witaj w pracy" bez podpisu
+  user: { tab: "login-tab-user", subtitle: "" },   // pod "Zaloguj się" bez podpisu
   employee: { tab: "login-tab-employee", subtitle: "Twoje godziny i harmonogram pracy" },
   zalew: { tab: "login-tab-zalew", subtitle: "Rejestracja zalewu na liniach" }
 };

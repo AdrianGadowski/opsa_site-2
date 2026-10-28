@@ -593,8 +593,9 @@ async function opToggleModule(key, enabled) {
 
     appModules[key] = enabled;
     logAction(enabled ? "Włączenie modułu" : "Wyłączenie modułu", mod.label);
-    // zakładki logowania od razu według nowego stanu
+    // zakładki logowania i menu (np. "Plan zalewu") od razu według nowego stanu
     applyLoginTabs();
+    applyNavVisibility();
     opModulesMsg(`${mod.label}: ${enabled ? "włączony" : "wyłączony"}.`, true);
   } catch (err) {
     console.error("Błąd zmiany stanu modułu:", err);

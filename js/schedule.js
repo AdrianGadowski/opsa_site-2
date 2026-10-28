@@ -766,3 +766,296 @@ document.addEventListener("keydown", e => {
   if (document.querySelector(".modal.active") || document.getElementById("rt-picker")?.classList.contains("open")) return;
   shClearSelection();
 });
+
+// ---------- Wydruk / PDF ----------
+// Okno wyboru: zakres dat (do 62 dni) i pracownicy (domyślnie widoczni po filtrach).
+// Tabela do druku powstaje w ukrytej ramce i od razu otwiera się okno drukowania przeglądarki
+// ("Zapisz jako PDF" daje plik). U góry dzień tygodnia i data, z lewej imię i nazwisko, w kratkach godziny od–do.
+const SH_PRINT_MAX_DAYS = 62;
+let shPrintChecked = new Set();   // id zaznaczonych pracowników
+
+function shOpenPrint() {
+  if (!shEmployees.length || !shDays.length) return;
+  // filtry okna: te same opcje i wybór co na ekranie Harmonogramu (firma, dział, moja lista)
+  [["sh-filter-business", "sh-print-business"], ["sh-filter-dept", "sh-print-dept"], ["sh-filter-list", "sh-print-elist"]]
+    .forEach(([src, dst]) => {
+      const from = document.getElementById(src), to = document.getElementById(dst);
+      if (!from || !to) return;
+      to.innerHTML = from.innerHTML;
+      to.value = from.value;
+    });
+  shPrintChecked = new Set(shPrintFiltered().map(e => Number(e.id)));
+  document.getElementById("sh-print-search").value = "";
+  document.getElementById("sh-print-msg").style.display = "none";
+  shPrintPreset("week");
+  shPrintRenderList();
+  toggleModal("modal-sh-print", true);
+}
+
+// Szybki wybór okresu: tydzień z ekranu, dwa tygodnie od niego albo miesiąc, w którym ten tydzień się zaczyna
+function shPrintPreset(kind) {
+  const monday = shDays[0].date;
+  let from = monday, to = shDays[6].date;
+  if (kind === "2weeks") to = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + 13);
+  if (kind === "month") {
+    from = new Date(monday.getFullYear(), monday.getMonth(), 1);
+    to = new Date(monday.getFullYear(), monday.getMonth() + 1, 0);
+  }
+  document.getElementById("sh-print-from").value = shDayIso(from);
+  document.getElementById("sh-print-to").value = shDayIso(to);
+  shPrintRangeInfo();
+}
+
+// Dni zakresu jako daty (południe każdego dnia - bez kłopotów ze zmianą czasu)
+function shPrintDays() {
+  const from = document.getElementById("sh-print-from").value;
+  const to = document.getElementById("sh-print-to").value;
+  if (!from || !to || to < from) return [];
+  const days = [];
+  for (let d = new Date(`${from}T12:00:00`); shDayIso(d) <= to && days.length <= SH_PRINT_MAX_DAYS; d.setDate(d.getDate() + 1)) {
+    days.push(new Date(d));
+  }
+  return days;
+}
+
+function shPrintRangeInfo() {
+  const n = shPrintDays().length;
+  document.getElementById("sh-print-days").textContent =
+    !n ? "zły zakres" : n > SH_PRINT_MAX_DAYS ? `za długo (maks. ${SH_PRINT_MAX_DAYS} dni)` : `${n} ${n === 1 ? "dzień" : "dni"}`;
+}
+
+// Pracownik pasuje do wyszukiwania w oknie (imię nazwisko albo nazwisko imię)
+function shPrintMatch(e, q) {
+  const a = `${e.first_name || ""} ${e.last_name || ""}`.toLowerCase();
+  const b = `${e.last_name || ""} ${e.first_name || ""}`.toLowerCase();
+  return !q || a.includes(q) || b.includes(q);
+}
+
+// Pracownicy pasujący do filtrów okna (firma, dział, moja lista) i - z search - do wyszukiwania
+function shPrintFiltered(search) {
+  const biz = document.getElementById("sh-print-business")?.value;
+  const dept = document.getElementById("sh-print-dept")?.value;
+  const listId = document.getElementById("sh-print-elist")?.value;
+  const own = listId && typeof rtlLists !== "undefined" ? rtlLists.find(l => String(l.id) === String(listId)) : null;
+  const q = search ? document.getElementById("sh-print-search").value.toLowerCase().trim() : "";
+  return shEmployees.filter(e =>
+    (!biz || String(e.business_id) === biz) &&
+    (!dept || String(e.department_id) === dept) &&
+    (!own || own.members.has(Number(e.id))) &&
+    shPrintMatch(e, q));
+}
+
+// Zmiana filtra w oknie: zaznaczeni są dokładnie pasujący pracownicy
+function shPrintFilter() {
+  shPrintChecked = new Set(shPrintFiltered().map(e => Number(e.id)));
+  shPrintRenderList();
+}
+
+function shPrintRenderList() {
+  const list = shPrintFiltered(true);
+  document.getElementById("sh-print-list").innerHTML = list.length ? list.map(e => `
+    <label><input type="checkbox" ${shPrintChecked.has(Number(e.id)) ? "checked" : ""} onchange="shPrintToggle(${Number(e.id)}, this.checked)" />
+      ${rtEsc(`${e.first_name || ""} ${e.last_name || ""}`.trim())}<small>${rtEsc(e.department?.department || "")}</small></label>`).join("")
+    : `<div class="empty">Brak pracowników</div>`;
+  document.getElementById("sh-print-count").textContent = `(zaznaczonych: ${shPrintChecked.size})`;
+}
+
+function shPrintToggle(id, on) {
+  if (on) shPrintChecked.add(id); else shPrintChecked.delete(id);
+  document.getElementById("sh-print-count").textContent = `(zaznaczonych: ${shPrintChecked.size})`;
+}
+
+// "Zaznacz widocznych" - pracownicy widoczni na liście okna (filtry i wyszukiwanie)
+function shPrintCheckAll(on) {
+  if (!on) shPrintChecked.clear();
+  else shPrintFiltered(true).forEach(e => shPrintChecked.add(Number(e.id)));
+  shPrintRenderList();
+}
+
+// Kratka wydruku: godziny pracy od–do (np. 06:30–14:30); wolne i nieobecność słownie
+// (przy wąskich kolumnach skrót W / N); dwa wpisy jeden pod drugim
+function shPrintCell(list, weekday) {
+  const w = weekday === 5 ? ` data-w="sat"` : weekday === 6 ? ` data-w="sun"` : "";
+  if (!list || !list.length) return `<td${w}></td>`;
+  const word = (full, short) => `<span class="full">${full}</span><span class="short">${short}</span>`;
+  // od–do; w wąskiej kolumnie "do" schodzi pod "od"
+  const hours = e => e.time_from && e.time_to ? `${rtEsc(e.time_from)}–<wbr>${rtEsc(e.time_to)}` : "";
+  const one = e => {
+    if (e.kind === "off") return `<div class="e"><b>${word("Wolne", "W")}</b></div>`;
+    if (e.kind === "absence") {
+      return `<div class="e"><b>${word("Nieobecność", "N")}</b>${hours(e) ? `<span>${hours(e)}</span>` : e.note ? `<span>${rtEsc(e.note)}</span>` : ""}</div>`;
+    }
+    return `<div class="e"><b class="h">${hours(e) || rtEsc(shEntryLabel(e))}</b></div>`;
+  };
+  const kind = list.every(e => e.kind === "off") ? "off" : list.some(e => e.kind === "absence") ? "ab" : "work";
+  return `<td class="${kind}"${w}>${list.map(one).join("")}</td>`;
+}
+
+// Biblioteka do zapisu PDF (html2canvas + jsPDF w jednym pliku) - ładowana dopiero przy zapisie, wewnątrz ramki wydruku
+const SH_PDF_LIB = "https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js";
+
+// Ustawienia PDF: A4 w poziomie, marginesy jak przy druku, wiersz tabeli nie dzieli się między strony
+function shPdfOptions(filename) {
+  return {
+    margin: 9,
+    filename,
+    image: { type: "jpeg", quality: 0.96 },
+    html2canvas: { scale: 2, backgroundColor: "#ffffff" },
+    jsPDF: { unit: "mm", format: "a4", orientation: "landscape" },
+    pagebreak: { mode: ["css", "legacy"], avoid: "tr" }
+  };
+}
+
+// mode: "print" - okno drukowania przeglądarki, "pdf" - od razu plik PDF do pobrania
+async function shPrint(mode = "print") {
+  const msg = document.getElementById("sh-print-msg");
+  const show = text => { msg.textContent = text; msg.style.display = "block"; };
+  const days = shPrintDays();
+  if (!days.length) return show("Wybierz poprawny zakres dat (Od nie później niż Do).");
+  if (days.length > SH_PRINT_MAX_DAYS) return show(`Zakres może mieć najwyżej ${SH_PRINT_MAX_DAYS} dni.`);
+  const emps = shEmployees.filter(e => shPrintChecked.has(Number(e.id)));
+  if (!emps.length) return show("Zaznacz co najmniej jednego pracownika.");
+  msg.style.display = "none";
+
+  const buttons = { print: document.getElementById("sh-print-go"), pdf: document.getElementById("sh-pdf-go") };
+  const labels = { print: `<i class="fa-solid fa-print"></i> Drukuj`, pdf: `<i class="fa-solid fa-file-pdf"></i> Zapisz PDF` };
+  const busy = on => Object.entries(buttons).forEach(([k, b]) => {
+    if (!b) return;
+    b.disabled = on;
+    b.innerHTML = on && k === mode ? `<i class="fa-solid fa-spinner fa-spin"></i> Przygotowywanie...` : labels[k];
+  });
+  busy(true);
+  const isoDays = days.map(shDayIso);
+  let rows;
+  try {
+    rows = await rpFetchAll(() => supabaseClient
+      .from("schedule_days")
+      .select("*")
+      .gte("day", isoDays[0])
+      .lte("day", isoDays[isoDays.length - 1]));
+  } catch (err) {
+    console.error("Błąd pobierania harmonogramu do wydruku:", err);
+    show("Nie udało się pobrać harmonogramu: " + (err.message || err));
+    busy(false);
+    return;
+  }
+  if (mode === "print") busy(false);
+
+  // { idPracownika: { dzień: [wpisy wg slotu] } }
+  const plan = {};
+  rows.forEach(r => {
+    const byDay = plan[r.employee_id] || (plan[r.employee_id] = {});
+    (byDay[r.day] || (byDay[r.day] = [])).push(r);
+  });
+  Object.values(plan).forEach(byDay => Object.values(byDay).forEach(l => l.sort((a, b) => (a.slot || 1) - (b.slot || 1))));
+
+  const p = n => String(n).padStart(2, "0");
+  const dm = d => `${p(d.getDate())}.${p(d.getMonth() + 1)}`;
+  const last = days[days.length - 1];
+  const range = `${dm(days[0])}.${days[0].getFullYear()} – ${dm(last)}.${last.getFullYear()}`;
+  const weekdays = days.map(d => (d.getDay() + 6) % 7);
+  const head = days.map((d, i) =>
+    `<th class="d${weekdays[i] === 5 ? " sat" : weekdays[i] === 6 ? " sun" : ""}"><b>${SH_DAY_SHORT[weekdays[i]]}</b><span>${dm(d)}</span></th>`).join("");
+  const body = emps.map(e => `<tr>
+      <th class="n">${rtEsc(`${e.first_name || ""} ${e.last_name || ""}`.trim())}</th>
+      ${isoDays.map((iso, i) => shPrintCell((plan[e.id] || {})[iso], weekdays[i])).join("")}
+    </tr>`).join("");
+  const shifts = SH_PRESETS.map(s => `<b>${s.label}</b> ${s.from}–${s.to}`).join(" · ");
+
+  const html = `<!doctype html><html lang="pl"><head><meta charset="utf-8"><title>Harmonogram ${range}</title><style>
+    @page { size: A4 landscape; margin: 9mm; }
+    * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    body { margin: 0; font-family: "Segoe UI", Arial, sans-serif; color: #1F2328; }
+    h1 { margin: 0 0 2px; font-size: 15pt; color: #08584B; }
+    .meta { font-size: 8.5pt; color: #5B616B; margin-bottom: 8px; }
+    table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 8pt; }
+    th, td { border: 0.6pt solid #9AA1A9; text-align: center; vertical-align: middle; padding: 2px 1px; }
+    thead th { background: #08584B; color: #fff; font-weight: 700; }
+    thead th.corner { text-align: left; padding: 4px 6px; width: 42mm; vertical-align: bottom; }
+    th.d { padding: 4px 1px; line-height: 1.15; }   /* dzień tygodnia u góry, data pod nim - poziomo */
+    th.d b { display: block; font-size: 8.5pt; } th.d span { display: block; font-size: 7pt; font-weight: 600; opacity: 0.9; white-space: nowrap; }
+    .compact th.d b { font-size: 7pt; } .compact th.d span { font-size: 5.6pt; letter-spacing: -0.1pt; }
+    th.d.sat { background: #FCD444; color: #03241E; } th.d.sun { background: #2563EB; }
+    th.n { text-align: left; padding: 3px 6px; font-weight: 600; background: #F3F5F4; overflow-wrap: anywhere; }   /* długie nazwisko - w dwóch linijkach */
+    td[data-w="sat"] { background: #FFF3C2; } td[data-w="sun"] { background: #E8EFFD; }
+    td.work { background: #E3F2EC; } td.off { background: #EEF0F2; color: #6B7280; } td.ab { background: #FDE8E8; color: #9B1C1C; }
+    .e { display: flex; flex-direction: column; align-items: center; line-height: 1.1; }
+    .e + .e { border-top: 0.6pt dashed #9AA1A9; margin-top: 2px; padding-top: 2px; }
+    .e b { font-size: 9pt; }
+    .e b.h { font-variant-numeric: tabular-nums; }
+    .short { display: none; } .compact .full { display: none; } .compact .short { display: inline; }
+    .e span { font-size: 7pt; font-variant-numeric: tabular-nums; }
+    .compact table { font-size: 6.5pt; } .compact .e b { font-size: 7.5pt; } .compact .e b.h { font-size: 6.6pt; } .compact .e span { font-size: 5.8pt; }
+    .compact thead th.corner { width: 34mm; }
+    tr { page-break-inside: avoid; }
+    .legend { margin-top: 6px; font-size: 7.5pt; color: #5B616B; }
+  </style></head><body><div class="sheet${days.length > 16 ? " compact" : ""}">
+    <h1>Harmonogram pracy</h1>
+    <div class="meta">${range} · pracowników: ${emps.length} · wydrukowano ${rtEsc(rtIsoToPl(shDayIso(new Date())))}</div>
+    <table><thead><tr><th class="corner">Imię i nazwisko</th>${head}</tr></thead><tbody>${body}</tbody></table>
+    <div class="legend">W kratkach godziny pracy od–do · ${shifts} · <b>W</b> wolne · <b>N</b> zgłoszona nieobecność · pusta kratka = nie zaplanowano</div>
+  </div></body></html>`;
+
+  // ukryta ramka: drukowanie bez nowego okna (nie zatrzyma go blokada wyskakujących okien)
+  document.getElementById("sh-print-frame")?.remove();
+  const frame = document.createElement("iframe");
+  frame.id = "sh-print-frame";
+  frame.setAttribute("aria-hidden", "true");
+  // szerokość jak strona A4 w poziomie bez marginesów (297 - 2 × 9 mm) - pomiar wierszy zgadza się z wydrukiem
+  frame.style.cssText = "position: fixed; left: -10000px; top: 0; width: 279mm; height: 190mm; border: 0; visibility: hidden;";
+  document.body.appendChild(frame);
+  const doc = frame.contentWindow.document;
+  doc.open();
+  doc.write(html);
+  doc.close();
+
+  if (mode === "print") {
+    toggleModal("modal-sh-print", false);
+    logAction("Wydruk harmonogramu", `${range}, pracowników: ${emps.length}`);
+    setTimeout(() => {
+      shPrintEvenRows(doc);
+      frame.contentWindow.focus();
+      frame.contentWindow.print();
+    }, 250);
+    return;
+  }
+
+  // PDF: biblioteka w ramce (style tabeli zostają takie jak przy druku), plik pobiera się od razu
+  const filename = `Harmonogram ${isoDays[0]} - ${isoDays[isoDays.length - 1]}.pdf`;
+  const fail = err => {
+    console.error("Błąd zapisu harmonogramu do PDF:", err);
+    show("Nie udało się zapisać PDF" + (err?.message ? ": " + err.message : " (brak połączenia z internetem?)") + ". Możesz użyć „Drukuj” i wybrać „Zapisz jako PDF”.");
+    busy(false);
+  };
+  const script = doc.createElement("script");
+  script.src = SH_PDF_LIB;
+  script.onerror = () => fail(null);
+  script.onload = () => {
+    shPrintEvenRows(doc);
+    frame.contentWindow.html2pdf().set(shPdfOptions(filename)).from(doc.querySelector(".sheet")).save()
+      .then(() => {
+        busy(false);
+        toggleModal("modal-sh-print", false);
+        logAction("Zapis harmonogramu do PDF", `${range}, pracowników: ${emps.length}`);
+      }, fail);
+  };
+  doc.head.appendChild(script);
+}
+
+// Wszystkie wiersze tej samej wysokości - jak wiersz z dwoma wpisami godzin w jednym dniu
+// (albo wyższy, gdy np. długie nazwisko zajmuje dwie linijki)
+function shPrintEvenRows(doc) {
+  const tbody = doc.querySelector("tbody");
+  const first = tbody?.querySelector("tr");
+  if (!first) return;
+  // wiersz próbny: w każdym dniu dwa wpisy od–do
+  const probe = first.cloneNode(true);
+  probe.querySelectorAll("td").forEach(td => {
+    td.className = "work";
+    td.innerHTML = `<div class="e"><b class="h">06:30–<wbr>14:30</b></div><div class="e"><b class="h">14:30–<wbr>18:00</b></div>`;
+  });
+  tbody.appendChild(probe);
+  const height = Math.max(...[...tbody.querySelectorAll("tr")].map(tr => tr.getBoundingClientRect().height));
+  probe.remove();
+  tbody.querySelectorAll("tr").forEach(tr => { tr.style.height = `${Math.ceil(height)}px`; });
+}
