@@ -9,7 +9,7 @@
 
 const FORCE_PASSWORD_MIN = 6;
 
-let forcePasswordCtx = null;   // { current, onDone(), onCancel() } - użytkownik jest już zalogowany hasłem tymczasowym
+let forcePasswordCtx = null;   // { current, askPhone, onDone(), onCancel() } - użytkownik jest już zalogowany hasłem tymczasowym
 let forcePasswordSaving = false;
 
 // Zmiana własnego hasła zalogowanej osoby (użytkownik systemu albo pracownik)
@@ -21,11 +21,19 @@ async function changeOwnPassword(current, next) {
   if (error) throw error;
 }
 
+// Numer telefonu: opcjonalny "+", cyfry, spacje i myślniki, 9-15 cyfr (ta sama kontrola w sql/44)
+function forcePhoneValid(phone) {
+  const digits = phone.replace(/\D/g, "").length;
+  return /^\+?[0-9][0-9 -]*$/.test(phone) && digits >= 9 && digits <= 15;
+}
+
 // ---------- Okno ustawiania własnego hasła ----------
 function openForcePassword(ctx) {
   forcePasswordCtx = ctx;
   document.getElementById("force-pass-new").value = "";
   document.getElementById("force-pass-repeat").value = "";
+  document.getElementById("force-pass-phone").value = "";
+  document.getElementById("force-pass-phone-group").style.display = ctx.askPhone ? "" : "none";
   forcePasswordMsg("");
   toggleModal("modal-force-password", true);
   document.getElementById("force-pass-new").focus();
@@ -65,6 +73,11 @@ async function submitForcePassword() {
     forcePasswordMsg("Nowe hasło musi być inne niż dotychczasowe.");
     return;
   }
+  const phone = ctx.askPhone ? document.getElementById("force-pass-phone").value.trim() : "";
+  if (phone && !forcePhoneValid(phone)) {
+    forcePasswordMsg("Nieprawidłowy numer telefonu. Popraw go albo zostaw puste pole.");
+    return;
+  }
 
   const btn = document.getElementById("force-pass-save");
   forcePasswordSaving = true;
@@ -73,6 +86,12 @@ async function submitForcePassword() {
 
   try {
     await changeOwnPassword(ctx.current, next);
+
+    // Numer jest opcjonalny: gdy się nie zapisze, hasło jest już zmienione, więc logowanie idzie dalej
+    if (phone) {
+      const { error: phoneError } = await supabaseClient.rpc("app_set_own_phone", { p_phone: phone });
+      if (phoneError) console.warn("Nie udało się zapisać numeru telefonu:", phoneError.message);
+    }
 
     forcePasswordCtx = null;
     toggleModal("modal-force-password", false);

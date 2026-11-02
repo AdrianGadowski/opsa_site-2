@@ -12,7 +12,7 @@
 // ==========================================
 
 const EP_SELECT = `
-  id, auth_id, first_name, last_name, login, active, must_change_password,
+  id, auth_id, first_name, last_name, login, active, must_change_password, phone_number,
   business:business_id ( business ),
   department:department_id ( department )
 `;
@@ -138,6 +138,7 @@ async function epLogin() {
     if (emp.must_change_password) {
       openForcePassword({
         current: password,
+        askPhone: !String(emp.phone_number || "").trim(),
         onDone: () => {
           emp.must_change_password = false;
           epCompleteLogin(emp);
