@@ -27,6 +27,18 @@ const LOGIN_MODES = {
   zalew: { tab: "login-tab-zalew", subtitle: "Rejestracja zalewu na liniach" }
 };
 
+// "Nie pamiętasz hasła?": do kogo się zgłosić zależy od rodzaju konta
+const FORGOT_PASSWORD_TEXT = {
+  user: "Skontaktuj się z administratorem i podaj swój login. Dostaniesz hasło tymczasowe, a przy logowaniu ustawisz nowe.",
+  employee: "Skontaktuj się ze swoim Mistrzem lub administratorem i podaj swój login. Dostaniesz hasło tymczasowe, a przy logowaniu ustawisz nowe.",
+  zalew: "Skontaktuj się z administratorem i podaj swój login. Ustawi Ci nowe hasło."
+};
+
+function openForgotPassword() {
+  document.getElementById("forgot-password-text").textContent = FORGOT_PASSWORD_TEXT[loginMode] || FORGOT_PASSWORD_TEXT.user;
+  toggleModal("modal-forgot-password", true);
+}
+
 function setLoginMode(mode) {
   loginMode = LOGIN_MODES[mode] ? mode : "user";
   Object.entries(LOGIN_MODES).forEach(([key, cfg]) => {

@@ -48,7 +48,7 @@ const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
 
 // Numer wydania doklejany do adresów plików, żeby przeglądarka nie używała starych kopii.
 // Zmieniaj przy każdej publikacji - tutaj i w index.html (?v=...).
-const APP_BUILD = "20261363";
+const APP_BUILD = "20261366";
 
 let currentUser = null;
 let cachedUsers = [];
@@ -1773,15 +1773,15 @@ async function openEditEmployeeModal(empId) {
 
 const EMPLOYEE_DEFAULT_PASSWORD = "123456";
 
-// Podstawa loginu: pierwsza litera imienia + dwie pierwsze litery nazwiska, małymi literami
-// i bez polskich znaków (np. Łukasz Żak -> "lza")
+// Podstawa loginu: dwie pierwsze litery imienia + dwie pierwsze litery nazwiska, małymi literami
+// i bez polskich znaków (np. Łukasz Żak -> "luza"). Ta sama reguła jest w sql/43_loginy_pracownikow.sql.
 function employeeLoginBase(firstName, lastName) {
   const plain = s => String(s || "")
     .toLowerCase()
     .replace(/ł/g, "l")
     .normalize("NFD")
     .replace(/[^a-z0-9]/g, "");
-  return plain(firstName).slice(0, 1) + plain(lastName).slice(0, 2);
+  return plain(firstName).slice(0, 2) + plain(lastName).slice(0, 2);
 }
 
 // Loginy zaczynające się od podanego tekstu, zajęte przez innych pracowników
@@ -1793,7 +1793,7 @@ async function fetchTakenEmployeeLogins(prefix, excludeId) {
   return new Set((data || []).map(r => String(r.login || "").toLowerCase()));
 }
 
-// Zajęty login dostaje kolejny numer: "lza2", "lza3"...
+// Zajęty login dostaje kolejny numer: "luza2", "luza3"...
 async function generateEmployeeLogin(firstName, lastName) {
   const base = employeeLoginBase(firstName, lastName);
   if (!base) throw new Error("Nie można utworzyć loginu z podanego imienia i nazwiska.");
