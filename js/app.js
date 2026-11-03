@@ -48,7 +48,7 @@ const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
 
 // Numer wydania doklejany do adresów plików, żeby przeglądarka nie używała starych kopii.
 // Zmieniaj przy każdej publikacji - tutaj i w index.html (?v=...).
-const APP_BUILD = "20261374";
+const APP_BUILD = "20261376";
 
 let currentUser = null;
 let cachedUsers = [];
@@ -68,7 +68,8 @@ const viewTitles = {
   logs: "Logi systemu",
   absences: "Zgłoszenia nieobecności",
   messages: "Komunikaty",
-  pour_plan: "Plan zalewu"
+  pour_plan: "Plan zalewu",
+  report_gen: "Generowanie raportów"
 };
 
 // Kliknięcie w awatar lub dane użytkownika w stopce menu otwiera "Moje konto"
@@ -87,7 +88,8 @@ const permissionMap = {
   options: { elementId: "nav-options", column: "allow_options" },
   logs: { elementId: "nav-logs", column: "allow_logs" },
   messages: { elementId: "nav-messages", column: "allow_messages" },
-  pour_plan: { elementId: "nav-pour_plan", column: "allow_pour_plan_view" }
+  pour_plan: { elementId: "nav-pour_plan", column: "allow_pour_plan_view" },
+  report_gen: { elementId: "nav-report_gen", column: "allow_report_generate" }
 };
 
 function hasPermission(columnName) {
@@ -843,6 +845,9 @@ async function onViewLoaded(viewName) {
     case 'pour_plan':
       await initPourPlanView();
       break;
+    case 'report_gen':
+      await initReportGenView();
+      break;
     case 'logs':
       await initLogsView();
       break;
@@ -1006,6 +1011,8 @@ async function openEditUserModal(login) {
   if (permPlanView) permPlanView.checked = !!(user.allow_pour_plan_view);
   const permPlanEdit = document.getElementById("perm-pour-plan-edit");
   if (permPlanEdit) permPlanEdit.checked = !!(user.allow_pour_plan_edit);
+  const permGen = document.getElementById("perm-report-generate");
+  if (permGen) permGen.checked = !!(user.allow_report_generate);
 
   const msgBox = document.getElementById("user-form-msg");
   if (msgBox) msgBox.style.display = "none";
@@ -1159,7 +1166,8 @@ async function loadUsersList() {
         { label: "Komunikaty", active: u.allow_messages },
         { label: "Zatwierdzanie raportów", active: u.allow_report_approve },
         { label: "Plan zalewu", active: u.allow_pour_plan_view && !u.allow_pour_plan_edit },
-        { label: "Plan zalewu (edycja)", active: u.allow_pour_plan_edit }
+        { label: "Plan zalewu (edycja)", active: u.allow_pour_plan_edit },
+        { label: "Generowanie raportów", active: u.allow_report_generate }
       ];
 
       const activeBadges = permissions
@@ -1249,7 +1257,10 @@ async function handleSaveUser(e) {
       ? {
           allow_pour_plan_view: document.getElementById("perm-pour-plan-view").checked || document.getElementById("perm-pour-plan-edit").checked,
           allow_pour_plan_edit: document.getElementById("perm-pour-plan-edit").checked
-        } : {})
+        } : {}),
+    // kolumna allow_report_generate istnieje dopiero po sql/45
+    ...(currentUser && "allow_report_generate" in currentUser && document.getElementById("perm-report-generate")
+      ? { allow_report_generate: document.getElementById("perm-report-generate").checked } : {})
   };
 
   try {
