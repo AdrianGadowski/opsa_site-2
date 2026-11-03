@@ -5,6 +5,7 @@
 // ==========================================
 
 const DB_TOP = 6;            // ile pozycji w listach działów, firm i pracowników
+const DB_COUNT_MS = 600;     // jak długo liczby w kafelkach nabijają się do wartości
 
 let dbEmpById = {};
 let dbDeptById = {};
@@ -36,11 +37,82 @@ function dbTipAttr(title, lines) {
   return rtEsc([title, ...lines.flat()].join("|"));
 }
 
-function dbHoursLines(present, absent) {
-  return [
+function dbHoursLines(present, absent, pendP = 0, pendA = 0) {
+  const lines = [
     ["var(--db-present)", `Obecne: ${dbHours(present)}`],
     ["var(--db-absent)", `Nieobecne: ${dbHours(absent)}`]
   ];
+  if (pendP > 0) lines.push(["var(--db-present-soft)", `Obecne do zatwierdzenia: ${dbHours(pendP)}`]);
+  if (pendA > 0) lines.push(["var(--db-absent-soft)", `Nieobecne do zatwierdzenia: ${dbHours(pendA)}`]);
+  return lines;
+}
+
+// Stan raportu (sql/34). Przed nim nie ma tej kolumny - wszystko liczy się jak zatwierdzone
+function dbStatus(row) {
+  return row.approval_status || "approved";
+}
+
+// Dolicza godziny wiersza: zatwierdzone (present, absent) albo do zatwierdzenia (pendP, pendA)
+function dbAddHours(entry, row) {
+  const hours = parseFloat(row.total_hours) || 0;
+  const away = row.at_work === false;
+  if (dbStatus(row) === "pending") {
+    if (away) entry.pendA += hours; else entry.pendP += hours;
+  } else if (away) {
+    entry.absent += hours;
+  } else {
+    entry.present += hours;
+  }
+}
+
+// Liczba w kafelku nabija się od zera do wartości (dbRunCounts); bez JS / animacji od razu właściwa
+function dbCountHtml(value, digits = 1) {
+  return `<span data-count="${value}" data-digits="${digits}">${dbNum(value, digits)}</span>`;
+}
+
+function dbRunCounts(root) {
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  const start = performance.now();
+  const items = [...root.querySelectorAll("[data-count]")].map(el => ({
+    el, target: Number(el.dataset.count), digits: Number(el.dataset.digits)
+  }));
+  const step = now => {
+    const t = Math.min(1, (now - start) / DB_COUNT_MS);
+    const eased = 1 - Math.pow(1 - t, 3);
+    items.forEach(({ el, target, digits }) => {
+      el.textContent = dbNum(t < 1 ? target * eased : target, digits);
+    });
+    if (t < 1) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+  // karta w tle nie rysuje klatek - właściwa wartość i tak musi się pojawić
+  setTimeout(() => items.forEach(({ el, target, digits }) => { el.textContent = dbNum(target, digits); }), DB_COUNT_MS + 100);
+}
+
+function dbEmptyEntry() {
+  return { present: 0, absent: 0, pendP: 0, pendA: 0 };
+}
+
+function dbEntrySum(e) {
+  return e.present + e.absent + e.pendP + e.pendA;
+}
+
+// Słupek wykresu: u góry kreskowane godziny do zatwierdzenia, pod nimi zatwierdzone.
+// index - numer kolumny: słupki wyrastają kolejno (--i, views/dashboard.html)
+function dbStackHtml(v, max, index = 0) {
+  const sum = dbEntrySum(v);
+  if (sum <= 0) return "";
+  const seg = (cls, hours) => (hours > 0 ? `<span class="seg ${cls}" style="flex: ${hours} 0 0;"></span>` : "");
+  return `
+    <div class="stack" style="height: ${(sum / max) * 100}%; --i: ${index};">
+      ${seg("pa", v.pendA)}${seg("pp", v.pendP)}${seg("a", v.absent)}${seg("p", v.present)}
+    </div>`;
+}
+
+// Opis słupka dla czytników ekranu
+function dbAriaHours(v) {
+  const pend = v.pendP + v.pendA;
+  return `obecne ${dbHours(v.present)}, nieobecne ${dbHours(v.absent)}${pend > 0 ? `, do zatwierdzenia ${dbHours(pend)}` : ""}`;
 }
 
 // ---------- Wybór okresu: strzałki ‹ › (bez list rozwijanych) ----------
@@ -176,18 +248,19 @@ async function dbLoad() {
   try {
     // Wykres roczny na dole zawsze pokazuje cały rok, niezależnie od wybranego miesiąca.
     // Przy "Cały rok" wystarcza jedno pobranie.
-    // Liczą się tylko zatwierdzone raporty (sql/34; przed nim - wszystkie)
-    const approved = await rpaApprovedOnly();
+    // Główne liczby to zatwierdzone raporty; oczekujące są osobno (dopiski, kreskowane słupki),
+    // a odrzucone tylko w pasku nad kafelkami (sql/34; przed nim każdy raport liczy się jak zatwierdzony)
+    const hasStatus = await rpaApprovedOnly();
     const [rows, yearOnly] = await Promise.all([
-      rpFetchAll(() => rpaFilterApproved(supabaseClient
+      rpFetchAll(() => supabaseClient
         .from("work_reports")
         .select("*") // "*": działa też przed dodaniem kolumny id_department (sql/24)
-        .like("report_date", pattern), approved)),
+        .like("report_date", pattern)),
       month
-        ? rpFetchAll(() => rpaFilterApproved(supabaseClient
+        ? rpFetchAll(() => supabaseClient
             .from("work_reports")
-            .select("report_date, total_hours, at_work")
-            .like("report_date", `%.${year}`), approved))
+            .select(`report_date, total_hours, at_work${hasStatus ? ", approval_status" : ""}`)
+            .like("report_date", `%.${year}`))
         : null
     ]);
     if (token !== dbLoadToken) return; // w międzyczasie zmieniono okres
@@ -205,33 +278,48 @@ async function dbLoad() {
   }
 }
 
-// Sumuje godziny obecne/nieobecne w mapie pod wskazanym kluczem
+// Sumuje godziny w mapie pod wskazanym kluczem
 function dbAdd(map, key, row) {
   let entry = map.get(key);
   if (!entry) {
-    entry = { present: 0, absent: 0 };
+    entry = dbEmptyEntry();
     map.set(key, entry);
   }
-  const hours = parseFloat(row.total_hours) || 0;
-  if (row.at_work === false) entry.absent += hours;
-  else entry.present += hours;
+  dbAddHours(entry, row);
 }
 
 function dbRender(rows, year, month) {
-  const total = { present: 0, absent: 0 };
+  const total = dbEmptyEntry();
   const byTime = new Map();    // dzień miesiąca albo numer miesiąca
   const byDept = new Map();
   const byBiz = new Map();
   const byEmp = new Map();
+  // Raporty, dni i pracownicy w kafelkach: tylko zatwierdzone
   const reports = new Set();
   const days = new Set();
+  const people = new Set();
+  // Pasek nad kafelkami: co czeka w wybranym okresie
+  const waiting = { pendReports: new Set(), rejHours: 0, rejReports: new Set() };
 
   rows.forEach(r => {
+    const status = dbStatus(r);
+    if (status === "rejected") {     // odrzucony raport się zmieni - bez wykresów, tylko w pasku
+      waiting.rejHours += parseFloat(r.total_hours) || 0;
+      waiting.rejReports.add(r.number_report);
+      return;
+    }
+    if (status === "pending") {
+      waiting.pendReports.add(r.number_report);
+    } else {
+      reports.add(r.number_report);
+      days.add(r.report_date);
+      people.add(r.first_name_id);
+    }
+
     const [d, m] = String(r.report_date || "").split(".");
     const emp = dbEmpById[r.first_name_id];
-    const all = new Map([["all", total]]);
 
-    dbAdd(all, "all", r);
+    dbAddHours(total, r);
     dbAdd(byTime, Number(month ? d : m), r);
     // dział raportu, jak w kolumnie „Dział” na liście raportów (dział mistrza);
     // bez kolumny id_department w bazie (przed sql/24) - dział pracownika
@@ -239,20 +327,22 @@ function dbRender(rows, year, month) {
     dbAdd(byDept, (deptId != null && (dbDeptById[deptId] || "Dział #" + deptId)) || "Brak działu", r);
     dbAdd(byBiz, emp?.business?.business || "Brak firmy", r);
     dbAdd(byEmp, r.first_name_id, r);
-    reports.add(r.number_report);
-    days.add(r.report_date);
   });
 
   const periodName = month ? `${RP_MONTHS[Number(month) - 1].toLowerCase()} ${year}` : `rok ${year}`;
   document.getElementById("db-period-label").textContent =
     `Podsumowanie czasu pracy z raportów — ${periodName}.`;
 
-  dbRenderKpis(total, reports.size, days.size, byEmp.size);
+  dbRenderPending(total.pendP + total.pendA, waiting);
+  dbRenderKpis(total, reports.size, days.size, people.size);
   dbRenderTime(byTime, year, month);
+  const legendPend = document.getElementById("db-legend-pend");
+  if (legendPend) legendPend.style.display = total.pendP + total.pendA > 0 ? "" : "none";
 
+  // Kolejność według zatwierdzonych; przy remisie decydują oczekujące
   const sortByTotal = map => [...map.entries()]
     .map(([label, v]) => ({ label, ...v }))
-    .sort((a, b) => (b.present + b.absent) - (a.present + a.absent));
+    .sort((a, b) => (b.present + b.absent) - (a.present + a.absent) || (b.pendP + b.pendA) - (a.pendP + a.pendA));
 
   dbRenderBars("db-depts", dbFold(sortByTotal(byDept)), "both");
   dbRenderBars("db-biz", dbFold(sortByTotal(byBiz)), "both");
@@ -262,17 +352,43 @@ function dbRender(rows, year, month) {
     return { label: e ? `${e.first_name || ""} ${e.last_name || ""}`.trim() : `Pracownik #${id}`, ...v };
   });
   dbRenderBars("db-top-present",
-    emps.filter(e => e.present > 0).sort((a, b) => b.present - a.present).slice(0, DB_TOP), "present");
+    emps.filter(e => e.present + e.pendP > 0).sort((a, b) => b.present - a.present || b.pendP - a.pendP).slice(0, DB_TOP), "present");
   dbRenderBars("db-top-absent",
-    emps.filter(e => e.absent > 0).sort((a, b) => b.absent - a.absent).slice(0, DB_TOP), "absent");
+    emps.filter(e => e.absent + e.pendA > 0).sort((a, b) => b.absent - a.absent || b.pendA - a.pendA).slice(0, DB_TOP), "absent");
+}
+
+// ---------- Pasek: co czeka na zatwierdzenie i poprawę w wybranym okresie ----------
+// Klikalny dla zatwierdzających - tylko oni widzą w zakładkach wszystkie te raporty
+function dbRenderPending(pendHours, waiting) {
+  const el = document.getElementById("db-pending");
+  if (!el) return;
+  const canOpen = typeof rpaCanApprove === "function" && rpaCanApprove();
+  const inReports = n => `${dbNum(n, 0)} ${n === 1 ? "raporcie" : "raportach"}`;
+  const item = (cls, icon, label, hours, count, tab) => {
+    const text = `<i class="fa-solid ${icon}"></i><span>${label}: <b>${dbHours(hours)}</b> w ${inReports(count)}</span>`;
+    return canOpen
+      ? `<button type="button" class="db-wait ${cls}" onclick="rpaOpenTab('${tab}')">${text}<i class="fa-solid fa-chevron-right go"></i></button>`
+      : `<div class="db-wait ${cls}">${text}</div>`;
+  };
+  const parts = [];
+  if (waiting.pendReports.size) parts.push(item("pend", "fa-hourglass-half", "Do zatwierdzenia", pendHours, waiting.pendReports.size, "pending"));
+  if (waiting.rejReports.size) parts.push(item("rej", "fa-pen", "Do poprawy", waiting.rejHours, waiting.rejReports.size, "rejected"));
+  el.innerHTML = parts.join("");
+  el.hidden = !parts.length;
 }
 
 // Zostawia DB_TOP największych pozycji, resztę łączy w "Pozostałe"
 function dbFold(items) {
   if (items.length <= DB_TOP) return items;
   const rest = items.slice(DB_TOP - 1).reduce(
-    (acc, it) => ({ label: acc.label, present: acc.present + it.present, absent: acc.absent + it.absent }),
-    { label: `Pozostałe (${items.length - DB_TOP + 1})`, present: 0, absent: 0 }
+    (acc, it) => ({
+      label: acc.label,
+      present: acc.present + it.present,
+      absent: acc.absent + it.absent,
+      pendP: acc.pendP + it.pendP,
+      pendA: acc.pendA + it.pendA
+    }),
+    { label: `Pozostałe (${items.length - DB_TOP + 1})`, ...dbEmptyEntry() }
   );
   return [...items.slice(0, DB_TOP - 1), rest];
 }
@@ -283,26 +399,29 @@ function dbRenderKpis(total, reportCount, dayCount, empCount) {
   const rate = all > 0 ? (total.absent / all) * 100 : 0;
   const perEmp = empCount > 0 ? total.present / empCount : 0;
 
-  const tile = (cls, icon, label, value, unit, note, extra = "") => `
+  const tile = (cls, icon, label, value, unit, note, extra = "", pending = 0) => `
     <div class="db-kpi ${cls}">
       <div class="lbl"><span class="ico"><i class="fa-solid ${icon}"></i></span>${label}</div>
       <div class="val">${value}${unit ? `<small>${unit}</small>` : ""}</div>
+      ${pending > 0 ? `<div class="pend">+ ${dbHours(pending)} do zatwierdzenia</div>` : ""}
       ${extra}
       <div class="note">${note}</div>
     </div>`;
 
-  document.getElementById("db-kpis").innerHTML =
-    tile("lead", "fa-clock", "Godziny obecne", dbNum(total.present), "h",
-      `Średnio ${dbNum(perEmp)} h na pracownika`) +
-    tile("absent", "fa-user-xmark", "Godziny nieobecne", dbNum(total.absent), "h",
-      `z ${dbNum(all)} h zgłoszonych łącznie`) +
-    tile("rate", "fa-percent", "Wskaźnik absencji", dbNum(rate), "%",
+  const kpis = document.getElementById("db-kpis");
+  kpis.innerHTML =
+    tile("lead", "fa-clock", "Godziny obecne", dbCountHtml(total.present), "h",
+      `Średnio ${dbNum(perEmp)} h na pracownika`, "", total.pendP) +
+    tile("absent", "fa-user-xmark", "Godziny nieobecne", dbCountHtml(total.absent), "h",
+      `z ${dbNum(all)} h zgłoszonych łącznie`, "", total.pendA) +
+    tile("rate", "fa-percent", "Wskaźnik absencji", dbCountHtml(rate), "%",
       "Udział godzin nieobecnych w zgłoszonych",
       `<div class="db-meter" aria-hidden="true"><span style="width: ${Math.min(rate, 100)}%;"></span></div>`) +
-    tile("", "fa-file-lines", "Raporty", dbNum(reportCount, 0), "",
+    tile("", "fa-file-lines", "Raporty", dbCountHtml(reportCount, 0), "",
       `Dni z raportami: ${dbNum(dayCount, 0)}`) +
-    tile("", "fa-users", "Pracownicy", dbNum(empCount, 0), "",
+    tile("", "fa-users", "Pracownicy", dbCountHtml(empCount, 0), "",
       "Osoby ujęte w raportach");
+  dbRunCounts(kpis);
 }
 
 // ---------- Wykres: godziny w czasie ----------
@@ -314,7 +433,7 @@ function dbRenderTime(byTime, year, month) {
   const count = month ? new Date(Number(year), Number(month), 0).getDate() : 12;
   const points = Array.from({ length: count }, (_, i) => {
     const key = i + 1;
-    const v = byTime.get(key) || { present: 0, absent: 0 };
+    const v = byTime.get(key) || dbEmptyEntry();
     const axis = month ? String(key) : RP_MONTHS[i].slice(0, 3);
     const full = month ? `${String(key).padStart(2, "0")}.${month}.${year}` : `${RP_MONTHS[i]} ${year}`;
     return { key, axis, full, ...v };
@@ -322,7 +441,7 @@ function dbRenderTime(byTime, year, month) {
 
   title.textContent = month ? "Godziny dzień po dniu" : "Godziny w kolejnych miesiącach";
   document.getElementById("db-legend-weekend").style.display = month ? "" : "none";
-  const maxTotal = Math.max(...points.map(p => p.present + p.absent));
+  const maxTotal = Math.max(...points.map(dbEntrySum));
 
   if (maxTotal <= 0) {
     sub.textContent = "";
@@ -330,8 +449,8 @@ function dbRenderTime(byTime, year, month) {
     return;
   }
 
-  const peak = points.reduce((a, b) => ((b.present + b.absent) > (a.present + a.absent) ? b : a));
-  sub.textContent = `Najwięcej zgłoszonych godzin: ${peak.full} (${dbHours(peak.present + peak.absent)})`;
+  const peak = points.reduce((a, b) => (dbEntrySum(b) > dbEntrySum(a) ? b : a));
+  sub.textContent = `Najwięcej zgłoszonych godzin: ${peak.full} (${dbHours(dbEntrySum(peak))})`;
 
   const max = dbNiceMax(maxTotal);
   const ticks = [0, 1, 2, 3, 4].map(i => (max / 4) * i);
@@ -341,23 +460,18 @@ function dbRenderTime(byTime, year, month) {
     `<i class="${t === 0 ? "base" : ""}" style="bottom: ${(t / max) * 100}%;"></i>`).join("");
 
   const cols = points.map(p => {
-    const sum = p.present + p.absent;
     // na telefonie podpisy co 5 dni (plus pierwszy), żeby się nie zlewały
     const minor = month && !(p.key === 1 || p.key % 5 === 0) ? " minor" : "";
-    const stack = sum > 0 ? `
-      <div class="stack" style="height: ${(sum / max) * 100}%;">
-        ${p.absent > 0 ? `<span class="seg a" style="flex: ${p.absent} 0 0;"></span>` : ""}
-        ${p.present > 0 ? `<span class="seg p" style="flex: ${p.present} 0 0;"></span>` : ""}
-      </div>` : "";
+    const stack = dbStackHtml(p, max, p.key - 1);
     // Weekend (tylko w widoku dni): sobota i niedziela mają własne tło kolumny
     const weekday = month ? new Date(Number(year), Number(month) - 1, p.key).getDay() : -1;
     const dayClass = weekday === 6 ? " sat" : weekday === 0 ? " sun" : "";
     const dayName = weekday === 6 ? " (sobota)" : weekday === 0 ? " (niedziela)" : "";
-    const label = `${p.full}${dayName}: obecne ${dbHours(p.present)}, nieobecne ${dbHours(p.absent)}`;
+    const label = `${p.full}${dayName}: ${dbAriaHours(p)}`;
 
     return `
       <div class="db-col${dayClass}" tabindex="0" role="img" aria-label="${rtEsc(label)}"
-           data-tip="${dbTipAttr(p.full + dayName, dbHoursLines(p.present, p.absent))}">
+           data-tip="${dbTipAttr(p.full + dayName, dbHoursLines(p.present, p.absent, p.pendP, p.pendA))}">
         <div class="area">${stack}</div>
         <div class="xl${minor}">${rtEsc(p.axis)}</div>
       </div>`;
@@ -393,7 +507,7 @@ function dbRenderYear(rows, year, selectedMonth) {
 
   const y = Number(year);
 
-  // months[m] = lista tygodni tego miesiąca: { week, from, to, present, absent }
+  // months[m] = lista tygodni tego miesiąca: { week, from, to, present, absent, pendP, pendA }
   const months = Array.from({ length: 12 }, (_, mi) => {
     const weeks = [];
     const daysInMonth = new Date(y, mi + 1, 0).getDate();
@@ -401,22 +515,24 @@ function dbRenderYear(rows, year, selectedMonth) {
       const week = dbWeekOfYear(y, mi + 1, d);
       const last = weeks[weeks.length - 1];
       if (last && last.week === week) last.to = d;
-      else weeks.push({ week, from: d, to: d, present: 0, absent: 0 });
+      else weeks.push({ week, from: d, to: d, ...dbEmptyEntry() });
     }
     return weeks;
   });
 
   rows.forEach(r => {
+    if (dbStatus(r) === "rejected") return;   // odrzucone poza wykresem
     const [d, m] = String(r.report_date || "").split(".").map(Number);
     if (!(m >= 1 && m <= 12) || !(d >= 1 && d <= 31)) return;
     const cell = months[m - 1].find(w => d >= w.from && d <= w.to);
     if (!cell) return;
-    const hours = parseFloat(r.total_hours) || 0;
-    if (r.at_work === false) cell.absent += hours;
-    else cell.present += hours;
+    dbAddHours(cell, r);
   });
 
-  const maxWeek = Math.max(...months.flat().map(c => c.present + c.absent));
+  const legendPend = document.getElementById("db-legend-pend-year");
+  if (legendPend) legendPend.style.display = months.flat().some(c => c.pendP + c.pendA > 0) ? "" : "none";
+
+  const maxWeek = Math.max(...months.flat().map(dbEntrySum));
   if (maxWeek <= 0) {
     el.innerHTML = dbEmptyHtml(`Brak raportów w roku ${year}.`);
     return;
@@ -432,30 +548,28 @@ function dbRenderYear(rows, year, selectedMonth) {
   const groups = months.map((weeks, mi) => {
     const monthName = RP_MONTHS[mi];
     const mm = p2(mi + 1);
-    const total = weeks.reduce((acc, c) => ({ present: acc.present + c.present, absent: acc.absent + c.absent }),
-      { present: 0, absent: 0 });
+    const total = weeks.reduce((acc, c) => ({
+      present: acc.present + c.present,
+      absent: acc.absent + c.absent,
+      pendP: acc.pendP + c.pendP,
+      pendA: acc.pendA + c.pendA
+    }), dbEmptyEntry());
 
     const cols = weeks.map(c => {
-      const sum = c.present + c.absent;
       const range = c.from === c.to ? `${p2(c.from)}.${mm}.${year}` : `${p2(c.from)}.${mm}–${p2(c.to)}.${mm}.${year}`;
       const name = `Tydzień ${c.week} (${range})`;
-      const stack = sum > 0 ? `
-        <div class="stack" style="height: ${(sum / max) * 100}%;">
-          ${c.absent > 0 ? `<span class="seg a" style="flex: ${c.absent} 0 0;"></span>` : ""}
-          ${c.present > 0 ? `<span class="seg p" style="flex: ${c.present} 0 0;"></span>` : ""}
-        </div>` : "";
 
       return `
         <div class="db-col" tabindex="0" role="img"
-             aria-label="${rtEsc(`${name}: obecne ${dbHours(c.present)}, nieobecne ${dbHours(c.absent)}`)}"
-             data-tip="${dbTipAttr(name, dbHoursLines(c.present, c.absent))}">
-          <div class="area">${stack}</div>
+             aria-label="${rtEsc(`${name}: ${dbAriaHours(c)}`)}"
+             data-tip="${dbTipAttr(name, dbHoursLines(c.present, c.absent, c.pendP, c.pendA))}">
+          <div class="area">${dbStackHtml(c, max, c.week - 1)}</div>
           <div class="wk">${c.week}</div>
         </div>`;
     }).join("");
 
     const isSelected = selectedMonth && Number(selectedMonth) === mi + 1;
-    const monthTip = dbTipAttr(`${monthName} ${year} — razem`, dbHoursLines(total.present, total.absent));
+    const monthTip = dbTipAttr(`${monthName} ${year} — razem`, dbHoursLines(total.present, total.absent, total.pendP, total.pendA));
 
     return `
       <div class="db-mgroup ${isSelected ? "selected" : ""}">
@@ -484,7 +598,8 @@ function dbRenderBars(containerId, items, mode) {
   const el = document.getElementById(containerId);
   if (!el) return;
 
-  const value = it => (mode === "present" ? it.present : mode === "absent" ? it.absent : it.present + it.absent);
+  // Długość paska z oczekującymi; liczba główna tylko z zatwierdzonych
+  const value = it => (mode === "present" ? it.present + it.pendP : mode === "absent" ? it.absent + it.pendA : dbEntrySum(it));
   const max = Math.max(0, ...items.map(value));
 
   if (items.length === 0 || max <= 0) {
@@ -495,12 +610,15 @@ function dbRenderBars(containerId, items, mode) {
   el.innerHTML = `<div class="db-bars">` + items.map(it => {
     const p = mode === "absent" ? 0 : it.present;
     const a = mode === "present" ? 0 : it.absent;
-    const num = mode === "both"
+    const pp = mode === "absent" ? 0 : it.pendP;
+    const pa = mode === "present" ? 0 : it.pendA;
+    const num = (mode === "both"
       ? `<b>${dbHours(it.present)}</b> · ${dbHours(it.absent)} nieob.`
-      : `<b>${dbHours(value(it))}</b>`;
+      : `<b>${dbHours(p + a)}</b>`) +
+      (pp + pa > 0 ? ` <span class="pend">+ ${dbHours(pp + pa)}</span>` : "");
 
     return `
-      <div class="db-bar" tabindex="0" data-tip="${dbTipAttr(it.label, dbHoursLines(it.present, it.absent))}">
+      <div class="db-bar" tabindex="0" data-tip="${dbTipAttr(it.label, dbHoursLines(it.present, it.absent, it.pendP, it.pendA))}">
         <div class="top">
           <span class="name">${rtEsc(it.label)}</span>
           <span class="num">${num}</span>
@@ -508,6 +626,8 @@ function dbRenderBars(containerId, items, mode) {
         <div class="track" aria-hidden="true">
           ${p > 0 ? `<span class="p" style="width: ${(p / max) * 100}%;"></span>` : ""}
           ${a > 0 ? `<span class="a" style="width: ${(a / max) * 100}%;"></span>` : ""}
+          ${pp > 0 ? `<span class="pp" style="width: ${(pp / max) * 100}%;"></span>` : ""}
+          ${pa > 0 ? `<span class="pa" style="width: ${(pa / max) * 100}%;"></span>` : ""}
         </div>
       </div>`;
   }).join("") + `</div>`;

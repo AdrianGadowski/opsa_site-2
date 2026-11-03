@@ -1177,6 +1177,7 @@ async function rtSaveReport() {
     logAction(target ? "Dopisanie do raportu" : "Utworzenie raportu",
       `Raport nr ${reportNumber}, ${reportDate}, ${rtMeta.shift}, osób: ${records.length}`);
     rtClearTargets();
+    savedToast();
     const toApproval = typeof rpaInstalled === "function" && rpaInstalled() && !(target && target.status === "rejected");
     rtShowBanner("success", (target
       ? `Dopisano ${records.length} os. do raportu nr ${reportNumber} (${reportDate}, ${rtMeta.shift}).`

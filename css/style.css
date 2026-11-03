@@ -560,3 +560,51 @@ input[type="checkbox"] {
 .account-reset-btn.armed { border-color: var(--danger); color: var(--danger); background: #FDECEC; }
 .account-reset-btn.done { border-color: #10B981; color: #0b7a57; background: rgba(16, 185, 129, 0.1); }
 .account-reset-btn:disabled:not(.done) { opacity: 0.6; cursor: not-allowed; }
+
+/* ==========================================
+   ANIMACJE: wejście widoku i potwierdzenie zapisu
+   ========================================== */
+@keyframes viewIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
+}
+/* Nowy widok: bloki wchodzą kolejno. "backwards": po animacji nie zostaje transform,
+   więc elementy position: fixed w widoku działają normalnie. Okna (.modal) mają własną animację. */
+#main-content.view-enter > :not(.modal):not(style):not(script) { animation: viewIn 0.3s ease-out backwards; }
+#main-content.view-enter > :not(.modal):not(style):not(script):nth-child(3) { animation-delay: 40ms; }
+#main-content.view-enter > :not(.modal):not(style):not(script):nth-child(4) { animation-delay: 80ms; }
+#main-content.view-enter > :not(.modal):not(style):not(script):nth-child(n+5) { animation-delay: 120ms; }
+
+/* Zapisano: przycisk na chwilę zielony z ✓ (js/app.js, savedFlash). Klasa nie zmienia napisu,
+   więc nie przeszkadza kodowi, który sam ustawia tekst przycisku. */
+@keyframes savedPop {
+  0% { transform: scale(0.96); }
+  50% { transform: scale(1.03); }
+  100% { transform: none; }
+}
+.btn-saved { position: relative; overflow: hidden; opacity: 1 !important; animation: savedPop 0.3s ease-out; }
+.btn-saved::after {
+  content: "\2713\00a0" attr(data-saved-text); position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: #0E8A6C; color: #fff; font-weight: 700;
+}
+
+/* Zapisano, gdy okno z przyciskiem już się zamknęło (js/app.js, savedToast) */
+@keyframes savedToastIn {
+  0% { opacity: 0; transform: translate(-50%, 12px); }
+  12% { opacity: 1; transform: translate(-50%, 0); }
+  85% { opacity: 1; transform: translate(-50%, 0); }
+  100% { opacity: 0; transform: translate(-50%, 0); }
+}
+.saved-toast {
+  position: fixed; left: 50%; bottom: 24px; z-index: 3000; pointer-events: none;
+  display: inline-flex; align-items: center; gap: 8px; padding: 10px 18px; border-radius: 999px;
+  background: #0E8A6C; color: #fff; font-size: 0.9rem; font-weight: 700; white-space: nowrap;
+  box-shadow: 0 8px 22px rgba(8, 88, 75, 0.35);
+  animation: savedToastIn 1.8s ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #main-content.view-enter > :not(.modal):not(style):not(script), .btn-saved { animation: none; }
+  .saved-toast { animation-timing-function: step-end; transform: translateX(-50%); }
+}

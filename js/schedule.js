@@ -732,6 +732,7 @@ async function shSetDays(changes, label) {
   } else {
     const people = new Set(changes.map(c => c.emp)).size;
     logAction("Zmiana harmonogramu", `${shWeekTitle()}: ${label}; dni: ${changes.length}, osób: ${people}`);
+    savedToast();
   }
   shRefreshCells();
   // licznik zaplanowanych i przyciski "Pn → Pt" zależą od wpisów

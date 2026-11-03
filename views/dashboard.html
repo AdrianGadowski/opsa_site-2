@@ -3,6 +3,11 @@
   .db-root {
     --db-present: #08584B;      /* godziny obecne */
     --db-absent: #E5484D;       /* godziny nieobecne */
+    --db-present-soft: #8DBDB3; /* obecne do zatwierdzenia (dymek) */
+    --db-absent-soft: #F2A9AB;  /* nieobecne do zatwierdzenia (dymek) */
+    /* godziny do zatwierdzenia: kreskowane, w kolorze obecnych / nieobecnych */
+    --db-hatch-p: repeating-linear-gradient(135deg, var(--db-present) 0 2px, #CFE3DE 2px 5px);
+    --db-hatch-a: repeating-linear-gradient(135deg, var(--db-absent) 0 2px, #F9D5D6 2px 5px);
     --db-sat: #FFF4C7;          /* tło kolumny: sobota */
     --db-sun: #FDE3E3;          /* tło kolumny: niedziela */
     --db-track: #EEF0F3;
@@ -37,6 +42,22 @@
   .db-kpi .val { margin-top: 10px; font-size: 1.75rem; font-weight: 700; letter-spacing: -0.02em; color: var(--db-ink); line-height: 1.1; }
   .db-kpi .val small { font-size: 0.95rem; font-weight: 600; color: var(--db-ink-2); margin-left: 3px; }
   .db-kpi .note { margin-top: 6px; font-size: 0.78rem; color: var(--db-ink-3); }
+  .db-kpi .pend { margin-top: 5px; font-size: 0.8rem; font-weight: 700; color: #fff; }   /* tylko na kolorowych kafelkach godzin */
+
+  /* --- Pasek: do zatwierdzenia i do poprawy (js/dashboard.js, dbRenderPending) --- */
+  .db-pending { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 14px; }
+  .db-pending[hidden] { display: none; }
+  .db-wait {
+    display: inline-flex; align-items: center; gap: 9px; padding: 10px 14px; border-radius: 10px; font-family: inherit; font-size: 0.88rem; text-align: left;
+    border: 1px solid; flex: 1 1 280px;
+  }
+  .db-wait.pend { background: #FFF8DF; border-color: #F2D98A; color: #6B5507; }
+  .db-wait.rej { background: #FDF1F1; border-color: #F3C4C5; color: #9B1C1C; }
+  .db-wait b { font-weight: 800; }
+  .db-wait .go { margin-left: auto; font-size: 0.75rem; opacity: 0.7; }
+  button.db-wait { cursor: pointer; }
+  button.db-wait:hover { filter: brightness(0.97); }
+  button.db-wait:focus-visible { outline: 3px solid rgba(8, 88, 75, 0.35); outline-offset: 1px; }
   .db-kpi.lead { background: linear-gradient(135deg, #0B6B5B 0%, #08584B 50%, #053D34 100%); border-color: transparent; box-shadow: 0 8px 22px rgba(8, 88, 75, 0.25); }
   .db-kpi.lead .lbl, .db-kpi.lead .note { color: rgba(255, 255, 255, 0.78); }
   .db-kpi.lead .ico { background: rgba(255, 255, 255, 0.14); color: var(--accent); }
@@ -64,6 +85,7 @@
   .db-legend i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
   .db-legend .p { background: var(--db-present); }
   .db-legend .a { background: var(--db-absent); }
+  .db-legend .pp { background: var(--db-hatch-p); }
 
   /* --- Wykres kolumnowy: godziny w czasie --- */
   .db-chart { display: grid; grid-template-columns: 44px 1fr; height: 270px; }
@@ -78,9 +100,23 @@
   .db-col { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; cursor: default; border-radius: 6px; outline: none; }
   .db-col .area { flex: 1; display: flex; align-items: flex-end; justify-content: center; padding: 0 1px; }
   .db-col .stack { position: relative; z-index: 2; width: 100%; max-width: 26px; display: flex; flex-direction: column; gap: 2px; }
+  /* słupki wyrastają od dołu kolejno, paski wysuwają się od lewej, kafelki wchodzą jeden po drugim */
+  @keyframes dbGrow { from { transform: scaleY(0); } to { transform: none; } }
+  @keyframes dbBarIn { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0); } }
+  .db-col .stack { transform-origin: bottom; animation: dbGrow 0.45s cubic-bezier(0.22, 1, 0.36, 1) backwards; animation-delay: calc(var(--i, 0) * 12ms); }
+  .db-chart.months .db-col .stack { animation-delay: calc(var(--i, 0) * 6ms); }
+  .db-bar .track { animation: dbBarIn 0.6s cubic-bezier(0.22, 1, 0.36, 1) backwards; }
+  .db-kpi { animation: viewIn 0.35s ease-out backwards; }
+  .db-kpi:nth-child(2) { animation-delay: 50ms; }
+  .db-kpi:nth-child(3) { animation-delay: 100ms; }
+  .db-kpi:nth-child(4) { animation-delay: 150ms; }
+  .db-kpi:nth-child(5) { animation-delay: 200ms; }
+  @media (prefers-reduced-motion: reduce) { .db-col .stack, .db-bar .track, .db-kpi { animation: none; } }
   .db-col .seg { display: block; min-height: 2px; }
   .db-col .seg.a { background: var(--db-absent); }
   .db-col .seg.p { background: var(--db-present); }
+  .db-col .seg.pp { background: var(--db-hatch-p); }
+  .db-col .seg.pa { background: var(--db-hatch-a); }
   .db-col .seg:first-child { border-radius: 4px 4px 0 0; }
   .db-col .xl { height: 22px; line-height: 22px; text-align: center; font-size: 0.7rem; color: var(--db-ink-3); overflow: hidden; }
   .db-col:hover, .db-col:focus-visible { background: rgba(8, 88, 75, 0.06); }
@@ -129,6 +165,9 @@
   .db-bar .track span { display: block; height: 100%; }
   .db-bar .track .p { background: var(--db-present); }
   .db-bar .track .a { background: var(--db-absent); }
+  .db-bar .track .pp { background: var(--db-hatch-p); }
+  .db-bar .track .pa { background: var(--db-hatch-a); }
+  .db-bar .num .pend { color: #8A6D0B; font-weight: 700; }
   .db-bar:hover .track, .db-bar:focus-visible .track { box-shadow: 0 0 0 3px rgba(8, 88, 75, 0.1); }
 
   .db-empty { padding: 26px 10px; text-align: center; font-size: 0.88rem; color: var(--db-ink-3); }
@@ -261,6 +300,7 @@
   </section>
 
   <section class="db-pane" data-pane="time">
+  <div class="db-pending" id="db-pending" hidden></div>
   <div class="db-kpis" id="db-kpis"></div>
 
   <div class="db-panel">
@@ -272,6 +312,7 @@
       <div class="db-legend">
         <span><i class="p"></i> Obecne</span>
         <span><i class="a"></i> Nieobecne</span>
+        <span id="db-legend-pend" style="display: none;"><i class="pp"></i> Do zatwierdzenia</span>
         <span id="db-legend-weekend" style="gap: 16px;">
           <span><i class="sat"></i> Sobota</span>
           <span><i class="sun"></i> Niedziela</span>
@@ -310,6 +351,7 @@
       <div class="db-legend">
         <span><i class="p"></i> Obecne</span>
         <span><i class="a"></i> Nieobecne</span>
+        <span id="db-legend-pend-year" style="display: none;"><i class="pp"></i> Do zatwierdzenia</span>
       </div>
     </div>
     <div id="db-year"></div>

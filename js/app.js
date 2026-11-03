@@ -48,7 +48,7 @@ const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
 
 // Numer wydania doklejany do adresów plików, żeby przeglądarka nie używała starych kopii.
 // Zmieniaj przy każdej publikacji - tutaj i w index.html (?v=...).
-const APP_BUILD = "20261370";
+const APP_BUILD = "20261374";
 
 let currentUser = null;
 let cachedUsers = [];
@@ -722,6 +722,32 @@ function initDashboardApp(startView) {
 // ==========================================
 // 4. NAWIGACJA MIĘDZY WIDOKAMI
 // ==========================================
+let viewEnterTimer = null;
+
+// Potwierdzenie zapisu: krótki komunikat na dole ekranu (okno z przyciskiem już się zamknęło)
+function savedToast(text = "Zapisano") {
+  document.querySelector(".saved-toast")?.remove();
+  const toast = document.createElement("div");
+  toast.className = "saved-toast";
+  toast.setAttribute("role", "status");
+  toast.innerHTML = `<i class="fa-solid fa-check"></i>`;
+  toast.append(` ${text}`);
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 1900);
+}
+
+// Potwierdzenie zapisu na przycisku, który zostaje na ekranie; ukryty przycisk - komunikat na dole
+function savedFlash(btn, text = "Zapisano") {
+  if (!btn || !btn.offsetParent) {
+    savedToast(text);
+    return;
+  }
+  btn.dataset.savedText = text;
+  btn.classList.add("btn-saved");
+  clearTimeout(btn.savedTimer);
+  btn.savedTimer = setTimeout(() => btn.classList.remove("btn-saved"), 1500);
+}
+
 async function navigateTo(viewName) {
   const contentEl = document.getElementById("main-content");
   const topbarTitle = document.getElementById("topbar-title");
@@ -755,6 +781,10 @@ async function navigateTo(viewName) {
     }
     const html = await response.text();
     contentEl.innerHTML = html;
+    // bloki widoku wchodzą kolejno (css/style.css); klasa znika, żeby nic nie animowało się ponownie
+    contentEl.classList.add("view-enter");
+    clearTimeout(viewEnterTimer);
+    viewEnterTimer = setTimeout(() => contentEl.classList.remove("view-enter"), 700);
 
     onViewLoaded(viewName);
 
@@ -1286,6 +1316,7 @@ async function handleSaveUser(e) {
     logAction(mode === "create" ? "Dodanie użytkownika" : "Edycja użytkownika",
       `${name} ${last_name} (login: ${mode === "create" ? login : originalLogin})`);
     toggleModal("modal-user-form", false);
+    savedToast();
     await loadUsersList();
 
   } catch (err) {
@@ -1934,6 +1965,7 @@ async function handleSaveEmployee(e) {
     logAction(mode === "create" ? "Dodanie pracownika" : "Edycja pracownika",
       `${first_name} ${last_name}${login ? ` (login: ${login})` : ""}`);
     toggleModal("modal-employee-form", false);
+    savedToast();
     await loadEmployeesList();
     applyEmployeeFilters();
 

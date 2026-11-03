@@ -1372,6 +1372,7 @@ async function rpSaveAll() {
         (newDate ? `, zmiana daty na ${newDate}` : "") +
         (edits.length ? `, zmienionych wierszy: ${edits.length}` : ""));
       rpCloseDetail();
+      savedToast();
       rpShowBanner("success", (newDate
         ? `Zapisano zmiany w raporcie nr ${rep.number}. Raport został przeniesiony z ${rep.date} na ${newDate}.`
         : `Zapisano zmiany w raporcie nr ${rpLabel(rep)}.`) +

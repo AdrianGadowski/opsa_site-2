@@ -1469,6 +1469,7 @@ async function zwDoSavePour(payload, editing) {
       zwSyncPeriod();
     }
     zwClosePour();
+    savedToast();
     await zwLoadPours();
   } catch (err) {
     console.error("Błąd zapisu zalewu:", err);
@@ -1637,6 +1638,7 @@ async function zwSaveModel() {
     if (!data || data.length === 0) throw new Error("brak uprawnień w bazie");
 
     zwCloseModel();
+    savedToast();
     await zwLoadModels();
   } catch (err) {
     console.error("Błąd zapisu modelu:", err);

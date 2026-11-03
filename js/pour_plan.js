@@ -393,6 +393,7 @@ async function ppSave() {
       }).join("") + (keys.length > 6 ? "; ..." : ""));
     ppEdits = {};
     ppShowBanner("success", `Zapisano plan: ${ppLine}, zmienionych zmian: ${keys.length}.`);
+    savedFlash(document.getElementById("pp-save"));
     ppBusy = false;
     await ppLoad();
     return true;
