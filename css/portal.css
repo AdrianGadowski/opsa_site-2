@@ -118,6 +118,12 @@
 .ep-root .eh-pill { display: inline-block; padding: 3px 9px; border-radius: 999px; font-size: 0.76rem; font-weight: 600; }
 .ep-root .eh-pill.ok { background: rgba(16, 185, 129, 0.12); color: #0b7a57; }
 .ep-root .eh-pill.absent { background: rgba(217, 56, 58, 0.1); color: var(--danger); }
+/* Godziny do zatwierdzenia: żółty znacznik i pasek przy wierszu, dopisek w kafelku */
+.ep-root .eh-pill.wait { background: #FFF1C2; color: #7A5C00; white-space: nowrap; }
+.ep-root .eh-tile .pend { margin-top: 3px; font-size: 0.76rem; font-weight: 700; color: #7A5C00; }
+.ep-root .eh-table tr.pending td:first-child { box-shadow: inset 4px 0 0 #F2BE2E; }
+.ep-root .eh-table tr.pending .hrs { color: #7A5C00; }
+.ep-pending-note { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; padding: 10px 14px; border-radius: 10px; background: #FFF8DF; border: 1px solid #F2D98A; color: #6B5507; font-size: 0.86rem; }
 
 .ep-empty { padding: 34px 16px; text-align: center; font-size: 0.9rem; color: var(--text-muted); }
 .ep-empty.only-mobile { display: none; }
@@ -145,6 +151,8 @@
   }
   .ep-root .eh-table tbody tr.sat { background: #FFF8DB; }
   .ep-root .eh-table tbody tr.sun { background: #FDEDED; }
+  .ep-root .eh-table tbody tr.pending { box-shadow: inset 4px 0 0 #F2BE2E; }
+  .ep-root .eh-table tbody tr.pending td:first-child { box-shadow: none; }
   .ep-root .eh-table tbody td { display: block; padding: 0; border: none; background: transparent !important; text-align: left; }
 
   /* 1. linia: dzień i godziny; 2. linia: zmiana, od–do, status */

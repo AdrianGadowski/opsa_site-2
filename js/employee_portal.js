@@ -344,15 +344,12 @@ async function epLoad(userAction) {
   });
 
   try {
-    // pracownik widzi tylko godziny z zatwierdzonych raportów (sql/34; przed nim - wszystkie)
-    const approved = await rpaApprovedOnly();
+    const hasStatus = await rpaApprovedOnly();
+    // chwilowy błąd sprawdzania statusu nie może odsłonić odrzuconych raportów
+    if (!hasStatus && rpaColumnState !== false) throw new Error("brak połączenia z bazą danych");
     const [lockState, rows] = await Promise.all([
       lockPromise,
-      rpFetchAll(() => rpaFilterApproved(supabaseClient
-        .from("work_reports")
-        .select("id, report_date, shift, start_time, end_time, total_hours, at_work, number_report")
-        .eq("first_name_id", epEmployee.id)
-        .like("report_date", `%.${month}.${year}`), approved))
+      ehFetchMonth(epEmployee.id, year, month, hasStatus)
     ]);
     if (token !== epLoadToken) return; // zmieniono miesiąc albo wylogowano
 
@@ -360,12 +357,14 @@ async function epLoad(userAction) {
     const built = ehBuild(rows, Number(year), Number(month));
     document.getElementById("ep-tiles").innerHTML = built.tilesHtml;
     body.innerHTML = built.bodyHtml;
+    document.getElementById("ep-pending-note").style.display = built.hasPending ? "" : "none";
     // na telefonie dni bez wpisu są ukryte - przy pustym miesiącu pokaż informację
     document.getElementById("ep-mobile-empty").style.display = rows.length === 0 ? "" : "none";
   } catch (err) {
     if (token !== epLoadToken) return;
     console.error("Błąd pobierania godzin pracownika:", err);
     document.getElementById("ep-tiles").innerHTML = "";
+    document.getElementById("ep-pending-note").style.display = "none";
     body.innerHTML = `<tr><td colspan="7" class="ep-empty" style="color: var(--danger);">
       Nie udało się pobrać godzin: ${rtEsc(err.message || err)}</td></tr>`;
   }

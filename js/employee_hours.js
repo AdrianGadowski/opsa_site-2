@@ -53,13 +53,7 @@ async function ehLoad() {
     <i class="fa-solid fa-spinner fa-spin"></i> Ładowanie godzin...</td></tr>`;
 
   try {
-    // tylko zatwierdzone raporty (sql/34; przed nim - wszystkie)
-    const approved = await rpaApprovedOnly();
-    const rows = await rpFetchAll(() => rpaFilterApproved(supabaseClient
-      .from("work_reports")
-      .select("id, report_date, shift, start_time, end_time, total_hours, at_work, number_report")
-      .eq("first_name_id", ehEmpId)
-      .like("report_date", `%.${month}.${year}`), approved));
+    const rows = await ehFetchMonth(ehEmpId, year, month, await rpaApprovedOnly());
     if (token !== ehLoadToken) return; // zmieniono miesiąc albo zamknięto okno
 
     ehRender(rows, Number(year), Number(month));
@@ -67,15 +61,30 @@ async function ehLoad() {
     if (token !== ehLoadToken) return;
     console.error("Błąd pobierania godzin pracownika:", err);
     document.getElementById("eh-tiles").innerHTML = "";
+    document.getElementById("eh-pending-note").style.display = "none";
     body.innerHTML = `<tr><td colspan="7" style="text-align:center;color:var(--danger);padding:25px;">
       Nie udało się pobrać godzin: ${rtEsc(err.message || err)}</td></tr>`;
   }
+}
+
+// Godziny z miesiąca: zatwierdzone i do zatwierdzenia, odrzucone raporty są ukryte
+// (sql/34; przed nim nie ma statusu - wszystkie raporty). Używane też w portalu pracownika.
+function ehFetchMonth(empId, year, month, hasStatus) {
+  return rpFetchAll(() => {
+    const query = supabaseClient
+      .from("work_reports")
+      .select(`id, report_date, shift, start_time, end_time, total_hours, at_work, number_report${hasStatus ? ", approval_status" : ""}`)
+      .eq("first_name_id", empId)
+      .like("report_date", `%.${month}.${year}`);
+    return hasStatus ? query.in("approval_status", ["approved", "pending"]) : query;
+  });
 }
 
 // Buduje kafelki podsumowania i wiersze tabeli miesiąca (używane też w portalu pracownika)
 function ehBuild(rows, year, month) {
   const byDay = new Map();
   let present = 0, absent = 0;
+  let pendP = 0, pendA = 0;    // do zatwierdzenia: osobno, poza głównymi liczbami
   const workDays = new Set(), absentDays = new Set();
 
   rows.forEach(r => {
@@ -84,7 +93,10 @@ function ehBuild(rows, year, month) {
     if (!byDay.has(day)) byDay.set(day, []);
     byDay.get(day).push(r);
 
-    if (r.at_work === false) {
+    if (r.approval_status === "pending") {
+      if (r.at_work === false) pendA += hours;
+      else pendP += hours;
+    } else if (r.at_work === false) {
       absent += hours;
       absentDays.add(day);
     } else {
@@ -93,9 +105,10 @@ function ehBuild(rows, year, month) {
     }
   });
 
+  const pendNote = hours => (hours > 0 ? `<div class="pend">+ ${rtFmtHours(hours)} do zatwierdzenia</div>` : "");
   const tilesHtml = `
-    <div class="eh-tile ok"><div class="lbl">Godziny przepracowane</div><div class="val">${rtFmtHours(present)}</div></div>
-    <div class="eh-tile absent"><div class="lbl">Godziny nieobecne</div><div class="val">${rtFmtHours(absent)}</div></div>
+    <div class="eh-tile ok"><div class="lbl">Godziny przepracowane</div><div class="val">${rtFmtHours(present)}</div>${pendNote(pendP)}</div>
+    <div class="eh-tile absent"><div class="lbl">Godziny nieobecne</div><div class="val">${rtFmtHours(absent)}</div>${pendNote(pendA)}</div>
     <div class="eh-tile"><div class="lbl">Dni pracy</div><div class="val">${workDays.size}</div></div>
     <div class="eh-tile"><div class="lbl">Dni z nieobecnością</div><div class="val">${absentDays.size}</div></div>`;
 
@@ -117,8 +130,9 @@ function ehBuild(rows, year, month) {
     }
 
     entries.forEach(r => {
+      const pending = r.approval_status === "pending";
       html += `
-        <tr class="${cls}">
+        <tr class="${cls}${pending ? " pending" : ""}">
           ${dayCell}
           <td>${rtEsc(r.shift || "-")}</td>
           <td>${rtEsc(r.start_time || "-")}</td>
@@ -126,17 +140,18 @@ function ehBuild(rows, year, month) {
           <td class="hrs${r.at_work === false ? " absent" : ""}">${rtFmtHours(parseFloat(r.total_hours) || 0)}</td>
           <td>${r.at_work === false
             ? `<span class="eh-pill absent">Nieobecność</span>`
-            : `<span class="eh-pill ok">Obecność</span>`}</td>
+            : pending ? "" : `<span class="eh-pill ok">Obecność</span>`}${pending ? `<span class="eh-pill wait"><i class="fa-solid fa-hourglass-half"></i> Do zatwierdzenia</span>` : ""}</td>
           <td>${rtEsc(r.number_report ?? "-")}</td>
         </tr>`;
     });
   }
 
-  return { tilesHtml, bodyHtml: html };
+  return { tilesHtml, bodyHtml: html, hasPending: pendP + pendA > 0 };
 }
 
 function ehRender(rows, year, month) {
   const built = ehBuild(rows, year, month);
   document.getElementById("eh-tiles").innerHTML = built.tilesHtml;
   document.getElementById("eh-body").innerHTML = built.bodyHtml;
+  document.getElementById("eh-pending-note").style.display = built.hasPending ? "" : "none";
 }

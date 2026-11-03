@@ -367,6 +367,11 @@
   .eh-pill { display: inline-block; padding: 3px 9px; border-radius: 999px; font-size: 0.76rem; font-weight: 600; }
   .eh-pill.ok { background: rgba(16, 185, 129, 0.12); color: #0b7a57; }
   .eh-pill.absent { background: rgba(217, 56, 58, 0.1); color: var(--danger); }
+  /* Godziny do zatwierdzenia: żółty znacznik i pasek przy wierszu, dopisek w kafelku */
+  .eh-pill.wait { background: #FFF1C2; color: #7A5C00; white-space: nowrap; }
+  .eh-tile .pend { margin-top: 3px; font-size: 0.76rem; font-weight: 700; color: #7A5C00; }
+  .eh-table tr.pending td:first-child { box-shadow: inset 4px 0 0 #F2BE2E; }
+  .eh-table tr.pending .hrs { color: #7A5C00; }
 
   @media (max-width: 768px) {
     .eh-modal-box { display: block; width: 100%; max-height: calc(100vh - 20px); max-height: calc(100dvh - 20px); overflow-y: auto; }
@@ -380,6 +385,8 @@
     #main-content .eh-table tbody tr.sat { background: #FFF8DB; }
     #main-content .eh-table tbody tr.sun { background: #FDEDED; }
     #main-content .eh-table tbody tr td { background: transparent; }
+    #main-content .eh-table tbody tr.pending { box-shadow: inset 4px 0 0 #F2BE2E; }
+    #main-content .eh-table tbody tr.pending td:first-child { box-shadow: none; }
   }
 </style>
 
@@ -401,6 +408,9 @@
     </div>
 
     <div class="eh-tiles" id="eh-tiles"></div>
+    <div id="eh-pending-note" class="ep-pending-note" role="note" style="display: none;">
+      <i class="fa-solid fa-hourglass-half"></i> Godziny „do zatwierdzenia” czekają na sprawdzenie i mogą się jeszcze zmienić.
+    </div>
 
     <div class="eh-scroll">
       <table class="eh-table">
