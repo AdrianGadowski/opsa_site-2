@@ -192,8 +192,10 @@
   .rp-when { display: block; font-size: 0.76rem; color: var(--text-muted); font-weight: 500; }
   .rp-reason { max-width: 280px; white-space: normal !important; font-size: 0.84rem; color: #9b1c1f; }
   .rp-reason.empty { color: var(--text-muted); font-style: italic; }
-  .rp-tag { display: inline-block; margin-left: 6px; padding: 2px 8px; border-radius: 999px; font-size: 0.7rem; font-weight: 700; vertical-align: middle; }
+  .rp-tag { display: block; width: fit-content; margin: 2px auto 0; padding: 1px 8px; border-radius: 999px; font-size: 0.7rem; font-weight: 700; }   /* pod numerem raportu */
   .rp-tag.fixed { background: rgba(8, 88, 75, 0.1); color: var(--primary); }
+  @media (min-width: 769px) { .rp-table td.rp-num:has(.rp-tag) { padding-top: 0; padding-bottom: 0; } }   /* dwie linie w wierszu tej samej wysokości */
+  @media (max-width: 768px) { .rp-tag { margin-right: 0; } }   /* karta na telefonie jest wyrównana do prawej */
 
   /* stan zatwierdzenia w oknie raportu */
   .rp-status-box { display: flex; align-items: flex-start; gap: 10px; padding: 11px 14px; border-radius: 8px; margin-bottom: 14px; font-size: 0.88rem; line-height: 1.45; }

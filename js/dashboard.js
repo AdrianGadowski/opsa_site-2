@@ -39,11 +39,11 @@ function dbTipAttr(title, lines) {
 
 function dbHoursLines(present, absent, pendP = 0, pendA = 0) {
   const lines = [
-    ["var(--db-present)", `Obecne: ${dbHours(present)}`],
-    ["var(--db-absent)", `Nieobecne: ${dbHours(absent)}`]
+    ["var(--db-present)", `Obecne: ${dbHours(present + pendP)}`],
+    ["var(--db-absent)", `Nieobecne: ${dbHours(absent + pendA)}`]
   ];
-  if (pendP > 0) lines.push(["var(--db-present-soft)", `Obecne do zatwierdzenia: ${dbHours(pendP)}`]);
-  if (pendA > 0) lines.push(["var(--db-absent-soft)", `Nieobecne do zatwierdzenia: ${dbHours(pendA)}`]);
+  if (pendP > 0) lines.push(["var(--db-present-soft)", `w tym obecne do zatwierdzenia: ${dbHours(pendP)}`]);
+  if (pendA > 0) lines.push(["var(--db-absent-soft)", `w tym nieobecne do zatwierdzenia: ${dbHours(pendA)}`]);
   return lines;
 }
 
@@ -112,13 +112,12 @@ function dbStackHtml(v, max, index = 0) {
 // Opis słupka dla czytników ekranu
 function dbAriaHours(v) {
   const pend = v.pendP + v.pendA;
-  return `obecne ${dbHours(v.present)}, nieobecne ${dbHours(v.absent)}${pend > 0 ? `, do zatwierdzenia ${dbHours(pend)}` : ""}`;
+  return `obecne ${dbHours(v.present + v.pendP)}, nieobecne ${dbHours(v.absent + v.pendA)}${pend > 0 ? `, w tym do zatwierdzenia ${dbHours(pend)}` : ""}`;
 }
 
-// ---------- Wybór okresu: strzałki ‹ › (bez list rozwijanych) ----------
-// Okres trzymają ukryte pola db-filter-year ("2026") i db-filter-month ("01".."12", "" = cały rok).
-// Z wybranym miesiącem strzałki zmieniają miesiąc (styczeń ‹ = grudzień poprzedniego roku,
-// grudzień › = styczeń następnego). Nie da się wyjść poza bieżący miesiąc.
+// ---------- Wybór okresu: rok ze strzałkami i pasek miesięcy ----------
+// Okres trzymają ukryte pola db-filter-year ("2026") i db-filter-month ("01".."12").
+// Nie da się wyjść poza bieżący miesiąc.
 
 function dbPeriod() {
   return {
@@ -130,20 +129,21 @@ function dbPeriod() {
 function dbSetPeriod(year, month) {
   document.getElementById("db-filter-year").value = String(year);
   document.getElementById("db-filter-month").value = month ? String(month).padStart(2, "0") : "";
-  dbSyncPeriodArrows();
+  dbSyncPeriodPick();
 }
 
-function dbStepPeriod(delta) {
-  let { year, month } = dbPeriod();
-  if (month) {
-    month += delta;
-    if (month < 1) { month = 12; year--; }
-    if (month > 12) { month = 1; year++; }
-  } else {
-    year += delta;
-  }
-  if (dbPeriodInFuture(year, month)) return;
-  dbSetPeriod(year, month);
+function dbPickMonth(month) {
+  dbSetPeriod(dbPeriod().year, month);
+  dbLoad();
+}
+
+// Zmiana roku zostawia miesiąc; gdyby wypadł w przyszłości - bieżący miesiąc
+function dbStepYear(delta) {
+  const now = new Date();
+  const year = dbPeriod().year + delta;
+  if (year > now.getFullYear()) return;
+  const month = dbPeriod().month;
+  dbSetPeriod(year, dbPeriodInFuture(year, month) ? now.getMonth() + 1 : month);
   dbLoad();
 }
 
@@ -152,21 +152,57 @@ function dbPeriodInFuture(year, month) {
   return year > now.getFullYear() || (year === now.getFullYear() && month > now.getMonth() + 1);
 }
 
-function dbSyncPeriodArrows() {
+function dbSyncPeriodPick() {
   const { year, month } = dbPeriod();
-  const label = month ? "miesiąc" : "rok";
-  const text = document.getElementById("db-period-text");
-  if (text) text.textContent = month ? `${RP_MONTHS[month - 1]} ${year}` : `Rok ${year}`;
-  const prev = document.getElementById("db-prev");
-  const next = document.getElementById("db-next");
-  if (prev) prev.title = `Poprzedni ${label}`;
-  if (next) {
-    next.title = `Następny ${label}`;
-    const ny = month ? (month === 12 ? year + 1 : year) : year + 1;
-    const nm = month ? (month === 12 ? 1 : month + 1) : 0;
-    next.disabled = dbPeriodInFuture(ny, nm);
+  const text = document.getElementById("db-year-text");
+  if (text) text.textContent = year;
+  const next = document.getElementById("db-year-next");
+  if (next) next.disabled = year >= new Date().getFullYear();
+  const months = document.getElementById("db-months");
+  if (!months) return;
+  // szklany wskaźnik zostaje na miejscu (podmieniane są tylko przyciski), dzięki temu może przepłynąć
+  months.querySelectorAll("button").forEach(b => b.remove());
+  months.insertAdjacentHTML("beforeend", RP_MONTHS.map((name, i) => `
+    <button type="button" class="${month === i + 1 ? "on" : ""}" title="${name} ${year}" aria-label="${name} ${year}"
+      aria-pressed="${month === i + 1}" ${dbPeriodInFuture(year, i + 1) ? "disabled" : ""} onclick="dbPickMonth(${i + 1})">${name.slice(0, 3)}</button>`).join(""));
+  dbPlaceMonthGlass();
+}
+
+// Szklany wskaźnik wybranego miesiąca: przepływa jak wskaźnik w menu; pierwsze ustawienie bez animacji
+let dbMonthGlassTimer = null;
+function dbPlaceMonthGlass() {
+  const months = document.getElementById("db-months");
+  const target = months?.querySelector("button.on");
+  if (!months) return;
+  let glass = months.querySelector(".db-month-glass");
+  if (!glass) {
+    glass = document.createElement("span");
+    glass.className = "db-month-glass";
+    glass.setAttribute("aria-hidden", "true");
+    months.prepend(glass);
+  }
+  if (!target || !target.offsetWidth) {       // brak wyboru albo ukryta zakładka
+    glass.classList.remove("visible");
+    return;
+  }
+  const first = !glass.classList.contains("visible");
+  const moved = glass.dataset.pos !== String(target.offsetLeft) + "," + target.offsetTop;
+  if (first) glass.classList.add("no-anim");
+  glass.style.width = target.offsetWidth + "px";
+  glass.style.height = target.offsetHeight + "px";
+  glass.style.transform = `translate(${target.offsetLeft}px, ${target.offsetTop}px)`;
+  glass.dataset.pos = String(target.offsetLeft) + "," + target.offsetTop;
+  glass.classList.add("visible");
+  if (first) {
+    void glass.offsetWidth;   // wymuś przeliczenie stylów bez przejścia
+    glass.classList.remove("no-anim");
+  } else if (moved) {
+    glass.classList.add("is-moving");
+    clearTimeout(dbMonthGlassTimer);
+    dbMonthGlassTimer = setTimeout(() => glass.classList.remove("is-moving"), 500);
   }
 }
+window.addEventListener("resize", dbPlaceMonthGlass);
 
 // ---------- Zakładki: Ewidencja czasu pracy / Zalew ----------
 // Wybrana zakładka jest pamiętana w tej przeglądarce. Zakładka Zalew znika, gdy moduł Zalew jest wyłączony.
@@ -188,6 +224,7 @@ function dbSetTab(tab) {
   document.querySelectorAll(".db-pane").forEach(p => { p.hidden = p.dataset.pane !== tab; });
   // nagłówek: miesiąc dla ewidencji, tydzień dla Zalewu
   document.querySelectorAll("[data-only]").forEach(el => { el.hidden = el.dataset.only !== tab; });
+  dbPlaceMonthGlass();    // na ukrytej zakładce nie ma wymiarów
   // przejście z ewidencji na Zalew: kadź spada z góry na swoje miejsce
   if (tab === "zalew" && !wasZalew && typeof zwDropLadle === "function") zwDropLadle();
   try { localStorage.setItem(DB_TAB_KEY, tab); } catch (e) { /* bez zapamiętania */ }
@@ -209,7 +246,7 @@ async function initDashboardView() {
   const now = new Date();
   dbSetPeriod(now.getFullYear(), now.getMonth() + 1);
 
-  dbSyncPeriodArrows();
+  dbSyncPeriodPick();
   dbSetTab(dbTabSaved());
   dbInitTooltip();
   // tydzień zalewu ma własny wybór tygodnia - nie zależy od miesiąca pulpitu
@@ -248,8 +285,8 @@ async function dbLoad() {
   try {
     // Wykres roczny na dole zawsze pokazuje cały rok, niezależnie od wybranego miesiąca.
     // Przy "Cały rok" wystarcza jedno pobranie.
-    // Główne liczby to zatwierdzone raporty; oczekujące są osobno (dopiski, kreskowane słupki),
-    // a odrzucone tylko w pasku nad kafelkami (sql/34; przed nim każdy raport liczy się jak zatwierdzony)
+    // Główne liczby to raporty zatwierdzone i oczekujące razem; oczekujące są zaznaczone (dopiski, kreskowane słupki),
+    // a odrzucone tylko w pasku nad kafelkami, u autora raportu (sql/34; przed nim każdy raport liczy się jak zatwierdzony)
     const hasStatus = await rpaApprovedOnly();
     const [rows, yearOnly] = await Promise.all([
       rpFetchAll(() => supabaseClient
@@ -272,6 +309,7 @@ async function dbLoad() {
     if (token !== dbLoadToken) return;
     console.error("Błąd pobierania danych dashboardu:", err);
     document.getElementById("db-kpis").innerHTML = "";
+    document.getElementById("db-mine-panel").hidden = true;
     document.getElementById("db-time").innerHTML =
       dbEmptyHtml("Nie udało się pobrać danych: " + (err.message || err));
     document.getElementById("db-year").innerHTML = "";
@@ -294,22 +332,26 @@ function dbRender(rows, year, month) {
   const byDept = new Map();
   const byBiz = new Map();
   const byEmp = new Map();
-  // Raporty, dni i pracownicy w kafelkach: tylko zatwierdzone
+  // Zbiory zatwierdzonych; to, co tylko oczekuje, dochodzi z paska niżej
   const reports = new Set();
   const days = new Set();
   const people = new Set();
   // Pasek nad kafelkami: co czeka w wybranym okresie
-  const waiting = { pendReports: new Set(), rejHours: 0, rejReports: new Set() };
+  const waiting = { pendReports: new Set(), pendDays: new Set(), pendPeople: new Set(), rejHours: 0, rejReports: new Set() };
 
   rows.forEach(r => {
     const status = dbStatus(r);
-    if (status === "rejected") {     // odrzucony raport się zmieni - bez wykresów, tylko w pasku
-      waiting.rejHours += parseFloat(r.total_hours) || 0;
-      waiting.rejReports.add(r.number_report);
+    if (status === "rejected") {     // odrzucony raport się zmieni - bez wykresów; w pasku tylko u autora
+      if (Number(r.add_first_name_id) === Number(currentUser?.id)) {
+        waiting.rejHours += parseFloat(r.total_hours) || 0;
+        waiting.rejReports.add(r.number_report);
+      }
       return;
     }
     if (status === "pending") {
       waiting.pendReports.add(r.number_report);
+      waiting.pendDays.add(r.report_date);
+      waiting.pendPeople.add(r.first_name_id);
     } else {
       reports.add(r.number_report);
       days.add(r.report_date);
@@ -334,15 +376,22 @@ function dbRender(rows, year, month) {
     `Podsumowanie czasu pracy z raportów — ${periodName}.`;
 
   dbRenderPending(total.pendP + total.pendA, waiting);
-  dbRenderKpis(total, reports.size, days.size, people.size);
+  // Dopiski w kafelkach: tylko to, czego jeszcze nie ma wśród zatwierdzonych (dzień czy osoba liczy się raz)
+  const extra = (pend, approved) => [...pend].filter(x => !approved.has(x)).length;
+  dbRenderKpis(total, reports.size, days.size, people.size, {
+    reports: extra(waiting.pendReports, reports),
+    days: extra(waiting.pendDays, days),
+    people: extra(waiting.pendPeople, people)
+  });
   dbRenderTime(byTime, year, month);
+  dbRenderMine(rows, year, month);
   const legendPend = document.getElementById("db-legend-pend");
   if (legendPend) legendPend.style.display = total.pendP + total.pendA > 0 ? "" : "none";
 
-  // Kolejność według zatwierdzonych; przy remisie decydują oczekujące
+  // Kolejność według wszystkich godzin: zatwierdzone i do zatwierdzenia
   const sortByTotal = map => [...map.entries()]
     .map(([label, v]) => ({ label, ...v }))
-    .sort((a, b) => (b.present + b.absent) - (a.present + a.absent) || (b.pendP + b.pendA) - (a.pendP + a.pendA));
+    .sort((a, b) => dbEntrySum(b) - dbEntrySum(a));
 
   dbRenderBars("db-depts", dbFold(sortByTotal(byDept)), "both");
   dbRenderBars("db-biz", dbFold(sortByTotal(byBiz)), "both");
@@ -352,9 +401,9 @@ function dbRender(rows, year, month) {
     return { label: e ? `${e.first_name || ""} ${e.last_name || ""}`.trim() : `Pracownik #${id}`, ...v };
   });
   dbRenderBars("db-top-present",
-    emps.filter(e => e.present + e.pendP > 0).sort((a, b) => b.present - a.present || b.pendP - a.pendP).slice(0, DB_TOP), "present");
+    emps.filter(e => e.present + e.pendP > 0).sort((a, b) => (b.present + b.pendP) - (a.present + a.pendP)).slice(0, DB_TOP), "present");
   dbRenderBars("db-top-absent",
-    emps.filter(e => e.absent + e.pendA > 0).sort((a, b) => b.absent - a.absent || b.pendA - a.pendA).slice(0, DB_TOP), "absent");
+    emps.filter(e => e.absent + e.pendA > 0).sort((a, b) => (b.absent + b.pendA) - (a.absent + a.pendA)).slice(0, DB_TOP), "absent");
 }
 
 // ---------- Pasek: co czeka na zatwierdzenie i poprawę w wybranym okresie ----------
@@ -362,16 +411,17 @@ function dbRender(rows, year, month) {
 function dbRenderPending(pendHours, waiting) {
   const el = document.getElementById("db-pending");
   if (!el) return;
-  const canOpen = typeof rpaCanApprove === "function" && rpaCanApprove();
+  const canApprove = typeof rpaCanApprove === "function" && rpaCanApprove();
+  const tabs = typeof rpaTabs === "function" ? rpaTabs() : [];
   const inReports = n => `${dbNum(n, 0)} ${n === 1 ? "raporcie" : "raportach"}`;
   const item = (cls, icon, label, hours, count, tab) => {
     const text = `<i class="fa-solid ${icon}"></i><span>${label}: <b>${dbHours(hours)}</b> w ${inReports(count)}</span>`;
-    return canOpen
+    return tabs.includes(tab)
       ? `<button type="button" class="db-wait ${cls}" onclick="rpaOpenTab('${tab}')">${text}<i class="fa-solid fa-chevron-right go"></i></button>`
       : `<div class="db-wait ${cls}">${text}</div>`;
   };
   const parts = [];
-  if (waiting.pendReports.size) parts.push(item("pend", "fa-hourglass-half", "Do zatwierdzenia", pendHours, waiting.pendReports.size, "pending"));
+  if (canApprove && waiting.pendReports.size) parts.push(item("pend", "fa-hourglass-half", "Do zatwierdzenia", pendHours, waiting.pendReports.size, "pending"));
   if (waiting.rejReports.size) parts.push(item("rej", "fa-pen", "Do poprawy", waiting.rejHours, waiting.rejReports.size, "rejected"));
   el.innerHTML = parts.join("");
   el.hidden = !parts.length;
@@ -394,34 +444,121 @@ function dbFold(items) {
 }
 
 // ---------- Kafelki ----------
-function dbRenderKpis(total, reportCount, dayCount, empCount) {
-  const all = total.present + total.absent;
-  const rate = all > 0 ? (total.absent / all) * 100 : 0;
-  const perEmp = empCount > 0 ? total.present / empCount : 0;
+function dbRenderKpis(total, reportCount, dayCount, empCount, pend) {
+  // Godziny, dni i osoby: zatwierdzone razem z oczekującymi
+  const present = total.present + total.pendP;
+  const absent = total.absent + total.pendA;
+  const all = present + absent;
+  const rate = all > 0 ? (absent / all) * 100 : 0;
+  const people = empCount + pend.people;
+  const perEmp = people > 0 ? present / people : 0;
 
-  const tile = (cls, icon, label, value, unit, note, extra = "", pending = 0) => `
+  const tile = (cls, icon, label, value, unit, note, extra = "", pending = "") => `
     <div class="db-kpi ${cls}">
       <div class="lbl"><span class="ico"><i class="fa-solid ${icon}"></i></span>${label}</div>
       <div class="val">${value}${unit ? `<small>${unit}</small>` : ""}</div>
-      ${pending > 0 ? `<div class="pend">+ ${dbHours(pending)} do zatwierdzenia</div>` : ""}
+      ${pending ? `<div class="pend">${pending} do zatwierdzenia</div>` : ""}
       ${extra}
       <div class="note">${note}</div>
     </div>`;
 
+  const pendOf = hours => (hours > 0 ? `w tym ${dbHours(hours)}` : "");
   const kpis = document.getElementById("db-kpis");
   kpis.innerHTML =
-    tile("lead", "fa-clock", "Godziny obecne", dbCountHtml(total.present), "h",
-      `Średnio ${dbNum(perEmp)} h na pracownika`, "", total.pendP) +
-    tile("absent", "fa-user-xmark", "Godziny nieobecne", dbCountHtml(total.absent), "h",
-      `z ${dbNum(all)} h zgłoszonych łącznie`, "", total.pendA) +
+    tile("lead", "fa-clock", "Godziny obecne", dbCountHtml(present), "h",
+      `Średnio ${dbNum(perEmp)} h na pracownika`, "", pendOf(total.pendP)) +
+    tile("absent", "fa-user-xmark", "Godziny nieobecne", dbCountHtml(absent), "h",
+      `z ${dbNum(all)} h zgłoszonych łącznie`, "", pendOf(total.pendA)) +
     tile("rate", "fa-percent", "Wskaźnik absencji", dbCountHtml(rate), "%",
       "Udział godzin nieobecnych w zgłoszonych",
       `<div class="db-meter" aria-hidden="true"><span style="width: ${Math.min(rate, 100)}%;"></span></div>`) +
-    tile("", "fa-file-lines", "Raporty", dbCountHtml(reportCount, 0), "",
-      `Dni z raportami: ${dbNum(dayCount, 0)}`) +
-    tile("", "fa-users", "Pracownicy", dbCountHtml(empCount, 0), "",
-      "Osoby ujęte w raportach");
+    tile("", "fa-file-lines", "Raporty zatwierdzone", dbCountHtml(reportCount, 0), "",
+      `Dni z raportami: ${dbNum(dayCount + pend.days, 0)}${pend.days > 0 ? ` (w tym ${dbNum(pend.days, 0)} do zatwierdzenia)` : ""}`, "", pend.reports > 0 ? `+ ${dbNum(pend.reports, 0)}` : "") +
+    tile("", "fa-users", "Pracownicy", dbCountHtml(people, 0), "",
+      "Osoby ujęte w raportach", "", pend.people > 0 ? `w tym ${dbNum(pend.people, 0)}` : "");
   dbRunCounts(kpis);
+}
+
+// ---------- Święta i rodzaj dnia ----------
+const dbHolidayCache = {};
+
+// Polskie dni ustawowo wolne od pracy w danym roku: { "miesiąc-dzień": nazwa }
+function dbHolidays(year) {
+  if (dbHolidayCache[year]) return dbHolidayCache[year];
+  // Wielkanoc: algorytm Meeusa/Jonesa/Butchera
+  const a = year % 19, b = Math.floor(year / 100), c = year % 100;
+  const d = Math.floor(b / 4), e = b % 4, f = Math.floor((b + 8) / 25), g = Math.floor((b - f + 1) / 3);
+  const h = (19 * a + b - d - g + 15) % 30, i = Math.floor(c / 4), k = c % 4;
+  const l = (32 + 2 * e + 2 * i - h - k) % 7, m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const easterMonth = Math.floor((h + l - 7 * m + 114) / 31), easterDay = (h + l - 7 * m + 114) % 31 + 1;
+
+  const list = {
+    "1-1": "Nowy Rok", "1-6": "Trzech Króli", "5-1": "Święto Pracy", "5-3": "Święto Konstytucji 3 Maja",
+    "8-15": "Wniebowzięcie NMP", "11-1": "Wszystkich Świętych", "11-11": "Święto Niepodległości",
+    "12-25": "Boże Narodzenie", "12-26": "Boże Narodzenie"
+  };
+  if (year >= 2025) list["12-24"] = "Wigilia";     // dzień wolny od 2025 r.
+  [[0, "Wielkanoc"], [1, "Poniedziałek Wielkanocny"], [49, "Zielone Świątki"], [60, "Boże Ciało"]].forEach(([plus, name]) => {
+    const date = new Date(year, easterMonth - 1, easterDay + plus);
+    list[`${date.getMonth() + 1}-${date.getDate()}`] = name;
+  });
+  dbHolidayCache[year] = list;
+  return list;
+}
+
+// Klasa tła i nazwa dnia; święto ma pierwszeństwo przed sobotą i niedzielą
+function dbDayKind(year, month, day) {
+  const holiday = dbHolidays(year)[`${month}-${day}`];
+  if (holiday) return { cls: "sun", name: holiday };
+  const weekday = new Date(year, month - 1, day).getDay();
+  if (weekday === 6) return { cls: "sat", name: "sobota" };
+  if (weekday === 0) return { cls: "sun", name: "niedziela" };
+  return { cls: "", name: "" };
+}
+
+// ---------- Moje raporty: kwadraciki zmian w miesiącu (raporty zalogowanej osoby) ----------
+function dbRenderMine(rows, year, month) {
+  const panel = document.getElementById("db-mine-panel");
+  if (!panel) return;
+  const myId = Number(currentUser?.id);
+  const mine = rows.filter(r => Number(r.add_first_name_id) === myId);
+  const canReport = typeof hasPermission === "function" && (hasPermission("allow_time_reporting") || hasPermission("allow_reports"));
+  panel.hidden = !month || (!canReport && !mine.length);
+  if (panel.hidden) return;
+
+  const y = Number(year), m = Number(month);
+  const done = new Map();   // "dzień|zmiana" -> stany raportów
+  mine.forEach(r => {
+    const day = Number(String(r.report_date || "").split(".")[0]);
+    const shift = String(r.shift || "").replace("Zmiana", "").trim();
+    const key = `${day}|${shift}`;
+    if (!done.has(key)) done.set(key, new Set());
+    done.get(key).add(dbStatus(r));
+  });
+
+  const count = new Date(y, m, 0).getDate();
+  const days = Array.from({ length: count }, (_, i) => ({ day: i + 1, ...dbDayKind(y, m, i + 1) }));
+  const statusText = { approved: "Raport zatwierdzony", pending: "Raport do zatwierdzenia", rejected: "Raport do poprawy" };
+  let filled = 0;
+
+  const head = days.map(d => `<div class="dh${d.cls ? ` ${d.cls}` : ""}">${d.day}</div>`).join("");
+  const body = ["I", "II", "III"].map(shift => `<div class="sh">${shift}</div>` + days.map(d => {
+    const states = done.get(`${d.day}|${shift}`);
+    if (states) filled++;
+    const when = `${String(d.day).padStart(2, "0")}.${String(m).padStart(2, "0")}.${y}${d.name ? ` (${d.name})` : ""}`;
+    const lines = states
+      ? [...states].map(s => [s === "approved" ? "var(--db-present)" : "var(--db-present-soft)", statusText[s] || "Raport wystawiony"])
+      : [["#D0D5DB", "Brak raportu"]];
+    // pełny kolor tylko, gdy wszystko na tej zmianie jest zatwierdzone; inaczej kreskowanie jak na wykresach
+    const cellClass = states ? ([...states].every(s => s === "approved") ? " on" : " pend") : d.cls ? ` ${d.cls}` : "";
+    return `<div class="c${cellClass}" tabindex="0" role="img"
+      aria-label="${rtEsc(`${when}, zmiana ${shift}: ${lines.map(l => l[1]).join(", ")}`)}" data-tip="${dbTipAttr(when, [["", `Zmiana ${shift}`], ...lines])}"></div>`;
+  }).join("")).join("");
+
+  document.getElementById("db-mine-sub").textContent =
+    `Zmiany z raportem: ${filled}`;
+  document.getElementById("db-mine").innerHTML =
+    `<div class="db-mine-grid" style="--days: ${count};"><div></div>${head}${body}</div>`;
 }
 
 // ---------- Wykres: godziny w czasie ----------
@@ -463,10 +600,10 @@ function dbRenderTime(byTime, year, month) {
     // na telefonie podpisy co 5 dni (plus pierwszy), żeby się nie zlewały
     const minor = month && !(p.key === 1 || p.key % 5 === 0) ? " minor" : "";
     const stack = dbStackHtml(p, max, p.key - 1);
-    // Weekend (tylko w widoku dni): sobota i niedziela mają własne tło kolumny
-    const weekday = month ? new Date(Number(year), Number(month) - 1, p.key).getDay() : -1;
-    const dayClass = weekday === 6 ? " sat" : weekday === 0 ? " sun" : "";
-    const dayName = weekday === 6 ? " (sobota)" : weekday === 0 ? " (niedziela)" : "";
+    // Tylko w widoku dni: soboty, niedziele i święta mają własne tło kolumny
+    const { cls, name } = month ? dbDayKind(Number(year), Number(month), p.key) : { cls: "", name: "" };
+    const dayClass = cls ? ` ${cls}` : "";
+    const dayName = name ? ` (${name})` : "";
     const label = `${p.full}${dayName}: ${dbAriaHours(p)}`;
 
     return `
@@ -576,8 +713,8 @@ function dbRenderYear(rows, year, selectedMonth) {
         <div class="weeks">${cols}</div>
         <div class="mxl" tabindex="0" data-tip="${monthTip}">
           <span class="mn">${rtEsc(monthName.slice(0, 3))}</span>
-          <span class="tot ok" title="Godziny obecne">${dbHours(total.present)}</span>
-          <span class="tot absent" title="Godziny nieobecne">${dbHours(total.absent)}</span>
+          <span class="tot ok" title="Godziny obecne">${dbHours(total.present + total.pendP)}</span>
+          <span class="tot absent" title="Godziny nieobecne">${dbHours(total.absent + total.pendA)}</span>
         </div>
       </div>`;
   }).join("");
@@ -598,7 +735,7 @@ function dbRenderBars(containerId, items, mode) {
   const el = document.getElementById(containerId);
   if (!el) return;
 
-  // Długość paska z oczekującymi; liczba główna tylko z zatwierdzonych
+  // Długość paska i liczba główna: zatwierdzone razem z oczekującymi, które są zaznaczone osobno
   const value = it => (mode === "present" ? it.present + it.pendP : mode === "absent" ? it.absent + it.pendA : dbEntrySum(it));
   const max = Math.max(0, ...items.map(value));
 
@@ -613,9 +750,9 @@ function dbRenderBars(containerId, items, mode) {
     const pp = mode === "absent" ? 0 : it.pendP;
     const pa = mode === "present" ? 0 : it.pendA;
     const num = (mode === "both"
-      ? `<b>${dbHours(it.present)}</b> · ${dbHours(it.absent)} nieob.`
-      : `<b>${dbHours(p + a)}</b>`) +
-      (pp + pa > 0 ? ` <span class="pend">+ ${dbHours(pp + pa)}</span>` : "");
+      ? `<b>${dbHours(it.present + it.pendP)}</b> · ${dbHours(it.absent + it.pendA)} nieob.`
+      : `<b>${dbHours(p + a + pp + pa)}</b>`) +
+      (pp + pa > 0 ? ` <span class="pend">(w tym ${dbHours(pp + pa)} do zatw.)</span>` : "");
 
     return `
       <div class="db-bar" tabindex="0" data-tip="${dbTipAttr(it.label, dbHoursLines(it.present, it.absent, it.pendP, it.pendA))}">
@@ -650,9 +787,11 @@ function dbInitTooltip() {
     for (let i = 1; i + 1 < parts.length; i += 2) {
       const row = document.createElement("div");
       row.className = "row";
-      const dot = document.createElement("i");
-      dot.style.background = parts[i];
-      row.appendChild(dot);
+      if (parts[i]) {     // wiersz bez koloru to zwykły tekst, bez kropki
+        const dot = document.createElement("i");
+        dot.style.background = parts[i];
+        row.appendChild(dot);
+      }
       row.appendChild(document.createTextNode(parts[i + 1]));
       tip.appendChild(row);
     }

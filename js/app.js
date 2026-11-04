@@ -48,7 +48,7 @@ const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
 
 // Numer wydania doklejany do adresów plików, żeby przeglądarka nie używała starych kopii.
 // Zmieniaj przy każdej publikacji - tutaj i w index.html (?v=...).
-const APP_BUILD = "20261379";
+const APP_BUILD = "202611041247";
 
 let currentUser = null;
 let cachedUsers = [];
@@ -187,9 +187,9 @@ function applyNavVisibility() {
 // Aktualna wersja systemu w prawym górnym rogu (tabela Check_version, wiersz "aktualna_wersja")
 function setTopbarVersion(version) {
   const el = document.getElementById("topbar-version");
-  if (el) el.innerText = `Wersja: ${version || "—"}`;
+  if (el) el.innerText = `Wersja: ${version || "—"} (${APP_BUILD})`;
   const loginEl = document.getElementById("auth-version");
-  if (loginEl) loginEl.innerText = version ? ` • v${version}` : "";
+  if (loginEl) loginEl.innerText = ` • ${version ? `v${version} ` : ""}(${APP_BUILD})`;
 }
 
 async function loadTopbarVersion() {

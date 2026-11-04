@@ -42,7 +42,8 @@
   .db-kpi .val { margin-top: 10px; font-size: 1.75rem; font-weight: 700; letter-spacing: -0.02em; color: var(--db-ink); line-height: 1.1; }
   .db-kpi .val small { font-size: 0.95rem; font-weight: 600; color: var(--db-ink-2); margin-left: 3px; }
   .db-kpi .note { margin-top: 6px; font-size: 0.78rem; color: var(--db-ink-3); }
-  .db-kpi .pend { margin-top: 5px; font-size: 0.8rem; font-weight: 700; color: #fff; }   /* tylko na kolorowych kafelkach godzin */
+  .db-kpi .pend { margin-top: 5px; font-size: 0.8rem; font-weight: 700; color: #7A5C00; }
+  .db-kpi.lead .pend, .db-kpi.absent .pend { color: #fff; }
 
   /* --- Pasek: do zatwierdzenia i do poprawy (js/dashboard.js, dbRenderPending) --- */
   .db-pending { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 14px; }
@@ -128,6 +129,50 @@
   .db-col.sun:hover, .db-col.sun:focus-visible { background: #F9CFCF; }
   .db-legend .sat { background: var(--db-sat); border: 1px solid #E8D48A; }
   .db-legend .sun { background: var(--db-sun); border: 1px solid #F0BDBD; }
+  /* Moje raporty w nagłówku: wiersze to zmiany, kolumny to dni miesiąca. Biała karta, bo kolory wykresów nie są widoczne na zielonym tle */
+  /* kolejność w nagłówku: tytuł, wybór miesiąca, moje raporty */
+  .db-hero-title { flex: 1 1 220px; min-width: 0; }
+  .db-root .page-hero-actions { order: 1; }
+  .db-hero-mine { order: 2; }
+  /* Ewidencja na komputerze: po lewej tytuł, pod nim miesiące i rok; po prawej moje raporty (na zakładce Zalew układ bez zmian) */
+  @media (min-width: 769px) {
+    .db-root .page-hero { container-type: inline-size; }
+    .db-root .page-hero:has(.db-hero-mine:not([hidden])) { display: grid; grid-template-columns: auto minmax(0, 1fr); row-gap: 12px; }
+    .db-hero-title { grid-column: 1; grid-row: 1; }
+    /* karta zajmuje całe miejsce po prawej, na pełną wysokość nagłówka */
+    .db-hero-mine { grid-column: 2; grid-row: 1 / 3; align-self: stretch; display: flex; justify-content: flex-end; }
+    .db-mine-card { width: 100%; max-width: 720px; display: flex; flex-direction: column; justify-content: center; }
+    .db-root .page-hero:has(.db-hero-mine:not([hidden])) .page-hero-actions { grid-column: 1; grid-row: 2; justify-self: start; }
+    /* gdy pasek nie mieści się obok karty, zajmuje cały drugi rząd, nadal od lewej */
+    @container (max-width: 1124px) {
+      .db-root .page-hero:has(.db-hero-mine:not([hidden])) { grid-template-columns: minmax(260px, auto) minmax(470px, 1fr); }
+      .db-hero-mine { grid-row: 1; }
+      .db-root .page-hero:has(.db-hero-mine:not([hidden])) .page-hero-actions { grid-column: 1 / -1; }
+    }
+  }
+  .db-mine-card { box-sizing: border-box; padding: 8px 10px 6px; border-radius: 12px; background: #fff; color: var(--db-ink); box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18); }
+  .db-mine-card[hidden] { display: none; }
+  .db-mine-top { display: flex; align-items: center; flex-wrap: wrap; gap: 2px 8px; margin-bottom: 3px; padding: 0 3px; font-size: 0.74rem; }
+  .db-mine-top strong { font-size: 0.84rem; font-weight: 700; color: var(--primary); }
+  .db-mine-top .sub { color: var(--db-ink-3); }
+  .db-mine-leg { display: inline-flex; gap: 10px; margin-left: auto; color: var(--db-ink-2); }
+  .db-mine-leg span { display: inline-flex; align-items: center; gap: 4px; }
+  .db-mine-leg i { width: 9px; height: 9px; border-radius: 2px; }
+  .db-mine-leg .p { background: var(--db-present); }
+  .db-mine-leg .pp { background: var(--db-hatch-p); }
+  /* odstęp, żeby przewijanie nie ucinało obramowania kwadracika */
+  .db-mine-scroll { overflow-x: auto; padding: 3px; }
+  .db-mine-grid { display: grid; grid-template-columns: 16px repeat(var(--days), minmax(0, 1fr)); gap: 2px; align-items: center; }
+  .db-mine-grid .dh { text-align: center; font-size: 0.62rem; font-weight: 600; color: var(--db-ink-3); border-radius: 3px; line-height: 13px; }
+  .db-mine-grid .dh.sat { background: var(--db-sat); color: #7A5C00; font-weight: 700; }
+  .db-mine-grid .dh.sun { background: var(--db-sun); color: #B52B2D; font-weight: 700; }
+  .db-mine-grid .sh { text-align: center; font-size: 0.62rem; font-weight: 700; color: var(--db-ink-2); }
+  .db-mine-grid .c { aspect-ratio: 1; border-radius: 3px; background: #EDEFF2; }
+  .db-mine-grid .c.sat { background: var(--db-sat); }
+  .db-mine-grid .c.sun { background: var(--db-sun); }
+  .db-mine-grid .c.on { background: var(--db-present); }
+  .db-mine-grid .c.pend { background: var(--db-hatch-p); }
+  .db-mine-grid .c:hover, .db-mine-grid .c:focus-visible { outline: 2px solid var(--db-ink-2); outline-offset: 1px; }
   .db-col:hover .xl, .db-col:focus-visible .xl { color: var(--db-ink); font-weight: 700; }
 
   /* --- Wykres roczny: 12 miesięcy, w każdym kolumny tygodni --- */
@@ -167,7 +212,7 @@
   .db-bar .track .a { background: var(--db-absent); }
   .db-bar .track .pp { background: var(--db-hatch-p); }
   .db-bar .track .pa { background: var(--db-hatch-a); }
-  .db-bar .num .pend { color: #8A6D0B; font-weight: 700; }
+  .db-bar .num .pend { color: #8A6D0B; font-weight: 400; }
   .db-bar:hover .track, .db-bar:focus-visible .track { box-shadow: 0 0 0 3px rgba(8, 88, 75, 0.1); }
 
   .db-empty { padding: 26px 10px; text-align: center; font-size: 0.88rem; color: var(--db-ink-3); }
@@ -177,7 +222,7 @@
   .db-tip {
     position: fixed; z-index: 1003; pointer-events: none; display: none;
     background: #1F2328; color: #fff; border-radius: 8px; padding: 8px 11px;
-    font-size: 0.78rem; line-height: 1.5; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25); max-width: 240px;
+    font-size: 0.78rem; line-height: 1.5; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25); width: max-content; max-width: calc(100vw - 16px);
   }
   .db-tip strong { display: block; font-size: 0.82rem; margin-bottom: 2px; }
   .db-tip .row { display: flex; align-items: center; gap: 7px; white-space: nowrap; }
@@ -198,6 +243,11 @@
     .db-chart.months .db-gridlines { bottom: 44px; }
     .db-mgroup .mxl { height: 28px; }
     .db-cols { gap: 1px; }
+    .db-hero-title, .db-hero-mine { flex-basis: 100%; min-width: 0; max-width: none; }
+    /* cały miesiąc się nie zmieści: przewijanie w bok wewnątrz karty, bez rozpychania strony */
+    .db-mine-scroll { width: 0; min-width: 100%; box-sizing: border-box; }
+    .db-mine-grid { min-width: 500px; }
+    .db-mine-leg { margin-left: 0; }
     .db-col .xl.minor { visibility: hidden; }
     .db-chart.months .db-cols { gap: 3px; }
     .db-mgroup .weeks { gap: 1px; padding: 0; }
@@ -207,29 +257,70 @@
     .db-grid { grid-template-columns: 1fr; }
   }
 
-  /* Wybór okresu w zielonym nagłówku: strzałki ‹ › jak w Harmonogramie */
+  /* Wybór okresu w zielonym nagłówku: półprzezroczysta kapsuła ze strzałkami w środku */
   .db-periodpick { display: flex; align-items: center; gap: 6px; }
+  .db-pick-cap {
+    display: inline-flex; align-items: center; height: 44px; padding: 0 3px; box-sizing: border-box; border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.28); background: rgba(255, 255, 255, 0.12);
+  }
   .db-periodpick button {
-    width: 42px; height: 44px; flex-shrink: 0; border-radius: 12px; cursor: pointer; font-size: 0.9rem;
-    border: 1px solid rgba(255, 255, 255, 0.25); background: rgba(255, 255, 255, 0.12); color: #fff;
+    width: 36px; height: 36px; flex-shrink: 0; border: none; border-radius: 50%; cursor: pointer; font-size: 0.85rem;
+    background: transparent; color: #fff; transition: background 0.15s;
   }
   .db-periodpick button:hover:not(:disabled) { background: rgba(255, 255, 255, 0.22); }
   .db-periodpick button:disabled { opacity: 0.4; cursor: default; }
   .db-periodpick button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
   .db-period-label {
-    width: 200px; height: 44px; display: inline-flex; align-items: center; justify-content: center; padding: 0 10px; text-align: center; box-sizing: border-box;
-    border-radius: 12px; background: rgba(255, 255, 255, 0.95); color: var(--primary); font-weight: 700; font-size: 0.95rem; white-space: nowrap;
+    width: 180px; display: inline-flex; align-items: center; justify-content: center; padding: 0 6px; text-align: center; box-sizing: border-box;
+    color: #fff; font-weight: 700; font-size: 0.95rem; white-space: nowrap;
   }
   /* strzałki i "Cały rok": treść zawsze na środku kafelka; stała szerokość - kafelki nie skaczą przy zmianie okresu */
   .db-periodpick button { display: inline-flex; align-items: center; justify-content: center; text-align: center; }
+  /* Ewidencja: rok ze strzałkami i pasek miesięcy (wybrany jak żółte szkło, przyszłe przygaszone) */
+  .db-monthstrip { display: flex; align-items: center; gap: 10px; }
+  .db-year, .db-months { box-sizing: border-box; height: 38px; border: 1px solid rgba(255, 255, 255, 0.28); border-radius: 999px; background: rgba(255, 255, 255, 0.12); }
+  .db-year { display: inline-flex; align-items: center; padding: 0 2px; color: #fff; font-size: 0.9rem; font-weight: 700; }
+  .db-year span { width: 48px; text-align: center; }
+  .db-periodpick .db-year button { width: 32px; height: 32px; font-size: 0.8rem; }
+  .db-months { display: flex; gap: 2px; padding: 2px; }
+  .db-periodpick .db-months button { width: 40px; height: 32px; border-radius: 999px; font-family: inherit; font-size: 0.78rem; font-weight: 600; }
+  /* wybrany miesiąc: żółta szklana kapsuła, która przepływa do klikniętego miesiąca jak wskaźnik w menu */
+  .db-months { position: relative; }
+  .db-month-glass {
+    position: absolute; left: 0; top: 0; z-index: 0; border-radius: 999px; overflow: hidden; pointer-events: none; opacity: 0;
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.6) 0%, rgba(255, 255, 255, 0.14) 48%, rgba(255, 255, 255, 0) 52%, rgba(255, 255, 255, 0.16) 100%),
+      rgba(255, 200, 0, 0.8);
+    -webkit-backdrop-filter: blur(8px) saturate(180%); backdrop-filter: blur(8px) saturate(180%);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.55), inset 0 -1px 0 rgba(150, 95, 0, 0.35), 0 3px 12px rgba(255, 190, 0, 0.45);
+    transition: transform 0.5s cubic-bezier(0.34, 1.35, 0.5, 1), width 0.3s ease, height 0.3s ease, opacity 0.35s ease, box-shadow 0.3s ease;
+  }
+  .db-month-glass.visible { opacity: 1; }
+  .db-month-glass.no-anim { transition: none; }
+  .db-month-glass.is-moving { box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.55), inset 0 -1px 0 rgba(150, 95, 0, 0.35), 0 0 22px rgba(255, 190, 0, 0.8); }
+  /* wolny połysk przebiegający po szkle, jak we wskaźniku menu */
+  .db-month-glass::after {
+    content: ""; position: absolute; inset: 0; background: linear-gradient(100deg, transparent 30%, rgba(255, 255, 255, 0.55) 50%, transparent 70%);
+    background-size: 250% 100%; background-position: 130% 0; animation: indicatorShine 5s ease-in-out infinite;
+  }
+  @media (prefers-reduced-motion: reduce) { .db-month-glass, .db-month-glass::after { transition: none; animation: none; } }
+  .db-periodpick .db-months button { position: relative; z-index: 1; }
+  .db-periodpick .db-months button.on, .db-periodpick .db-months button.on:hover:not(:disabled) { background: transparent; color: #2B2609; font-weight: 800; }
+  .db-periodpick .db-months button:disabled { opacity: 0.35; }
   /* tydzień zalewu: dwie linijki (numer tygodnia i daty) i przycisk "Ten tydzień" */
   .db-weekpick .db-period-label { flex-direction: column; line-height: 1.15; width: 140px; }   /* węższy niż miesiąc - obok jest kadź */
   .db-weekpick .db-period-label b { font-size: 0.92rem; }
   .db-weekpick .db-period-label span { font-size: 0.74rem; font-weight: 600; opacity: 0.8; }
-  .db-weekpick button.txt { width: auto; padding: 0 14px; font-family: inherit; font-size: 0.84rem; font-weight: 700; }
+  .db-weekpick button.txt { width: auto; height: 44px; padding: 0 16px; border: 1px solid rgba(255, 255, 255, 0.28); border-radius: 999px; background: rgba(255, 255, 255, 0.12); font-family: inherit; font-size: 0.84rem; font-weight: 700; }
+  .db-weekpick button.txt:hover:not(:disabled) { background: rgba(255, 255, 255, 0.22); }
   [data-only][hidden] { display: none !important; }
   @media (max-width: 768px) {
     .db-periodpick { width: 100%; }
+    .db-pick-cap { flex: 1 1 100%; min-width: 0; }
+    .db-monthstrip { flex-direction: column-reverse; align-items: stretch; width: 100%; }   /* rok nad miesiącami */
+    .db-year { justify-content: space-between; }
+    .db-months { display: grid; grid-template-columns: repeat(6, 1fr); height: auto; padding: 4px; gap: 3px; border-radius: 14px; }
+    .db-periodpick .db-months button { width: auto; }
     .db-weekpick { flex-wrap: wrap; }
     .db-weekpick button.txt { flex-basis: 100%; }
     .db-period-label { flex: 1; width: auto; min-width: 0; font-size: 0.88rem; }
@@ -250,28 +341,48 @@
 
 <div class="db-root" id="db-root">
   <div class="page-hero">
-    <div>
+    <div class="db-hero-title">
       <div class="eyebrow">Podsumowanie</div>
       <h3>Pulpit główny</h3>
       <p id="db-period-label" data-only="time">Podsumowanie czasu pracy z raportów.</p>
       <p data-only="zalew" hidden>Kadzie, metal i formy dobre względem liczby zadanej.</p>
+    </div>
+    <div class="db-hero-mine" data-only="time">
+      <div class="db-mine-card" id="db-mine-panel" hidden>
+        <div class="db-mine-top">
+          <strong>Moje raporty</strong>
+          <span class="sub" id="db-mine-sub"></span>
+          <span class="db-mine-leg">
+            <span><i class="p"></i> Zatwierdzony</span>
+            <span><i class="pp"></i> Niezatwierdzony</span>
+          </span>
+        </div>
+        <div class="db-mine-scroll"><div id="db-mine"></div></div>
+      </div>
     </div>
     <div class="page-hero-actions">
       <!-- zakładka Zalew: wybór tygodnia zalewu (js/zalew.js, zwDashStep) zamiast miesiąca -->
       <!-- kadź z płynnym metalem: wykonanie planu tygodnia (js/zalew.js, zwRenderLadle) -->
       <div class="zw-ladlebox" id="db-zwd-ladle" data-only="zalew" hidden></div>
       <div class="db-periodpick db-weekpick" data-only="zalew" hidden>
-        <button type="button" onclick="zwDashStep(-1)" title="Poprzedni tydzień" aria-label="Poprzedni tydzień"><i class="fa-solid fa-chevron-left"></i></button>
-        <span class="db-period-label" id="db-zwd-week" aria-live="polite">—</span>
-        <button type="button" id="db-zwd-next" onclick="zwDashStep(1)" title="Następny tydzień" aria-label="Następny tydzień"><i class="fa-solid fa-chevron-right"></i></button>
+        <div class="db-pick-cap">
+          <button type="button" onclick="zwDashStep(-1)" title="Poprzedni tydzień" aria-label="Poprzedni tydzień"><i class="fa-solid fa-chevron-left"></i></button>
+          <span class="db-period-label" id="db-zwd-week" aria-live="polite">—</span>
+          <button type="button" id="db-zwd-next" onclick="zwDashStep(1)" title="Następny tydzień" aria-label="Następny tydzień"><i class="fa-solid fa-chevron-right"></i></button>
+        </div>
         <button type="button" id="db-zwd-now" class="txt" onclick="zwDashStep(0)" title="Wróć do bieżącego tygodnia">Ten tydzień</button>
       </div>
       <div class="db-periodpick" data-only="time">
-        <button type="button" id="db-prev" onclick="dbStepPeriod(-1)" title="Poprzedni miesiąc" aria-label="Poprzedni okres"><i class="fa-solid fa-chevron-left"></i></button>
         <input type="hidden" id="db-filter-year" />
         <input type="hidden" id="db-filter-month" />
-        <span class="db-period-label" id="db-period-text" aria-live="polite">—</span>
-        <button type="button" id="db-next" onclick="dbStepPeriod(1)" title="Następny miesiąc" aria-label="Następny okres"><i class="fa-solid fa-chevron-right"></i></button>
+        <div class="db-monthstrip">
+          <div class="db-months" id="db-months" role="group" aria-label="Miesiąc"></div>
+          <div class="db-year">
+            <button type="button" onclick="dbStepYear(-1)" title="Poprzedni rok" aria-label="Poprzedni rok"><i class="fa-solid fa-chevron-left"></i></button>
+            <span id="db-year-text" aria-live="polite">—</span>
+            <button type="button" id="db-year-next" onclick="dbStepYear(1)" title="Następny rok" aria-label="Następny rok"><i class="fa-solid fa-chevron-right"></i></button>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -315,7 +426,7 @@
         <span id="db-legend-pend" style="display: none;"><i class="pp"></i> Do zatwierdzenia</span>
         <span id="db-legend-weekend" style="gap: 16px;">
           <span><i class="sat"></i> Sobota</span>
-          <span><i class="sun"></i> Niedziela</span>
+          <span><i class="sun"></i> Niedziela / święto</span>
         </span>
       </div>
     </div>
