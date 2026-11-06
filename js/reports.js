@@ -69,11 +69,11 @@ function rpShowBanner(type, text) {
   rpBannerTimer = setTimeout(() => el.classList.remove("visible"), 8000);
 }
 
-function rpShowDetailMsg(text) {
+function rpShowDetailMsg(text, color = "var(--danger, #D9383A)") {
   const el = document.getElementById("rp-detail-msg");
   if (!el) return;
   el.textContent = text;
-  el.style.color = "var(--danger, #D9383A)";
+  el.style.color = color;
   el.style.display = "block";
 }
 
@@ -968,7 +968,9 @@ function rpRenderDetail(resetForm) {
   add.style.display = edit ? "" : "none";
   if (!edit) return;
 
-  if (resetForm || rep.empIds.has(rpAddEmpId)) rpAddEmpId = null;
+  // przy obecności częściowej osoba z raportu może zostać wybrana (dopisanie kolejnej części godzin)
+  const withParts = typeof RT_PARTIAL !== "undefined" && RT_PARTIAL;
+  if (resetForm || (!withParts && rep.empIds.has(rpAddEmpId))) rpAddEmpId = null;
   rpSyncAddEmp();
 
   if (resetForm) {
@@ -1362,6 +1364,18 @@ async function rpSaveAll() {
       }
     }
 
+    // 5. Po zmianie godzin albo statusu stykające się wpisy tej samej osoby z tym samym statusem
+    //    łączą się w jeden (np. nieobecność 06:30–07:30 przełączona na obecność + obecność 07:30–14:30)
+    let mergedCount = 0;
+    if (edits.length && typeof RT_PARTIAL !== "undefined" && RT_PARTIAL) {
+      try {
+        mergedCount = await rpMergeTouchingRows(rep.number, [...new Set(edits.map(e => e.row.first_name_id))]);
+      } catch (mergeErr) {
+        console.error("Błąd łączenia godzin w raporcie:", mergeErr);
+        failed.push("łączenie stykających się godzin");
+      }
+    }
+
     rpBusy = false;
     await rpReloadAfterEdit();
 
@@ -1370,12 +1384,14 @@ async function rpSaveAll() {
     } else {
       logAction("Edycja raportu", `Raport nr ${rep.number}, ${rep.date}` +
         (newDate ? `, zmiana daty na ${newDate}` : "") +
-        (edits.length ? `, zmienionych wierszy: ${edits.length}` : ""));
+        (edits.length ? `, zmienionych wierszy: ${edits.length}` : "") +
+        (mergedCount ? `, połączonych wpisów: ${mergedCount}` : ""));
       rpCloseDetail();
       savedToast();
       rpShowBanner("success", (newDate
         ? `Zapisano zmiany w raporcie nr ${rep.number}. Raport został przeniesiony z ${rep.date} na ${newDate}.`
         : `Zapisano zmiany w raporcie nr ${rpLabel(rep)}.`) +
+        (mergedCount ? ` Stykające się godziny z tym samym statusem połączono w jeden wpis (${mergedCount}).` : "") +
         (rpStatus(rep) === "rejected" ? " Gdy raport jest już poprawiony, wyślij go ponownie do zatwierdzenia." : ""));
       return true;
     }
@@ -1446,15 +1462,21 @@ function rpClosePicker() {
   toggleModal("modal-rp-picker", false);
 }
 
-// Aktywni pracownicy, których jeszcze nie ma w raporcie
+// Aktywni pracownicy, których jeszcze nie ma w raporcie. Przy obecności częściowej (RT_PARTIAL
+// w js/report_time.js) także ci, którzy już są - można dopisać im kolejną część godzin, np. nieobecność
+// przed rozpoczęciem pracy; godziny nie mogą się nakładać (sprawdza rpAddEmployee).
 function rpRenderPicker() {
   const rep = rpCurrent && rpFindReport(rpCurrent.number);
   const list = document.getElementById("rp-picker-list");
   if (!rep || !list) return;
 
+  const withParts = typeof RT_PARTIAL !== "undefined" && RT_PARTIAL;
+  // godziny osoby, która już jest w raporcie: "07:30–14:30 obecność"
+  const inReport = id => rep.rows.filter(r => Number(r.first_name_id) === Number(id))
+    .map(r => `${r.start_time || "?"}–${r.end_time || "?"} ${r.at_work === false ? "nieobecność" : "obecność"}`).join(", ");
   const q = (document.getElementById("rp-picker-search")?.value || "").toLowerCase().trim();
   const found = rpEmployees.filter(e => {
-    if (e.active === false || rep.empIds.has(e.id)) return false;
+    if (e.active === false || (!withParts && rep.empIds.has(e.id))) return false;
     if (!q) return true;
     const first = (e.first_name || "").toLowerCase();
     const last = (e.last_name || "").toLowerCase();
@@ -1469,11 +1491,15 @@ function rpRenderPicker() {
     return;
   }
 
-  list.innerHTML = found.map(e => `
-    <button type="button" class="rp-picker-item" onclick="rpPickEmployee(${Number(e.id)})">
-      <span class="name">${rtEsc(`${e.first_name || ""} ${e.last_name || ""}`.trim())}</span>
+  list.innerHTML = found.map(e => {
+    const already = withParts && rep.empIds.has(e.id) ? inReport(e.id) : "";
+    return `
+    <button type="button" class="rp-picker-item${already ? " in-report" : ""}" onclick="rpPickEmployee(${Number(e.id)})"
+      ${already ? `title="Już w raporcie: ${rtEsc(already)}. Możesz dopisać inne godziny, np. nieobecność."` : ""}>
+      <span class="name">${rtEsc(`${e.first_name || ""} ${e.last_name || ""}`.trim())}${already ? `<span class="in-report-tag">w raporcie: ${rtEsc(already)}</span>` : ""}</span>
       <span class="sub">${rtEsc(e.business?.business || "-")} • ${rtEsc(e.department?.department || "-")}</span>
-    </button>`).join("");
+    </button>`;
+  }).join("");
 }
 
 function rpPickEmployee(id) {
@@ -1482,6 +1508,74 @@ function rpPickEmployee(id) {
   rpHideDetailMsg();
   rpClosePicker();
   document.getElementById("rp-add-from")?.focus();
+}
+
+// Łączy wpisy tych osób w raporcie, które się stykają (koniec jednego = początek drugiego) i mają ten sam
+// status. Pierwszy wpis przejmuje godziny drugiego, drugi jest usuwany. Zwraca liczbę połączeń.
+async function rpMergeTouchingRows(number, empIds) {
+  if (!empIds.length) return 0;
+  const { data, error } = await supabaseClient
+    .from("work_reports")
+    .select("id, first_name_id, start_time, end_time, at_work")
+    .eq("number_report", number)
+    .in("first_name_id", empIds);
+  if (error) throw error;
+
+  let merged = 0;
+  for (const id of empIds) {
+    const rows = (data || []).filter(r => Number(r.first_name_id) === Number(id) && r.start_time && r.end_time);
+    for (;;) {
+      let a = null, b = null;
+      for (const x of rows) {
+        b = rows.find(y => y !== x && y.start_time === x.end_time && (y.at_work === false) === (x.at_work === false));
+        if (b) { a = x; break; }
+      }
+      if (!a) break;
+      const hours = rtDuration(a.start_time, b.end_time);
+      const { data: upd, error: updErr } = await supabaseClient
+        .from("work_reports")
+        .update({ end_time: b.end_time, total_hours: hours.toFixed(1) })
+        .eq("id", a.id)
+        .select("id");
+      if (updErr) throw updErr;
+      if (!upd || upd.length === 0) throw new Error("brak uprawnień do zmiany wpisu w bazie");
+      const { error: delErr } = await supabaseClient.from("work_reports").delete().eq("id", b.id);
+      if (delErr) throw delErr;
+      a.end_time = b.end_time;
+      rows.splice(rows.indexOf(b), 1);
+      merged++;
+    }
+  }
+  return merged;
+}
+
+// Łączy dodawane godziny z wpisem tej samej osoby w tym raporcie, gdy stykają się z nim i mają ten sam
+// status (obecność / nieobecność). Wypełnienie luki między dwoma wpisami łączy je w jeden.
+// Zwraca { from, to, hours } po połączeniu albo null, gdy nie ma czego łączyć.
+async function rpMergeAdjacent(rep, emp, existing, from, to, absent) {
+  const same = existing.filter(r => Number(r.number_report) === Number(rep.number) &&
+    (r.at_work === false) === absent && r.start_time && r.end_time);
+  const before = same.find(r => r.end_time === from);   // kończy się tam, gdzie zaczyna nowy
+  const after = same.find(r => r.start_time === to && r !== before);
+  if (!before && !after) return null;
+
+  const keep = before || after;
+  const start = before ? before.start_time : from;
+  const end = after ? after.end_time : to;
+  const hours = rtDuration(start, end);
+  const { data: upd, error: updErr } = await supabaseClient
+    .from("work_reports")
+    .update({ start_time: start, end_time: end, total_hours: hours.toFixed(1) })
+    .eq("id", keep.id)
+    .select("id");
+  if (updErr) throw updErr;
+  if (!upd || upd.length === 0) throw new Error("brak uprawnień do zmiany wpisu w bazie");
+
+  if (before && after) {         // drugi wpis jest już w połączonym
+    const { error: delErr } = await supabaseClient.from("work_reports").delete().eq("id", after.id);
+    if (delErr) throw delErr;
+  }
+  return { from: start, to: end, hours };
 }
 
 // Dodanie pracownika do raportu
@@ -1515,7 +1609,7 @@ async function rpAddEmployee() {
     // Ten sam pracownik nie może mieć nakładających się godzin w tym dniu i zmianie
     const { data: existing, error: checkErr } = await supabaseClient
       .from("work_reports")
-      .select("number_report, start_time, end_time")
+      .select("id, number_report, start_time, end_time, at_work")
       .eq("report_date", rep.date)
       .eq("shift", rep.shift)
       .eq("first_name_id", emp.id);
@@ -1526,6 +1620,21 @@ async function rpAddEmployee() {
       !r.start_time || !r.end_time || rtOverlap(mine, rtRange(r.start_time, r.end_time)));
     if (clash) {
       rpShowDetailMsg(`Ten pracownik jest już w raporcie nr ${clash.number_report} w godzinach ${clash.start_time || "?"}–${clash.end_time || "?"}.`);
+      return;
+    }
+
+    // Godziny stykające się z wpisem tej osoby w tym raporcie, z tym samym statusem, łączą się z nim
+    // (np. obecność 07:30–14:30 i dodawana 06:30–07:30 -> jeden wpis 06:30–14:30)
+    const merged = typeof RT_PARTIAL !== "undefined" && RT_PARTIAL
+      ? await rpMergeAdjacent(rep, emp, existing || [], from, to, absent)
+      : null;
+    if (merged) {
+      logAction("Dodanie godzin pracownika w raporcie",
+        `Raport nr ${rep.number}, ${rep.date}: ${rpEmpName(emp.id)}, połączono w ${merged.from}–${merged.to}${absent ? " (nieobecność)" : ""}`);
+      rpAddEmpId = null;
+      document.getElementById("rp-add-absent").checked = false;
+      await rpReloadAfterEdit();
+      if (rpCurrent) rpShowDetailMsg(`Godziny połączono z wcześniejszym wpisem: ${rpEmpName(emp.id)} ${merged.from}–${merged.to} (${rtFmtHours(merged.hours)}).`, "#0b7a57");
       return;
     }
 

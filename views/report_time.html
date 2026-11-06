@@ -31,6 +31,47 @@
   .rt-table th.rt-name, .rt-table td.rt-name { text-align: left; }
   .rt-row.is-filled { background: rgba(16, 185, 129, 0.06); }
   .rt-row.is-absent { background: rgba(217, 56, 58, 0.06); }
+  .rt-row.is-partial, .rt-part-row td { background: rgba(252, 212, 68, 0.12); }
+
+  /* Obecność: Obecny / Częściowo / Nieobecny (RT_PARTIAL w js/report_time.js) */
+  .rt-mode { position: relative; display: inline-flex; gap: 2px; padding: 3px; border-radius: 999px; background: #EEF0F2; }
+  .rt-mode button { position: relative; z-index: 1; border: 0; background: transparent; padding: 6px 10px; border-radius: 999px; cursor: pointer; white-space: nowrap;
+    font-family: inherit; font-size: 0.74rem; font-weight: 700; color: var(--text-muted); transition: background 0.15s, color 0.15s; }
+  .rt-mode button:hover:not(.on) { color: var(--text-dark); }
+  .rt-mode button:focus-visible { outline: 3px solid rgba(8, 88, 75, 0.35); outline-offset: 1px; }
+  .rt-mode button.on.p, .rt-mode button.on.a { color: #fff; }
+  .rt-mode button.on.c { color: #2B2609; }
+  /* kolorowy wskaźnik pod wybraną opcją: przepływa jak wskaźnik w menu, kolor przechodzi płynnie */
+  .rt-mode-glass {
+    position: absolute; left: 0; top: 3px; bottom: 3px; z-index: 0; border-radius: 999px; pointer-events: none; opacity: 0;
+    background: #0b7a57; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    transition: transform 0.5s cubic-bezier(0.34, 1.35, 0.5, 1), width 0.3s ease, background-color 0.35s ease, box-shadow 0.3s ease, opacity 0.2s ease;
+  }
+  .rt-mode-glass.visible { opacity: 1; }
+  .rt-mode-glass.no-anim { transition: none; }
+  .rt-mode-glass.c { background: var(--accent); }
+  .rt-mode-glass.a { background: var(--danger); }
+  .rt-mode-glass.is-moving { box-shadow: 0 0 16px rgba(245, 158, 11, 0.55); }
+  .rt-mode-glass.p.is-moving { box-shadow: 0 0 16px rgba(11, 122, 87, 0.5); }
+  .rt-mode-glass.a.is-moving { box-shadow: 0 0 16px rgba(217, 56, 58, 0.5); }
+  @media (prefers-reduced-motion: reduce) { .rt-mode-glass { transition: none; } }
+  /* wiersz z godzinami nieobecności pod pracownikiem */
+  .rt-table tr.rt-row.is-partial { border-bottom: none !important; }   /* wiersz nieobecności jest jego dalszą częścią */
+  /* ta sama wysokość co wiersz pracownika: odstępy jak w komórkach tabeli i treść wysoka jak pola godzin */
+  .rt-table tr.rt-part-row td { padding: 10px 14px; text-align: left; }
+  .rt-part { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; min-height: 32px; font-size: 0.82rem; line-height: 1.4; }
+  .rt-part label { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; color: var(--text-muted); }
+  .rt-part select { padding: 5px 8px; border-radius: 8px; border: 1px solid var(--border-color); background: #fff; font-family: inherit; font-weight: 700; color: var(--text-dark); }
+  .rt-part-bar { flex: 1 1 260px; min-width: 200px; height: 22px; display: flex; border-radius: 6px; overflow: hidden; background: #EEF0F2; }
+  .rt-part-bar span { display: flex; align-items: center; justify-content: center; overflow: hidden; white-space: nowrap; font-size: 0.68rem; font-weight: 700; color: #fff; }
+  .rt-part-bar .p { background: #0b7a57; }
+  .rt-part-bar .a { background: var(--danger); }
+  .rt-part-sum { color: var(--text-muted); }
+  .rt-part-sum b.p { color: #0b7a57; }
+  .rt-part-sum b.a { color: var(--danger); }
+  .rt-part-hint { color: #9b1c1f; font-weight: 600; }
+  .rt-part-hint.muted { color: var(--text-muted); font-weight: 500; }
+  .rt-part-cont { color: var(--text-muted); font-weight: 500; font-size: 0.82rem; }
   .rt-row.is-error { background: rgba(252, 212, 68, 0.22); }
 
   .rt-time {
@@ -165,6 +206,12 @@
     #main-content .rt-table tbody tr.rt-row.is-filled { background: #EEFAF5; }
     #main-content .rt-table tbody tr.rt-row.is-absent { background: #FDF1F1; }
     #main-content .rt-table tbody tr.rt-row.is-error { background: #FEF6D2; }
+    #main-content .rt-table tbody tr.rt-row.is-partial { background: #FFF8DB; }
+    /* godziny nieobecności doklejone pod kartą pracownika */
+    #main-content .rt-table tbody tr.rt-part-row { margin-top: -14px; padding: 10px 12px 12px; border-top: none !important; border-radius: 0 0 10px 10px; background: #FFF8DB; }
+    #main-content .rt-table tbody tr.rt-part-row td { padding: 0 !important; text-align: left !important; background: transparent; }
+    #main-content .rt-table tbody tr.rt-part-row td::before { content: none; }
+    .rt-part-bar { flex-basis: 100%; min-width: 0; }
 
     #main-content .rt-table tbody tr.rt-row td { min-height: 0; padding: 0 !important; text-align: left !important; }
     #main-content .rt-table tbody tr.rt-row td::before { content: none; }
@@ -215,7 +262,7 @@
   <div>
     <div class="eyebrow">Ewidencja</div>
     <h3>Rozliczanie czasu pracy</h3>
-    <p>Wybierz godziny od–do dla pracowników. Suwak oznacza nieobecność w wybranych godzinach. Zmiana jest wykrywana automatycznie z pierwszej wybranej godziny i ogranicza dostępne godziny do tej zmiany. Datę wybierzesz w oknie potwierdzenia.</p>
+    <p>Wybierz godziny od–do dla pracowników. Przy pracowniku zaznacz obecność, nieobecność albo „Częściowo” — wtedy wybierasz godziny nieobecności, a reszta liczy się jako obecność. Zmiana jest wykrywana automatycznie z pierwszej wybranej godziny i ogranicza dostępne godziny do tej zmiany. Datę wybierzesz w oknie potwierdzenia.</p>
   </div>
 </div>
 
@@ -279,7 +326,7 @@
           <th class="rt-c-time">Do</th>
           <th class="rt-c-shift">Zmiana</th>
           <th>Suma</th>
-          <th>Nieobecność</th>
+          <th>Obecność</th>
           <th style="width: 44px;"></th>
         </tr>
       </thead>

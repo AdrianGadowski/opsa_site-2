@@ -18,7 +18,12 @@ const RT_SHIFT_LEN = 480;
 let rtShift = null;          // zmiana wykryta z wybranych godzin (null = nic nie wybrano)
 let rtEmployees = [];
 let rtEmpById = {};
-let rtDraft = {};            // { [employeeId]: { from, to, absent } }
+// Obecność częściowa: w wierszu można zaznaczyć godziny nieobecności, reszta godzin to obecność.
+// Zapis: osobne wiersze work_reports tej osoby w tym samym raporcie (nie nakładają się).
+// false = jak dawniej, tylko przełącznik Obecny / Nieobecny.
+const RT_PARTIAL = true;
+
+let rtDraft = {};            // { [employeeId]: { from, to, absent, part: null | { from, to } } } (part - godziny nieobecności)
 let rtShowErrors = false;
 let rtMeta = { date: null, shift: null };
 let rtConflicts = {};        // { [employeeId]: [rekordy work_reports] }
@@ -378,8 +383,164 @@ function rtRowState(d) {
   if (!d) return { hours: null, filled: false, incomplete: false };
   const hours = rtDuration(d.from, d.to);
   const filled = hours !== null;
-  const incomplete = !filled && !!(d.from || d.to || d.absent);
+  const incomplete = !filled && !!(d.from || d.to || d.absent || d.part);
   return { hours, filled, incomplete };
+}
+
+// ---------- Obecność częściowa ----------
+// Godziny co 30 min w zakresie wiersza (od..do, także przez północ)
+function rtRowSlots(d) {
+  const [s, e] = rtRange(d.from, d.to);
+  const out = [];
+  for (let m = s; m <= e; m += 30) out.push(RT_ALL_TIMES[(m % 1440) / 30]);
+  return out;
+}
+
+// Godziny nieobecności dopasowane do godzin wiersza (po zmianie od–do mogłyby z nich wyjść).
+// Domyślnie: pierwsza połowa godzin wiersza.
+function rtPartOf(d) {
+  const slots = rtRowSlots(d);
+  const last = slots.length - 1;
+  let fi = d.part && d.part.from ? slots.indexOf(d.part.from) : -1;
+  let ti = d.part && d.part.to ? slots.indexOf(d.part.to) : -1;
+  if (fi < 0 && ti < 0) { fi = 0; ti = Math.max(1, Math.floor(last / 2)); }
+  if (fi < 0) fi = 0;
+  if (ti < 0 || ti > last) ti = last;
+  if (fi >= last) fi = last - 1;
+  if (ti <= fi) ti = fi + 1;
+  d.part = { from: slots[fi], to: slots[ti] };
+  return d.part;
+}
+
+// Części wiersza do zapisu: [{ from, to, absent }]
+function rtSegments(d) {
+  if (!RT_PARTIAL || !d.part || d.absent) return [{ from: d.from, to: d.to, absent: !!d.absent }];
+  const p = rtPartOf(d);
+  const out = [];
+  if (p.from !== d.from) out.push({ from: d.from, to: p.from, absent: false });
+  out.push({ from: p.from, to: p.to, absent: true });
+  if (p.to !== d.to) out.push({ from: p.to, to: d.to, absent: false });
+  return out;
+}
+
+// Przełącznik w wierszu: Obecny / Częściowo / Nieobecny
+function rtModeHtml(id, d) {
+  const mode = d.absent ? "a" : d.part ? "c" : "p";
+  const btn = (m, label) => `<button type="button" class="${m}${mode === m ? " on" : ""}" aria-pressed="${mode === m}"
+    onclick="rtSetMode(${id}, '${m}')">${label}</button>`;
+  return `<div class="rt-mode" id="rt-mode-${id}" role="group" aria-label="Obecność">
+    <span class="rt-mode-glass ${mode}" aria-hidden="true"></span>${btn("p", "Obecny")}${btn("c", "Częściowo")}${btn("a", "Nieobecny")}</div>`;
+}
+
+// Kolorowy wskaźnik wybranej opcji: przepływa pod klikniętą opcję jak wskaźnik w menu.
+// animate = false - od razu na miejscu (pierwsze rysowanie tabeli, zmiana rozmiaru okna)
+let rtModeTimers = {};
+function rtPlaceModeGlass(group, animate) {
+  const glass = group && group.querySelector(".rt-mode-glass");
+  const target = group && group.querySelector("button.on");
+  if (!glass || !target || !target.offsetWidth) return;
+  if (!animate) glass.classList.add("no-anim");
+  glass.style.width = target.offsetWidth + "px";
+  glass.style.transform = `translateX(${target.offsetLeft}px)`;
+  glass.classList.add("visible");
+  if (!animate) {
+    void glass.offsetWidth;   // wymuś przeliczenie stylów bez przejścia
+    glass.classList.remove("no-anim");
+    return;
+  }
+  glass.classList.add("is-moving");
+  clearTimeout(rtModeTimers[group.id]);
+  rtModeTimers[group.id] = setTimeout(() => glass.classList.remove("is-moving"), 500);
+}
+
+function rtPlaceAllModeGlass() {
+  document.querySelectorAll(".rt-mode").forEach(g => rtPlaceModeGlass(g, false));
+}
+window.addEventListener("resize", rtPlaceAllModeGlass);
+// po wczytaniu czcionki zmieniają się szerokości przycisków
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(rtPlaceAllModeGlass);
+
+// Zmiana opcji bez przerysowania przełącznika - dzięki temu wskaźnik może przepłynąć
+function rtSyncMode(id, d) {
+  const group = document.getElementById(`rt-mode-${id}`);
+  if (!group) return;
+  const mode = d && d.absent ? "a" : d && d.part ? "c" : "p";
+  group.querySelectorAll("button").forEach(b => {
+    const on = b.classList.contains(mode);
+    b.classList.toggle("on", on);
+    b.setAttribute("aria-pressed", String(on));
+  });
+  const glass = group.querySelector(".rt-mode-glass");
+  if (glass) glass.className = `rt-mode-glass visible ${mode}`;
+  rtPlaceModeGlass(group, true);
+}
+
+function rtSetMode(id, mode) {
+  const d = rtGetDraft(id);
+  d.absent = mode === "a";
+  d.part = mode === "c" ? (d.part || {}) : null;
+  if (d.part && rtRowState(d).filled) rtPartOf(d);
+  rtCleanupDraft(id);
+  rtSyncRow(id);
+  rtUpdateStats();
+  document.querySelector(`#rt-mode-${id} .${mode}`)?.focus();
+}
+
+// Wiersz pod pracownikiem: godziny nieobecności, pasek i podsumowanie części
+function rtPartRowHtml(id) {
+  const d = rtDraft[id];
+  if (!RT_PARTIAL || !d || !d.part || d.absent) return "";
+  const open = `<tr class="rt-part-row" id="rt-part-${id}"><td colspan="9"><div class="rt-part">`;
+  if (!rtRowState(d).filled) {
+    return `${open}<span class="rt-part-hint muted"><i class="fa-solid fa-circle-info"></i> Wpisz godziny od–do, potem zaznacz, kiedy pracownik był nieobecny.</span></div></td></tr>`;
+  }
+  const p = rtPartOf(d);
+  const slots = rtRowSlots(d);
+  const fi = slots.indexOf(p.from), ti = slots.indexOf(p.to);
+  const opts = (list, sel) => list.map(t => `<option value="${t}"${t === sel ? " selected" : ""}>${t}</option>`).join("");
+  const total = rtDuration(d.from, d.to);
+  const away = rtDuration(p.from, p.to);
+  const bar = rtSegments(d).map(s => {
+    const h = rtDuration(s.from, s.to);
+    return `<span class="${s.absent ? "a" : "p"}" style="flex: ${h} 0 0;" title="${s.absent ? "Nieobecność" : "Obecność"} ${s.from}–${s.to}">${h >= 1.5 ? `${s.from}–${s.to}` : ""}</span>`;
+  }).join("");
+  const whole = fi === 0 && ti === slots.length - 1;
+  return `${open}
+      <label>Nieobecny od <select id="rt-part-from-${id}" aria-label="Nieobecny od" onchange="rtOnPart(${id}, 'from', this.value)">${opts(slots.slice(0, -1), p.from)}</select></label>
+      <label>do <select id="rt-part-to-${id}" aria-label="Nieobecny do" onchange="rtOnPart(${id}, 'to', this.value)">${opts(slots.slice(1), p.to)}</select></label>
+      <div class="rt-part-bar" aria-hidden="true">${bar}</div>
+      <span class="rt-part-sum">obecność <b class="p">${rtFmtHours(total - away)}</b> · nieobecność <b class="a">${rtFmtHours(away)}</b></span>
+      ${whole ? `<span class="rt-part-hint">Nieobecność obejmuje wszystkie godziny — możesz wybrać „Nieobecny”.</span>` : ""}
+    </div></td></tr>`;
+}
+
+function rtOnPart(id, which, value) {
+  const d = rtDraft[id];
+  if (!d || !d.part) return;
+  const slots = rtRowSlots(d);
+  d.part[which] = value;
+  // "do" zawsze po "od": przesuwa się druga granica
+  const fi = slots.indexOf(d.part.from), ti = slots.indexOf(d.part.to);
+  if (ti <= fi) {
+    if (which === "from") d.part.to = slots[Math.min(fi + 1, slots.length - 1)];
+    else d.part.from = slots[Math.max(ti - 1, 0)];
+  }
+  rtSyncPartRow(id);
+  rtUpdateStats();
+  document.getElementById(`rt-part-${which}-${id}`)?.focus();
+}
+
+// Dodaje, odświeża albo usuwa wiersz z godzinami nieobecności pod pracownikiem
+function rtSyncPartRow(id) {
+  const tr = document.getElementById(`rt-row-${id}`);
+  const old = document.getElementById(`rt-part-${id}`);
+  const html = tr ? rtPartRowHtml(id) : "";
+  if (old) {
+    if (html) old.outerHTML = html;
+    else old.remove();
+  } else if (html) {
+    tr.insertAdjacentHTML("afterend", html);
+  }
 }
 
 function rtShowBanner(type, text) {
@@ -474,6 +635,7 @@ function rtRowClass(id) {
   const st = rtRowState(d);
   let cls = "rt-row";
   if (d && d.absent) cls += " is-absent";
+  else if (RT_PARTIAL && d && d.part) cls += " is-partial";
   else if (st.filled) cls += " is-filled";
   if (rtShowErrors && st.incomplete) cls += " is-error";
   return cls;
@@ -483,7 +645,7 @@ function rtRowHtml(emp) {
   const id = emp.id;
   const d = rtDraft[id] || { from: "", to: "", absent: false };
   const st = rtRowState(d);
-  const hasAny = !!(d.from || d.to || d.absent);
+  const hasAny = !!(d.from || d.to || d.absent || d.part);
 
   return `
     <tr id="rt-row-${id}" class="${rtRowClass(id)}" style="border-bottom: 1px solid #F0F0F0;">
@@ -505,18 +667,18 @@ function rtRowHtml(emp) {
       </td>
       <td class="rt-sum ${st.filled ? "" : "empty"}" id="rt-sum-${id}">${st.filled ? rtFmtHours(st.hours) : "—"}</td>
       <td>
-        <label class="rt-switch">
+        ${RT_PARTIAL ? rtModeHtml(id, d) : `<label class="rt-switch">
           <input type="checkbox" ${d.absent ? "checked" : ""} onchange="rtOnAbsent(${id}, this.checked)" aria-label="Nieobecność" />
           <span class="track"></span>
           <span class="lbl" id="rt-lbl-${id}">${d.absent ? "Nieobecny" : "Obecny"}</span>
-        </label>
+        </label>`}
       </td>
       <td>
         <button type="button" class="link-btn rt-clear ${hasAny ? "visible" : ""}" id="rt-clear-${id}" title="Wyczyść wiersz" onclick="rtClearRow(${id})">
           <i class="fa-solid fa-xmark"></i>
         </button>
       </td>
-    </tr>`;
+    </tr>${rtPartRowHtml(id)}`;
 }
 
 function rtRenderTable() {
@@ -531,6 +693,7 @@ function rtRenderTable() {
     return;
   }
   tbody.innerHTML = list.map(rtRowHtml).join("");
+  rtPlaceAllModeGlass();
 }
 
 function rtApplyFilters() { rtRenderTable(); }
@@ -555,7 +718,7 @@ function rtGetDraft(id) {
 
 function rtCleanupDraft(id) {
   const d = rtDraft[id];
-  if (d && !d.from && !d.to && !d.absent) delete rtDraft[id];
+  if (d && !d.from && !d.to && !d.absent && !d.part) delete rtDraft[id];
 }
 
 // Aktualizacja wiersza "w miejscu" (bez przerysowania, żeby nie gubić fokusu)
@@ -580,6 +743,9 @@ function rtSyncRow(id) {
 
   const lbl = document.getElementById(`rt-lbl-${id}`);
   if (lbl) lbl.textContent = d && d.absent ? "Nieobecny" : "Obecny";
+  const mode = document.getElementById(`rt-mode-${id}`);
+  if (mode) rtSyncMode(id, d);
+  rtSyncPartRow(id);
 
   const clr = document.getElementById(`rt-clear-${id}`);
   if (clr) clr.classList.toggle("visible", !!d);
@@ -606,9 +772,11 @@ function rtOnAbsent(id, checked) {
 }
 
 function rtReplaceRow(id) {
+  document.getElementById(`rt-part-${id}`)?.remove();
   const tr = document.getElementById(`rt-row-${id}`);
   const emp = rtEmpById[id];
   if (tr && emp) tr.outerHTML = rtRowHtml(emp);
+  rtPlaceModeGlass(document.getElementById(`rt-mode-${id}`), false);
 }
 
 function rtClearRow(id) {
@@ -631,25 +799,30 @@ function rtConfirmClearAll() {
   rtUpdateStats();
 }
 
+// Pozycje do zapisu: jedna na pracownika, a przy obecności częściowej - jedna na każdą część
+// (first: pierwsza pozycja danej osoby)
 function rtFilledEntries() {
   return rtEmployees
     .filter(e => rtRowState(rtDraft[e.id]).filled)
-    .map(e => {
-      const d = rtDraft[e.id];
-      return { emp: e, from: d.from, to: d.to, absent: !!d.absent, hours: rtDuration(d.from, d.to) };
-    });
+    .flatMap(e => rtSegments(rtDraft[e.id]).map((s, k) =>
+      ({ emp: e, from: s.from, to: s.to, absent: s.absent, hours: rtDuration(s.from, s.to), first: k === 0 })));
+}
+
+// Liczba osób (pozycji może być więcej, gdy ktoś jest obecny częściowo)
+function rtPeopleCount(entries, onlyAbsent) {
+  return new Set(entries.filter(e => !onlyAbsent || e.absent).map(e => e.emp.id)).size;
 }
 
 function rtUpdateStats() {
   rtRefreshPresets();
   const entries = rtFilledEntries();
   const total = entries.reduce((s, e) => s + e.hours, 0);
-  const absent = entries.filter(e => e.absent).length;
+  const absent = rtPeopleCount(entries, true);
 
   const c = document.getElementById("rt-stat-count");
   const a = document.getElementById("rt-stat-absent");
   const h = document.getElementById("rt-stat-hours");
-  if (c) c.textContent = entries.length;
+  if (c) c.textContent = rtPeopleCount(entries);
   if (a) a.textContent = absent;
   if (h) h.textContent = rtFmtHours(total);
 
@@ -733,7 +906,7 @@ function rtTargetApproved() {
 
 // Szuka wpisów tych pracowników w wybranym dniu i zmianie, które nakładają się godzinowo
 async function rtFetchConflicts(entries) {
-  const ids = entries.map(e => e.emp.id);
+  const ids = [...new Set(entries.map(e => e.emp.id))];
   const { data, error } = await supabaseClient
     .from("work_reports")
     .select("id, number_report, first_name_id, add_first_name_id, start_time, end_time, at_work")
@@ -743,13 +916,15 @@ async function rtFetchConflicts(entries) {
 
   if (error) return { error, map: {} };
 
+  // kolizje zbierane na osobę (przy obecności częściowej sprawdzana jest każda część)
   const map = {};
   entries.forEach(e => {
     const mine = rtRange(e.from, e.to);
-    map[e.emp.id] = (data || []).filter(r => {
-      if (Number(r.first_name_id) !== Number(e.emp.id)) return false;
-      if (!r.start_time || !r.end_time) return true; // brak godzin = traktuj jako kolizję
-      return rtOverlap(mine, rtRange(r.start_time, r.end_time));
+    const list = map[e.emp.id] || (map[e.emp.id] = []);
+    (data || []).forEach(r => {
+      if (Number(r.first_name_id) !== Number(e.emp.id) || list.includes(r)) return;
+      // brak godzin = traktuj jako kolizję
+      if (!r.start_time || !r.end_time || rtOverlap(mine, rtRange(r.start_time, r.end_time))) list.push(r);
     });
   });
   return { error: null, map };
@@ -896,7 +1071,7 @@ async function rtRefreshSummary() {
     const present = entries.filter(e => !e.absent).reduce((s, e) => s + e.hours, 0);
     const absent = entries.filter(e => e.absent).reduce((s, e) => s + e.hours, 0);
     info.innerHTML = `
-      <span>Pracowników:<strong>${entries.length}</strong></span>
+      <span>Pracowników:<strong>${rtPeopleCount(entries)}</strong></span>
       <span>Godziny obecne:<strong class="ok">${rtFmtHours(present)}</strong></span>
       <span>Godziny nieobecne:<strong class="absent">${rtFmtHours(absent)}</strong></span>`;
   }
@@ -980,7 +1155,8 @@ function rtRenderSummaryRows(entries) {
   if (!body) return;
 
   body.innerHTML = entries.map(e => {
-    const conflicts = rtConflicts[e.emp.id] || [];
+    // przy obecności częściowej kolizje, nazwisko i "Pomiń" są przy pierwszej części osoby
+    const conflicts = e.first ? (rtConflicts[e.emp.id] || []) : [];
     const isConflict = conflicts.length > 0;
 
     const status = isConflict
@@ -996,15 +1172,15 @@ function rtRenderSummaryRows(entries) {
           : `<span class="rt-pill ok">Obecność</span>`);
 
     return `
-      <tr class="${isConflict ? "conflict" : ""}">
-        <td style="font-weight: 600;">${rtEsc(e.emp.first_name)} ${rtEsc(e.emp.last_name)}</td>
-        <td>${rtEsc(e.emp.business?.business || "-")}</td>
-        <td>${rtEsc(e.emp.department?.department || "-")}</td>
+      <tr class="${isConflict ? "conflict" : ""}${e.first ? "" : " rt-part-next"}">
+        <td style="font-weight: 600;">${e.first ? `${rtEsc(e.emp.first_name)} ${rtEsc(e.emp.last_name)}` : `<span class="rt-part-cont">↳ dalsza część</span>`}</td>
+        <td>${e.first ? rtEsc(e.emp.business?.business || "-") : ""}</td>
+        <td>${e.first ? rtEsc(e.emp.department?.department || "-") : ""}</td>
         <td>${e.from}</td>
         <td>${e.to}</td>
         <td style="font-weight: 700; color: var(--primary); white-space: nowrap;">${rtFmtHours(e.hours)}</td>
         <td>${status}</td>
-        <td><button type="button" class="rt-mini-btn neutral" onclick="rtSkipEntry(${e.emp.id})">Pomiń</button></td>
+        <td>${e.first ? `<button type="button" class="rt-mini-btn neutral" onclick="rtSkipEntry(${e.emp.id})">Pomiń</button>` : ""}</td>
       </tr>`;
   }).join("");
 }
@@ -1166,6 +1342,7 @@ async function rtSaveReport() {
 
     const { error: insertErr } = await supabaseClient.from("work_reports").insert(records);
     if (insertErr) throw insertErr;
+    const people = new Set(records.map(r => r.first_name_id)).size;
 
     // 4. Sukces
     rtDraft = {};
@@ -1175,13 +1352,13 @@ async function rtSaveReport() {
     rtRenderTable();
     rtUpdateStats();
     logAction(target ? "Dopisanie do raportu" : "Utworzenie raportu",
-      `Raport nr ${reportNumber}, ${reportDate}, ${rtMeta.shift}, osób: ${records.length}`);
+      `Raport nr ${reportNumber}, ${reportDate}, ${rtMeta.shift}, osób: ${people}${people !== records.length ? `, wpisów: ${records.length}` : ""}`);
     rtClearTargets();
     savedToast();
     const toApproval = typeof rpaInstalled === "function" && rpaInstalled() && !(target && target.status === "rejected");
     rtShowBanner("success", (target
-      ? `Dopisano ${records.length} os. do raportu nr ${reportNumber} (${reportDate}, ${rtMeta.shift}).`
-      : `Raport nr ${reportNumber} (${reportDate}, ${rtMeta.shift}) został zapisany. Liczba osób: ${records.length}.`) +
+      ? `Dopisano ${people} os. do raportu nr ${reportNumber} (${reportDate}, ${rtMeta.shift}).`
+      : `Raport nr ${reportNumber} (${reportDate}, ${rtMeta.shift}) został zapisany. Liczba osób: ${people}.`) +
       (toApproval ? " Raport czeka na zatwierdzenie." : ""));
     if (typeof rpaRefreshBadges === "function") rpaRefreshBadges();
   } catch (err) {
