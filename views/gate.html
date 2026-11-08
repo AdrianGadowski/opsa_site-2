@@ -1,0 +1,382 @@
+<style>
+  /* ===== Odbicia z bramy (js/gate.js) ===== */
+  .gt-monthpick { display: flex; align-items: center; gap: 6px; }
+  .gt-monthpick button {
+    width: 42px; height: 44px; flex-shrink: 0; border-radius: 12px; cursor: pointer; font-size: 0.9rem;
+    border: 1px solid rgba(255, 255, 255, 0.25); background: rgba(255, 255, 255, 0.12); color: #fff;
+  }
+  .gt-monthpick button:hover:not(:disabled) { background: rgba(255, 255, 255, 0.22); }
+  .gt-monthpick button:disabled { opacity: 0.4; cursor: default; }
+  .gt-month-label {
+    width: 190px; height: 44px; display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box;
+    border-radius: 12px; background: rgba(255, 255, 255, 0.95); color: var(--primary); font-weight: 700; font-size: 0.95rem; white-space: nowrap;
+  }
+
+  .gt-banner { display: none; align-items: center; gap: 10px; padding: 12px 16px; border-radius: 10px; margin-bottom: 16px; font-size: 0.9rem; font-weight: 500; }
+  .gt-banner.visible { display: flex; }
+  .gt-banner.success { background: #DDF1E7; color: #0B5D44; }
+  .gt-banner.warning { background: #FFF8DF; color: #6B5507; border: 1px solid #F2D98A; }
+  .gt-banner.error { background: #FDF1F1; color: #9B1C1C; border: 1px solid #F3C4C5; }
+
+  .gt-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 16px; }
+  .gt-stat { background: #fff; border: 1px solid var(--border-color); border-radius: 12px; padding: 12px 16px; }
+  .gt-stat span { display: block; font-size: 0.74rem; font-weight: 600; color: var(--text-muted); }
+  .gt-stat b { font-size: 1.3rem; color: var(--text-dark); font-variant-numeric: tabular-nums; }
+  .gt-stat.warn { background: #FFF8DF; border-color: #F2D98A; }
+  .gt-stat.warn b { color: #7A5C00; }
+  .gt-stat.ok b { color: #0B7A57; }
+
+  /* dwie tabele: osoby z bramy | odbicia wybranej osoby */
+  .gt-filters { margin-bottom: 14px; }
+  .gt-filters .gt-tools { border-bottom: none; }
+  .gt-split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+  .gt-pane { min-width: 0; overflow: hidden; background: #fff; border: 1px solid var(--border-color); border-radius: 12px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05); }
+  .gt-pane-title { margin: 0; padding: 12px 16px; font-size: 0.92rem; color: var(--primary); border-bottom: 1px solid var(--border-color); text-align: center; }
+  .gt-split .gt-table th, .gt-split .gt-table th:first-child { text-align: center; }   /* nagłówki kolumn na środku */
+  .gt-table.gt-entries td:first-child { text-align: center; }   /* data w odbiciach na środku */
+  .gt-split .gt-table-wrap { overflow: auto; }   /* wysokość ustawia gtFitTables (js/gate.js) */
+  .gt-people tr.gt-person { cursor: pointer; }
+  .gt-people tr.gt-person:hover td { background: rgba(8, 88, 75, 0.05); }
+  .gt-people tr.gt-person.sel td { background: rgba(8, 88, 75, 0.1); box-shadow: inset 0 0 0 0 transparent; }
+  .gt-people tr.gt-person.sel td:first-child { box-shadow: inset 4px 0 0 var(--primary); }
+  .gt-person-list { height: auto; padding: 4px; }
+  .gt-person-list option { padding: 5px 8px; border-radius: 6px; }
+  .gt-form input[readonly] { background: #F3F4F6; color: var(--text-dark); font-weight: 600; cursor: default; }
+  .gt-unlink { margin-right: auto; padding: 11px 16px; border: 1.5px solid rgba(217, 56, 58, 0.4); border-radius: 10px; background: #fff; color: var(--danger);
+    cursor: pointer; font-family: inherit; font-size: 0.88rem; font-weight: 700; display: inline-flex; align-items: center; gap: 7px; }
+  .gt-unlink:hover { background: rgba(217, 56, 58, 0.06); }
+  .gt-unlink.armed { background: var(--danger); border-color: var(--danger); color: #fff; }
+  .gt-unm-btn { width: auto; padding: 10px 14px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; white-space: nowrap; }
+  .gt-person-list option.gt-taken { color: #0b7a57; font-weight: 600; }   /* już dopasowani do innej osoby z bramy */
+  /* niższy nagłówek i liczby w jednej linii - więcej miejsca dla tabel */
+  .gt-hero { padding-top: 18px; padding-bottom: 18px; margin-bottom: 14px; }
+  .gt-hero h3 { margin-bottom: 2px; }
+  .gt-mini-stats { display: inline-flex; flex-wrap: wrap; gap: 6px; margin-left: 6px; }
+  .gt-chip { padding: 2px 9px; border-radius: 999px; background: #F3F4F6; color: var(--text-muted); font-size: 0.74rem; font-weight: 500; white-space: nowrap; }
+  .gt-chip b { color: var(--text-dark); margin-left: 2px; }
+  .gt-chip.warn { background: #FFF1C2; color: #7A5C00; }
+  .gt-chip.warn b { color: #7A5C00; }
+  .gt-chip.bad { background: rgba(217, 56, 58, 0.1); color: var(--danger); }
+  .gt-chip.bad b { color: var(--danger); }
+  .gt-chip.scope { background: transparent; padding-left: 0; font-weight: 700; color: var(--primary); }
+  .gt-chip.scope.week { background: rgba(8, 88, 75, 0.1); padding-left: 9px; }
+  /* Wczytane tygodnie w zielonym nagłówku: biała karta, u góry miesiące, pod nimi tygodnie */
+  .gt-hero-weeks { flex-basis: 100%; min-width: 0; }
+  .gt-wcard { box-sizing: border-box; padding: 8px 12px 8px; border-radius: 12px; background: #fff; color: var(--text-dark); box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18); }
+  .gt-weeks-head { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 10px; margin-bottom: 6px; font-size: 0.86rem; color: var(--primary); }
+  .gt-weeks-legend { display: inline-flex; align-items: center; gap: 5px; margin-left: auto; font-size: 0.74rem; color: var(--text-muted); }
+  .gt-weeks-legend i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; margin-left: 6px; }
+  .gt-weeks-legend i.loaded { background: #0b7a57; }
+  .gt-weeks-legend i.review { background: #F2BE2E; }
+  .gt-weeks-legend i.empty { background: #EDEFF2; border: 1px solid #DDE1E5; }
+  .gt-wscroll { overflow-x: auto; padding: 3px; }
+  .gt-wgrid { display: grid; grid-template-columns: repeat(var(--weeks), minmax(22px, 1fr)); gap: 3px; min-width: calc(var(--weeks) * 25px); }
+  .gt-wgrid .mh { grid-row: 1; padding-bottom: 2px; border-bottom: 1px solid #E5E7EB; text-align: center; white-space: nowrap; overflow: hidden;
+    font-size: 0.66rem; font-weight: 700; color: var(--text-muted); }
+  .gt-wk { grid-row: 2; height: 24px; padding: 0; border: 0; display: flex; align-items: center; justify-content: center; border-radius: 4px; background: #EDEFF2; color: #8A919B;
+    font-family: inherit; font-size: 0.6rem; font-weight: 700; white-space: nowrap; overflow: hidden; cursor: pointer; }
+  .gt-wk:hover:not(:disabled) { filter: brightness(0.94); }
+  .gt-wk:disabled { cursor: default; }
+  .gt-wk.active { outline: 2px solid var(--primary); outline-offset: 2px; }   /* tydzień, z którego są liczby w ramce */
+  .gt-wk:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+  .gt-wk.loaded { background: #0b7a57; color: #fff; }
+  .gt-wk.review { background: #F2BE2E; color: #3D2E00; }   /* są odbicia do weryfikacji */
+  .gt-wk.future { opacity: 0.45; }
+  .gt-wk.current { box-shadow: inset 0 0 0 2px var(--text-dark); }
+  .gt-tools { display: grid; grid-template-columns: 2fr 1fr auto auto auto; gap: 12px; align-items: end; padding: 14px 18px; border-bottom: 1px solid var(--border-color); }
+  .gt-tools label.lbl { display: block; font-size: 0.78rem; font-weight: 600; color: var(--text-muted); margin-bottom: 6px; }
+  .gt-check { display: inline-flex; align-items: center; gap: 8px; height: 42px; font-size: 0.86rem; font-weight: 600; color: var(--text-dark); cursor: pointer; white-space: nowrap; }
+
+  .gt-table-wrap { overflow: auto; }
+  .gt-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+  .gt-table th { position: sticky; top: 0; z-index: 1; padding: 10px 12px; text-align: center; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.03em;
+    color: #4B5563; background: #F9FAFB; border-bottom: 1px solid var(--border-color); white-space: nowrap; }
+  .gt-table td { padding: 8px 12px; text-align: center; border-bottom: 1px solid #F0F0F0; vertical-align: middle; }
+  .gt-table th:first-child, .gt-table td:first-child { text-align: left; }
+  .gt-table tr.review td { background: #FFFBEB; }
+  .gt-table tr.unknown td { background: #FDF1F1; }   /* osoba nierozpoznana w Bazie pracowników */
+  .gt-table tr.partial td { background: #EEF6FD; }
+  .gt-name { font-weight: 600; color: var(--primary); }
+  .gt-sub { display: block; font-size: 0.74rem; font-weight: 500; color: var(--text-muted); }
+  .gt-sub.inline { display: inline; }
+  .gt-split .gt-table td, .gt-split .gt-table th { padding-left: 7px; padding-right: 7px; }
+  .gt-split .gt-table { font-size: 0.85rem; }
+  .gt-inout { font-weight: 700; color: #B0B5BC; }
+  .gt-inout .in { color: #0b7a57; }
+  .gt-inout .out { color: var(--danger); }
+  /* kropka przed nazwiskiem, na środku wysokości wiersza; miejsce zostawione w każdym wierszu, żeby nazwiska były w jednej linii */
+  .gt-namebox { display: inline-block; position: relative; vertical-align: middle; padding-left: 17px; }
+  .gt-dot { position: absolute; left: 0; top: 50%; width: 9px; height: 9px; border-radius: 50%; background: #F2BE2E; transform: translateY(-50%); }
+  .gt-dot.red { background: var(--danger); }   /* osoba nierozpoznana */
+  .gt-time { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .gt-missing { color: #B0B5BC; }
+  .gt-nextday { display: inline-block; padding: 0 5px; border-radius: 6px; background: #EEF0F2; color: var(--text-muted); font-size: 0.68rem; font-weight: 700; }
+  .gt-empty { padding: 30px; text-align: center; color: var(--text-muted); }
+
+  .gt-tag { display: inline-flex; align-items: center; gap: 4px; padding: 2px 9px; border-radius: 999px; font-size: 0.72rem; font-weight: 700; white-space: nowrap; margin: 1px 0; }
+  .gt-tag.ok { background: rgba(16, 185, 129, 0.12); color: #0b7a57; }
+  .gt-tag.warn { background: #FFF1C2; color: #7A5C00; }
+  .gt-tag.bad { background: rgba(217, 56, 58, 0.1); color: var(--danger); }
+  .gt-tag.info { background: #DCEEFC; color: #1D5C8C; }   /* dopasowanie częściowe nazwiska - do potwierdzenia */
+  .gt-tag.done { background: #EEF0F2; color: var(--text-muted); }
+
+  .gt-actions { white-space: nowrap; }
+  .gt-icon { min-width: 34px; height: 32px; padding: 0 8px; border: 0; border-radius: 8px; background: transparent; color: var(--primary); cursor: pointer; font-family: inherit; font-size: 0.82rem; font-weight: 700; }
+  .gt-icon:hover { background: rgba(8, 88, 75, 0.08); }
+  .gt-icon.danger { color: var(--danger); }
+  .gt-icon.danger:hover { background: rgba(217, 56, 58, 0.08); }
+  .gt-icon.armed { background: var(--danger); color: #fff; }
+
+  .gt-btn {
+    min-height: 42px; padding: 6px 16px; border-radius: 10px; border: 0; background: var(--accent); color: #2B2609; cursor: pointer;
+    font-family: inherit; font-size: 0.88rem; font-weight: 700; display: inline-flex; align-items: center; gap: 8px; white-space: nowrap;
+  }
+  .gt-btn:hover { background: #FFE27A; }
+
+  /* Okno: podgląd wczytanego pliku */
+  .gt-modal-wide { width: 96%; max-width: 1080px; max-height: calc(100vh - 40px); display: flex; flex-direction: column; }
+  .gt-imp-scroll { overflow: auto; flex: 1; min-height: 160px; border: 1px solid var(--border-color); border-radius: 10px; margin-top: 12px; }
+  .gt-imp-tools { padding: 12px 0 0; border-bottom: none; }
+  .gt-imp-hint { margin-top: 6px; font-size: 0.78rem; color: var(--text-muted); }
+  .gt-stat b small { font-size: 0.8rem; font-weight: 600; color: var(--text-muted); }
+  .gt-unknown { margin-top: 8px; font-size: 0.84rem; color: var(--text-muted); line-height: 1.5; }
+  .gt-unknown b { color: var(--danger); }
+  .gt-unknown b.gt-removed { color: var(--text-dark); }
+  .gt-link { border: 0; background: none; padding: 0; cursor: pointer; font-family: inherit; font-size: inherit; font-weight: 700; color: var(--primary); text-decoration: underline; }
+  .gt-form { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 14px; }
+  .gt-form label { display: block; font-size: 0.78rem; font-weight: 600; color: var(--text-muted); margin-bottom: 5px; }
+  .gt-form .full { grid-column: 1 / -1; }
+
+  /* obok siebie, gdy obszar treści (z uwzględnieniem menu) ma ponad 900 px; węższy - jedna pod drugą.
+     Za szeroka tabela przewija się w bok we własnej ramce, a nie cała strona. */
+  .gt-split-box { container-type: inline-size; }
+  @container (max-width: 900px) {
+    .gt-split { grid-template-columns: 1fr; }
+  }
+  .gt-wscroll { scrollbar-width: thin; }
+  /* niskie okno (laptop): zwarty nagłówek i filtry, żeby tabele zmieściły się bez przewijania strony */
+  @media (max-height: 860px) and (min-width: 769px) {
+    .gt-hero { padding-top: 12px; padding-bottom: 12px; margin-bottom: 10px; row-gap: 10px; }
+    .gt-hero .eyebrow, .gt-hero > div > p { display: none; }
+    .gt-hero h3 { font-size: 1.3rem; margin: 0; }
+    .gt-wcard { padding: 6px 10px; }
+    .gt-filters { margin-bottom: 10px; }
+    .gt-filters .gt-tools { padding-top: 8px; padding-bottom: 8px; }
+    .gt-filters .gt-tools label.lbl { display: none; }
+    .gt-pane-title { padding: 8px 14px; }
+  }
+  @media (max-width: 768px) {
+    .gt-tools { grid-template-columns: 1fr 1fr; padding: 12px; }
+    .gt-tools > :first-child { grid-column: 1 / -1; }
+    .gt-form { grid-template-columns: 1fr; }
+    .gt-table-wrap, .gt-imp-scroll { overflow: visible; }
+    .gt-split .gt-table-wrap { max-height: none; }
+  }
+</style>
+
+<div class="page-hero gt-hero">
+  <div>
+    <div class="eyebrow">Ewidencja</div>
+    <h3>Odbicia z bramy</h3>
+    <p>Wejścia i wyjścia pracowników z systemu kontroli dostępu.</p>
+  </div>
+  <div class="page-hero-actions">
+    <button type="button" class="gt-btn" data-gt-edit onclick="gtPickFile()"><i class="fa-solid fa-file-arrow-up"></i> Wczytaj plik z bramy</button>
+    <input type="file" id="gt-file" accept=".xlsx,.xls" hidden onchange="gtOnFile(this)" />
+    <div class="gt-monthpick">
+      <button type="button" onclick="gtStep(-1)" title="Poprzedni miesiąc" aria-label="Poprzedni miesiąc"><i class="fa-solid fa-chevron-left"></i></button>
+      <span class="gt-month-label" id="gt-month" aria-live="polite">—</span>
+      <button type="button" id="gt-next" onclick="gtStep(1)" title="Następny miesiąc" aria-label="Następny miesiąc"><i class="fa-solid fa-chevron-right"></i></button>
+    </div>
+  </div>
+  <!-- Wczytane tygodnie (jak "Moje raporty" na dashboardzie): miesiące, pod nimi tygodnie;
+       zielone - wgrane odbicia, żółte - są odbicia do weryfikacji. Kliknięcie tygodnia zmienia tylko liczby w ramce. -->
+  <div class="gt-hero-weeks">
+    <div class="gt-wcard">
+      <div class="gt-weeks-head">
+        <b id="gt-weeks-title">Wczytane tygodnie</b>
+        <span id="gt-weeks-sub" class="gt-sub inline"></span>
+        <span class="gt-mini-stats" id="gt-stats"></span>
+        <span class="gt-weeks-legend"><i class="loaded"></i> wgrane <i class="review"></i> do weryfikacji <i class="empty"></i> brak odbić</span>
+      </div>
+      <div class="gt-wscroll"><div id="gt-weeks"></div></div>
+    </div>
+  </div>
+</div>
+
+<div id="gt-banner" class="gt-banner" role="status"></div>
+
+<div class="card gt-filters" style="padding: 0;">
+  <div class="gt-tools">
+    <div>
+      <label class="lbl" for="gt-filter-search">Szukaj pracownika</label>
+      <input type="text" id="gt-filter-search" class="form-control" placeholder="Imię lub nazwisko..." oninput="gtRender()" />
+    </div>
+    <div>
+      <label class="lbl" for="gt-filter-firm">Firma</label>
+      <select id="gt-filter-firm" class="form-control" onchange="gtRender()"></select>
+    </div>
+    <label class="gt-check"><input type="checkbox" id="gt-filter-review" onchange="gtRender()" /> Tylko nierozpoznane</label>
+    <button type="button" class="btn-secondary gt-unm-btn" onclick="gtOpenUnmatched()"><i class="fa-solid fa-user-slash"></i> Pracownicy bez dopasowania</button>
+    <button type="button" class="btn-secondary" style="width: auto; padding: 10px 16px; display: inline-flex; align-items: center; justify-content: center; gap: 6px;" onclick="gtResetFilters()"><i class="fa-solid fa-rotate-left"></i> Reset</button>
+  </div>
+</div>
+
+<!-- 1. osoby z bramy i dopasowanie do Bazy pracowników, 2. odbicia osoby wybranej w pierwszej tabeli -->
+<div class="gt-split-box">
+<div class="gt-split">
+  <div class="gt-pane">
+    <h4 class="gt-pane-title">Pracownicy z bramy</h4>
+    <div class="gt-table-wrap">
+      <table class="gt-table gt-people">
+        <thead><tr><th>Pracownik</th><th>Firma</th><th title="Odbicia wejść | odbicia wyjść">Wej. | Wyj.</th><th>Status</th><th></th></tr></thead>
+        <tbody id="gt-people-body">
+          <tr><td colspan="5" class="gt-empty"><i class="fa-solid fa-spinner fa-spin"></i> Ładowanie...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="gt-pane">
+    <h4 class="gt-pane-title" id="gt-entries-title">Odbicia</h4>
+    <div class="gt-table-wrap">
+      <table class="gt-table gt-entries">
+        <thead><tr><th>Data</th><th>Zmiana</th><th>Wejście</th><th>Wyjście</th><th>Na terenie</th><th>Uwagi</th><th></th></tr></thead>
+        <tbody id="gt-body">
+          <tr><td colspan="7" class="gt-empty"><i class="fa-solid fa-spinner fa-spin"></i> Ładowanie...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+</div>
+
+<!-- Pracownicy z Bazy bez dopasowania do osoby z bramy -->
+<div id="modal-gt-unmatched" class="modal">
+  <div class="modal-box" style="width: 94%; max-width: 560px; max-height: calc(100vh - 40px); display: flex; flex-direction: column;">
+    <button class="link-btn" onclick="toggleModal('modal-gt-unmatched', false)" style="position: absolute; top: 22px; right: 22px; font-size: 1.2rem;" title="Zamknij">
+      <i class="fa-solid fa-xmark"></i>
+    </button>
+    <h3 style="color: var(--primary); margin: 0 0 4px 0;">Pracownicy bez dopasowania</h3>
+    <p id="gt-unm-count" style="margin: 0 0 14px 0; color: var(--text-muted); font-size: 0.84rem;"></p>
+    <input type="text" id="gt-unm-search" class="form-control" placeholder="Szukaj po imieniu, nazwisku lub firmie..." oninput="gtRenderUnmatched()" />
+    <div class="gt-imp-scroll">
+      <table class="gt-table">
+        <thead><tr><th>Pracownik</th><th>Firma</th></tr></thead>
+        <tbody id="gt-unm-body"></tbody>
+      </table>
+    </div>
+    <p class="gt-imp-hint" style="margin-top: 10px;">Aktywni pracownicy z Bazy pracowników, do których nie przypisano jeszcze żadnej osoby z bramy. Dopasujesz ich ołówkiem przy osobie w tabeli „Pracownicy z bramy”.</p>
+    <div style="display: flex; justify-content: flex-end; margin-top: 12px;">
+      <button type="button" class="btn-secondary" style="width: auto; padding: 11px 20px;" onclick="toggleModal('modal-gt-unmatched', false)">Zamknij</button>
+    </div>
+  </div>
+</div>
+
+<!-- Dopasowanie osoby z bramy do Bazy pracowników -->
+<div id="modal-gt-person" class="modal">
+  <div class="modal-box" style="width: 94%; max-width: 560px;">
+    <button class="link-btn" onclick="toggleModal('modal-gt-person', false)" style="position: absolute; top: 22px; right: 22px; font-size: 1.2rem;" title="Zamknij">
+      <i class="fa-solid fa-xmark"></i>
+    </button>
+    <h3 style="color: var(--primary); margin: 0 0 4px 0;">Dopasowanie do Bazy pracowników</h3>
+    <p id="gt-person-info" style="margin: 0 0 16px 0; color: var(--text-muted); font-size: 0.84rem;"></p>
+    <div class="gt-form">
+      <div>
+        <label for="gt-person-first">Imię (z raportu bramy)</label>
+        <input type="text" id="gt-person-first" class="form-control" readonly />
+      </div>
+      <div>
+        <label for="gt-person-last">Nazwisko (z raportu bramy)</label>
+        <input type="text" id="gt-person-last" class="form-control" readonly />
+      </div>
+      <div class="full">
+        <label for="gt-person-search">Pracownik w Bazie pracowników</label>
+        <input type="text" id="gt-person-search" class="form-control" placeholder="Szukaj w Bazie pracowników..." oninput="gtFillPersonSelect()" style="margin-bottom: 8px;" />
+        <select id="gt-person-emp" class="form-control gt-person-list" size="8"></select>
+      </div>
+    </div>
+    <p class="gt-imp-hint" style="margin-top: 10px;">Lista pomija pracowników nieaktywnych i już dopasowanych do innej osoby z bramy. Dopasowanie obejmie wszystkie odbicia tej osoby i zostanie zapamiętane dla kolejnych plików z bramy.</p>
+    <div id="gt-person-msg" style="display: none; font-size: 0.88rem; margin-top: 12px; color: var(--danger);"></div>
+    <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 18px;">
+      <button type="button" class="gt-unlink" id="gt-person-unlink" onclick="gtUnlinkPerson(this)"><i class="fa-solid fa-link-slash"></i> Usuń dopasowanie</button>
+      <button type="button" class="btn-secondary" style="width: auto; padding: 11px 20px;" onclick="toggleModal('modal-gt-person', false)">Anuluj</button>
+      <button type="button" class="btn-primary" id="gt-person-save" style="width: auto; padding: 11px 20px;" onclick="gtSavePerson()">Zapisz dopasowanie</button>
+    </div>
+  </div>
+</div>
+
+<!-- Podgląd wczytanego pliku przed zapisem -->
+<div id="modal-gt-import" class="modal">
+  <div class="modal-box gt-modal-wide">
+    <button class="link-btn" onclick="toggleModal('modal-gt-import', false)" style="position: absolute; top: 22px; right: 22px; font-size: 1.2rem;" title="Zamknij">
+      <i class="fa-solid fa-xmark"></i>
+    </button>
+    <h3 style="color: var(--primary); margin: 0 0 4px 0;">Podgląd odbić z pliku</h3>
+    <p id="gt-imp-file" style="margin: 0 0 14px 0; color: var(--text-muted); font-size: 0.86rem;"></p>
+    <div class="gt-stats" id="gt-imp-stats" style="margin-bottom: 8px;"></div>
+    <div id="gt-imp-issues"></div>
+    <!-- filtry podglądu: zapisują się tylko widoczne odbicia -->
+    <div class="gt-tools gt-imp-tools">
+      <div>
+        <label class="lbl" for="gt-imp-search">Szukaj po nazwisku</label>
+        <input type="text" id="gt-imp-search" class="form-control" placeholder="Imię lub nazwisko..." oninput="gtRenderPreview()" />
+      </div>
+      <div>
+        <label class="lbl" for="gt-imp-firm">Firma</label>
+        <select id="gt-imp-firm" class="form-control" onchange="gtRenderPreview()"></select>
+      </div>
+      <label class="gt-check"><input type="checkbox" id="gt-imp-review" onchange="gtRenderPreview()" /> Tylko nierozpoznane</label>
+      <button type="button" class="btn-secondary" style="width: auto; padding: 10px 16px; display: inline-flex; align-items: center; justify-content: center; gap: 6px;" onclick="gtImpResetFilters()"><i class="fa-solid fa-rotate-left"></i> Reset</button>
+    </div>
+    <div class="gt-imp-hint">Do bazy zapisują się tylko odbicia widoczne w tabeli. Koszem przy wierszu usuniesz odbicie z importu.</div>
+    <div class="gt-imp-scroll">
+      <table class="gt-table">
+        <thead><tr><th>Pracownik</th><th>Firma</th><th>Data</th><th>Zmiana</th><th>Wejście</th><th>Wyjście</th><th>Na terenie</th><th>Uwagi</th><th></th></tr></thead>
+        <tbody id="gt-imp-body"></tbody>
+      </table>
+    </div>
+    <div id="gt-imp-msg" style="display: none; font-size: 0.88rem; margin-top: 10px;"></div>
+    <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 14px;">
+      <button type="button" class="btn-secondary" style="width: auto; padding: 11px 20px;" onclick="toggleModal('modal-gt-import', false)">Anuluj</button>
+      <button type="button" class="btn-primary" id="gt-imp-save" style="width: auto; padding: 11px 20px;" onclick="gtSaveImport()">Zapisz do bazy</button>
+    </div>
+  </div>
+</div>
+
+<!-- Poprawa odbicia -->
+<div id="modal-gt-edit" class="modal">
+  <div class="modal-box" style="width: 94%; max-width: 560px;">
+    <button class="link-btn" onclick="toggleModal('modal-gt-edit', false)" style="position: absolute; top: 22px; right: 22px; font-size: 1.2rem;" title="Zamknij">
+      <i class="fa-solid fa-xmark"></i>
+    </button>
+    <h3 style="color: var(--primary); margin: 0 0 4px 0;">Popraw odbicie</h3>
+    <p id="gt-edit-gate" style="margin: 0 0 16px 0; color: var(--text-muted); font-size: 0.84rem;"></p>
+    <div class="gt-form">
+      <div>
+        <label for="gt-edit-date">Dzień zmiany</label>
+        <input type="date" id="gt-edit-date" class="form-control" />
+      </div>
+      <div>
+        <label for="gt-edit-shift">Zmiana</label>
+        <select id="gt-edit-shift" class="form-control">
+          <option>Zmiana I</option><option>Zmiana II</option><option>Zmiana III</option>
+        </select>
+      </div>
+      <div>
+        <label for="gt-edit-in">Wejście</label>
+        <input type="datetime-local" id="gt-edit-in" class="form-control" />
+      </div>
+      <div>
+        <label for="gt-edit-out">Wyjście</label>
+        <input type="datetime-local" id="gt-edit-out" class="form-control" />
+      </div>
+      <label class="gt-check full" style="height: auto;"><input type="checkbox" id="gt-edit-verified" /> Sprawdzone – zdejmij oznaczenie do weryfikacji</label>
+    </div>
+    <div id="gt-edit-msg" style="display: none; font-size: 0.88rem; margin-top: 12px; color: var(--danger);"></div>
+    <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 18px;">
+      <button type="button" class="btn-secondary" style="width: auto; padding: 11px 20px;" onclick="toggleModal('modal-gt-edit', false)">Anuluj</button>
+      <button type="button" class="btn-primary" id="gt-edit-save" style="width: auto; padding: 11px 20px;" onclick="gtSaveEdit()">Zapisz</button>
+    </div>
+  </div>
+</div>

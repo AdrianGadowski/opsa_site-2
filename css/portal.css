@@ -107,13 +107,14 @@
 }
 .ep-root .eh-table td { padding: 9px 14px; border-bottom: 1px solid #F0F0F0; text-align: center; vertical-align: middle; }
 .ep-root .eh-table th:first-child, .ep-root .eh-table td:first-child { text-align: left; white-space: nowrap; }
+.ep-root .eh-table td:nth-child(2) { white-space: nowrap; }
 .ep-root .eh-table .day { font-weight: 700; color: var(--text-dark); }
 .ep-root .eh-table .wd { margin-left: 6px; font-size: 0.78rem; color: var(--text-muted); }
 .ep-root .eh-table tr.sat td { background: #FFF8DB; }
 .ep-root .eh-table tr.sun td { background: #FDEDED; }
 .ep-root .eh-table tr.none td { color: #B0B5BC; }
 .ep-root .eh-table tr.none .day { color: #8B919A; font-weight: 600; }
-.ep-root .eh-table .hrs { font-weight: 700; color: var(--primary); white-space: nowrap; }
+.ep-root .eh-table .hrs { font-weight: 700; color: #0b7a57; white-space: nowrap; }
 .ep-root .eh-table .hrs.absent { color: var(--danger); }
 .ep-root .eh-pill { display: inline-block; padding: 3px 9px; border-radius: 999px; font-size: 0.76rem; font-weight: 600; }
 .ep-root .eh-pill.ok { background: rgba(16, 185, 129, 0.12); color: #0b7a57; }
@@ -122,7 +123,7 @@
 .ep-root .eh-pill.wait { background: #FFF1C2; color: #7A5C00; white-space: nowrap; }
 .ep-root .eh-tile .pend { margin-top: 3px; font-size: 0.76rem; font-weight: 700; color: #7A5C00; }
 .ep-root .eh-table tr.pending td:first-child { box-shadow: inset 4px 0 0 #F2BE2E; }
-.ep-root .eh-table tr.pending .hrs { color: #7A5C00; }
+/* do zatwierdzenia: kolor jak zwykle (obecność zielona, nieobecność czerwona) */
 .ep-pending-note { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; padding: 10px 14px; border-radius: 10px; background: #FFF8DF; border: 1px solid #F2D98A; color: #6B5507; font-size: 0.86rem; }
 
 .ep-empty { padding: 34px 16px; text-align: center; font-size: 0.9rem; color: var(--text-muted); }

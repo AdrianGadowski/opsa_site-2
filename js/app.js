@@ -48,7 +48,7 @@ const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
 
 // Numer wydania doklejany do adresów plików, żeby przeglądarka nie używała starych kopii.
 // Zmieniaj przy każdej publikacji - tutaj i w index.html (?v=...).
-const APP_BUILD = "202611060912";
+const APP_BUILD = "202611081049";
 
 let currentUser = null;
 let cachedUsers = [];
@@ -69,7 +69,8 @@ const viewTitles = {
   absences: "Zgłoszenia nieobecności",
   messages: "Komunikaty",
   pour_plan: "Plan zalewu",
-  report_gen: "Generowanie raportów"
+  report_gen: "Generowanie raportów",
+  gate: "Odbicia z bramy"
 };
 
 // Kliknięcie w awatar lub dane użytkownika w stopce menu otwiera "Moje konto"
@@ -89,7 +90,8 @@ const permissionMap = {
   logs: { elementId: "nav-logs", column: "allow_logs" },
   messages: { elementId: "nav-messages", column: "allow_messages" },
   pour_plan: { elementId: "nav-pour_plan", column: "allow_pour_plan_view" },
-  report_gen: { elementId: "nav-report_gen", column: "allow_report_generate" }
+  report_gen: { elementId: "nav-report_gen", column: "allow_report_generate" },
+  gate: { elementId: "nav-gate", column: "allow_gate_view" }
 };
 
 function hasPermission(columnName) {
@@ -167,6 +169,8 @@ function canOpenView(viewKey) {
   if (viewKey === "pour_plan") {
     return moduleEnabled("zalew") && (hasPermission("allow_pour_plan_view") || hasPermission("allow_pour_plan_edit"));
   }
+  // odbicia z bramy: podgląd albo wgrywanie (wgrywanie daje też podgląd)
+  if (viewKey === "gate") return hasPermission("allow_gate_view") || hasPermission("allow_gate_edit");
   const info = permissionMap[viewKey];
   if (info && !hasPermission(info.column)) return false;
   return true;
@@ -848,6 +852,9 @@ async function onViewLoaded(viewName) {
     case 'report_gen':
       await initReportGenView();
       break;
+    case 'gate':
+      await initGateView();
+      break;
     case 'logs':
       await initLogsView();
       break;
@@ -1013,6 +1020,10 @@ async function openEditUserModal(login) {
   if (permPlanEdit) permPlanEdit.checked = !!(user.allow_pour_plan_edit);
   const permGen = document.getElementById("perm-report-generate");
   if (permGen) permGen.checked = !!(user.allow_report_generate);
+  const permGateView = document.getElementById("perm-gate-view");
+  if (permGateView) permGateView.checked = !!(user.allow_gate_view);
+  const permGateEdit = document.getElementById("perm-gate-edit");
+  if (permGateEdit) permGateEdit.checked = !!(user.allow_gate_edit);
 
   const msgBox = document.getElementById("user-form-msg");
   if (msgBox) msgBox.style.display = "none";
@@ -1167,7 +1178,9 @@ async function loadUsersList() {
         { label: "Zatwierdzanie raportów", active: u.allow_report_approve },
         { label: "Plan zalewu", active: u.allow_pour_plan_view && !u.allow_pour_plan_edit },
         { label: "Plan zalewu (edycja)", active: u.allow_pour_plan_edit },
-        { label: "Generowanie raportów", active: u.allow_report_generate }
+        { label: "Generowanie raportów", active: u.allow_report_generate },
+        { label: "Odbicia z bramy", active: u.allow_gate_view && !u.allow_gate_edit },
+        { label: "Odbicia z bramy (wgrywanie)", active: u.allow_gate_edit }
       ];
 
       const activeBadges = permissions
@@ -1260,7 +1273,13 @@ async function handleSaveUser(e) {
         } : {}),
     // kolumna allow_report_generate istnieje dopiero po sql/45
     ...(currentUser && "allow_report_generate" in currentUser && document.getElementById("perm-report-generate")
-      ? { allow_report_generate: document.getElementById("perm-report-generate").checked } : {})
+      ? { allow_report_generate: document.getElementById("perm-report-generate").checked } : {}),
+    // kolumny odbić z bramy istnieją dopiero po sql/46; wgrywanie daje też podgląd
+    ...(currentUser && "allow_gate_view" in currentUser && document.getElementById("perm-gate-view")
+      ? {
+          allow_gate_view: document.getElementById("perm-gate-view").checked || document.getElementById("perm-gate-edit").checked,
+          allow_gate_edit: document.getElementById("perm-gate-edit").checked
+        } : {})
   };
 
   try {

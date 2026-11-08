@@ -16,7 +16,8 @@ const US_MODULES = [
   { column: "allow_options", label: "Opcje", icon: "fa-sliders" },
   { column: "allow_logs", label: "Logi", icon: "fa-clipboard-list" },
   { column: "allow_messages", label: "Komunikaty", icon: "fa-bullhorn" },
-  { column: "allow_report_generate", label: "Generowanie raportów", icon: "fa-file-pdf" }
+  { column: "allow_report_generate", label: "Generowanie raportów", icon: "fa-file-pdf" },
+  { column: "allow_gate_view", label: "Odbicia z bramy", icon: "fa-door-open" }
 ];
 
 let usSaving = false;

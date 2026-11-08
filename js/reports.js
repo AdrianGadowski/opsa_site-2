@@ -892,6 +892,7 @@ function rpRenderDetail(resetForm) {
     return;
   }
   const edit = rpCurrent.edit;
+  if (resetForm) delete rpGateCache[rpGateKey(rep)];   // przy otwarciu okna - świeże odbicia z bramy
 
   document.getElementById("rp-detail-title").textContent =
     `${edit ? "Edycja raportu" : "Raport"} nr ${rpLabel(rep)}`;
@@ -939,14 +940,15 @@ function rpRenderDetail(resetForm) {
         <td style="font-weight: 600;">${rtEsc(rpEmpName(r.first_name_id))}</td>
         <td>${rtEsc(emp?.business?.business || "-")}</td>
         <td>${rtEsc(emp?.department?.department || "-")}</td>
-        <td>${edit
+        <td id="rp-from-${id}" class="${rpGateMatchCls(rep, r, "from")}">${edit
           ? rpTimeBtnHtml(`rp-row-from-${id}`, "from", v.from, "rp-row-time", `rpOpenRowTime(${id}, 'from')`)
           : rtEsc(r.start_time || "-")}</td>
-        <td>${edit
+        <td id="rp-to-${id}" class="${rpGateMatchCls(rep, r, "to")}">${edit
           ? rpTimeBtnHtml(`rp-row-to-${id}`, "to", v.to, "rp-row-time", `rpOpenRowTime(${id}, 'to')`)
           : rtEsc(r.end_time || "-")}</td>
-        <td id="rp-row-sum-${id}" style="font-weight: 700; color: var(--primary); white-space: nowrap;">${hours === null ? "—" : rtFmtHours(hours)}</td>
-        <td>${edit
+        <td id="rp-row-sum-${id}" class="rp-sum${(edit ? v.absent : r.at_work === false) ? " absent" : ""}">${hours === null ? "—" : rtFmtHours(hours)}</td>
+        ${rpGateCellsHtml(rep, r)}
+        <td class="rp-status-cell">${edit
           ? `<label class="rp-switch row">
                <input type="checkbox" id="rp-row-absent-${id}" aria-label="Nieobecność" ${v.absent ? "checked" : ""} onchange="rpOnRowTime(${id})" />
                <span class="track"></span>
@@ -963,6 +965,8 @@ function rpRenderDetail(resetForm) {
   }).join("");
 
   rpSyncSaveAll();
+  rpLoadGate(rep);
+  rpSyncGateMatch(rep);
 
   const add = document.getElementById("rp-add");
   add.style.display = edit ? "" : "none";
@@ -977,6 +981,154 @@ function rpRenderDetail(resetForm) {
     rpResetAddTimes();
     document.getElementById("rp-add-absent").checked = false;
   }
+}
+
+// ---------- Odbicia z bramy w oknie raportu (sql/46): wejście i wyjście pracownika w dniu raportu ----------
+// Dane z gate_entries (dzień zmiany = data raportu, pracownik z wiersza). Przy kilku odbiciach w dniu
+// pierwszeństwo ma to z tej samej zmiany co raport. Bez tabeli albo uprawnienia - kreski.
+const rpGateCache = {};               // { "data|numer raportu": { [employee_id]: odbicie } | "error" }
+const rpGateLoading = new Set();      // klucze, dla których trwa pobieranie
+const rpGateLinked = {};              // { "data|numer raportu": Set(employee_id dopasowanych do osoby z bramy) | null (nie wiadomo) }
+
+// Pracownik nie jest dopasowany do żadnej osoby z bramy (gate_people) - w każdym raporcie, niezależnie od stanu
+function rpGateUnlinked(rep, row) {
+  const linked = rpGateLinked[rpGateKey(rep)];
+  return !!linked && !linked.has(Number(row.first_name_id));
+}
+
+// Kolumny Wejście / Wyjście widzi każdy, kto może otworzyć raport z Listy raportów (sql/46)
+function rpGateAllowed() {
+  return true;
+}
+
+function rpGateKey(rep) {
+  return `${rep.date}|${rep.number}`;
+}
+
+function rpGateTime(value, iso) {
+  if (!value) return `<span class="rp-gate-none" title="Brak odbicia z bramy">—</span>`;
+  const day = String(value).slice(0, 10);
+  const next = day !== iso ? ` <span class="rp-gate-day" title="${rtEsc(day.split("-").reverse().join("."))}">${day > iso ? "+1" : "−1"}</span>` : "";
+  return `${String(value).slice(11, 16)}${next}`;
+}
+
+function rpGateCellsHtml(rep, row) {
+  if (!rpGateAllowed()) return "";
+  const data = rpGateCache[rpGateKey(rep)];
+  const iso = rpIsoDate(rep.date);
+  const id = Number(row.id);
+  if (data === undefined) {
+    return `<td class="rp-gate" id="rp-gate-in-${id}">…</td><td class="rp-gate" id="rp-gate-out-${id}">…</td>`;
+  }
+  if (data !== "error" && rpGateUnlinked(rep, row)) {
+    return `<td class="rp-gate rp-gate-nolink" id="rp-gate-in-${id}" colspan="2"><span class="rp-pill nolink" title="Pracownik nie jest dopasowany do żadnej osoby z bramy (moduł Odbicia z bramy)">Brak dopasowania</span></td>`;
+  }
+  const e = data === "error" ? null : data[row.first_name_id];
+  const title = data === "error" ? "Odbicia z bramy są niedostępne" : e ? "" : "Brak odbicia z bramy w tym dniu";
+  return `<td class="rp-gate" id="rp-gate-in-${id}"${title ? ` title="${title}"` : ""}>${rpGateTime(e?.entry_at, iso)}</td>
+    <td class="rp-gate" id="rp-gate-out-${id}"${title ? ` title="${title}"` : ""}>${rpGateTime(e?.exit_at, iso)}</td>`;
+}
+
+// Czy godziny z raportu mieszczą się w odbiciu z bramy: Od - wejście było przed nią (albo o niej),
+// Do - wyjście było po niej (albo o niej). Zielone / czerwone; brak odbicia = czerwone.
+// Nieobecność i brak danych z bramy (np. brak dostępu) - bez koloru.
+function rpGateMatchCls(rep, row, which) {
+  const data = rpGateAllowed() ? rpGateCache[rpGateKey(rep)] : undefined;
+  if (!data || data === "error") return "";
+  const v = rpCurrent?.edit ? rpRowValues(row) : { from: row.start_time, to: row.end_time, absent: row.at_work === false };
+  if (v.absent || !v.from || !v.to || rpGateUnlinked(rep, row)) return "";
+  const e = data[row.first_name_id];
+  const gate = which === "from" ? e?.entry_at : e?.exit_at;
+  if (!gate) return "rp-gate-bad";
+  // godziny raportu na osi czasu dnia raportu (Do przed Od = następny dzień, np. III zmiana)
+  const iso = rpIsoDate(rep.date);
+  const toMs = (day, hm) => Date.parse(`${day}T${String(hm).slice(0, 5)}:00Z`);
+  const start = toMs(iso, v.from);
+  let end = toMs(iso, v.to);
+  if (end <= start) end += 86400000;
+  const g = Date.parse(`${String(gate).slice(0, 16)}:00Z`);
+  const ok = which === "from" ? g <= start : g >= end;
+  return ok ? "rp-gate-ok" : "rp-gate-bad";
+}
+
+function rpGateMatchTitle(cls, which) {
+  if (cls === "rp-gate-ok") return which === "from" ? "Wejście z bramy przed rozpoczęciem pracy" : "Wyjście z bramy po zakończeniu pracy";
+  if (cls === "rp-gate-bad") return which === "from" ? "Godzina rozpoczęcia nie zgadza się z wejściem z bramy" : "Godzina zakończenia nie zgadza się z wyjściem z bramy";
+  return "";
+}
+
+// Kolory Od / Do po pobraniu odbić albo po zmianie godzin w edycji
+function rpSyncGateMatch(rep) {
+  rep.rows.forEach(row => {
+    ["from", "to"].forEach(which => {
+      const td = document.getElementById(`rp-${which}-${Number(row.id)}`);
+      if (!td) return;
+      const cls = rpGateMatchCls(rep, row, which);
+      td.classList.remove("rp-gate-ok", "rp-gate-bad");
+      if (cls) td.classList.add(cls);
+      td.title = rpGateMatchTitle(cls, which);
+    });
+  });
+}
+
+// Którzy z pracowników są dopasowani do osoby z bramy. Pusta tabela gate_people albo brak do niej
+// dostępu (sql/46 sprzed tej zmiany) - null, wtedy bez oznaczeń "Brak dopasowania".
+async function rpFetchGateLinked(ids) {
+  try {
+    const { count, error: cErr } = await supabaseClient
+      .from("gate_people").select("gate_person_id", { count: "exact", head: true });
+    if (cErr || !count) return null;
+    const { data, error } = await supabaseClient
+      .from("gate_people").select("employee_id").in("employee_id", ids);
+    if (error) throw error;
+    return new Set((data || []).map(p => Number(p.employee_id)));
+  } catch (err) {
+    console.warn("Dopasowania osób z bramy niedostępne:", err.message || err);
+    return null;
+  }
+}
+
+async function rpLoadGate(rep) {
+  document.querySelectorAll(".rp-gate-head").forEach(th => { th.style.display = rpGateAllowed() ? "" : "none"; });
+  if (!rpGateAllowed()) return;
+  const key = rpGateKey(rep);
+  if (rpGateCache[key] !== undefined || rpGateLoading.has(key)) return;
+  rpGateLoading.add(key);
+  const ids = [...rep.empIds];
+  let data;
+  try {
+    const { data: rows, error } = await supabaseClient
+      .from("gate_entries")
+      .select("employee_id, shift, entry_at, exit_at")
+      .eq("work_date", rpIsoDate(rep.date))
+      .in("employee_id", ids);
+    if (error) throw error;
+    data = {};
+    // pierwszeństwo: ta sama zmiana co raport, potem najwcześniejsze wejście
+    (rows || []).sort((a, b) => Number(b.shift === rep.shift) - Number(a.shift === rep.shift) ||
+      String(a.entry_at || a.exit_at || "").localeCompare(String(b.entry_at || b.exit_at || "")))
+      .forEach(r => { if (!data[r.employee_id]) data[r.employee_id] = r; });
+    rpGateLinked[key] = await rpFetchGateLinked(ids);
+  } catch (err) {
+    console.warn("Odbicia z bramy niedostępne w oknie raportu:", err.message || err);
+    data = "error";
+  }
+  rpGateCache[key] = data;
+  rpGateLoading.delete(key);
+  // okno mogło zostać zamknięte albo przełączone na inny raport
+  const open = rpCurrent && rpFindReport(rpCurrent.number);
+  if (!open || rpGateKey(open) !== key) return;
+  open.rows.forEach(r => {
+    const html = rpGateCellsHtml(open, r);
+    const tmp = document.createElement("tr");
+    tmp.innerHTML = html;
+    const [inCell, outCell] = tmp.children;
+    document.getElementById(`rp-gate-in-${Number(r.id)}`)?.replaceWith(inCell);
+    const oldOut = document.getElementById(`rp-gate-out-${Number(r.id)}`);
+    if (outCell) oldOut?.replaceWith(outCell);
+    else oldOut?.remove();                       // "Brak dopasowania" zajmuje obie kolumny
+  });
+  rpSyncGateMatch(open);
 }
 
 // Stan zatwierdzenia nad tabelą okna raportu
@@ -1257,7 +1409,10 @@ function rpOnRowTime(recordId) {
 
   const hours = rtDuration(from, to);
   const sum = document.getElementById(`rp-row-sum-${recordId}`);
-  if (sum) sum.textContent = hours === null ? "—" : rtFmtHours(hours);
+  if (sum) {
+    sum.textContent = hours === null ? "—" : rtFmtHours(hours);
+    sum.classList.toggle("absent", !!document.getElementById(`rp-row-absent-${recordId}`)?.checked);   // nieobecność - suma na czerwono
+  }
 
   const changed = from !== (found.row.start_time || "") || to !== (found.row.end_time || "") ||
     absent !== (found.row.at_work === false);
@@ -1266,6 +1421,7 @@ function rpOnRowTime(recordId) {
 
   fromSel.closest("tr")?.classList.toggle("rp-dirty", changed);
   rpSyncSaveAll();
+  rpSyncGateMatch(found.rep);    // zgodność z bramą dla nowych godzin
 }
 
 // Zapis wszystkich zmienionych wierszy raportu jednym przyciskiem
@@ -1668,3 +1824,18 @@ async function rpAddEmployee() {
     if (btn) btn.disabled = false;
   }
 }
+
+// Esc zamyka podgląd raportu (najpierw okna otwarte nad nim: wybór godziny, pracownika, potwierdzenia).
+// W trybie edycji Esc nie zamyka podglądu, żeby nie stracić wprowadzonych zmian.
+document.addEventListener("keydown", e => {
+  if (e.key !== "Escape" || e.defaultPrevented) return;
+  const open = id => document.getElementById(id)?.classList.contains("active");
+  if (!open("modal-rp-detail")) return;
+  if (typeof rtPick !== "undefined" && rtPick) { e.preventDefault(); rtPickClose(true); return; }
+  if (open("modal-rp-picker")) { e.preventDefault(); rpClosePicker(); return; }
+  if (open("modal-rp-delete-confirm")) { e.preventDefault(); rpCloseDelete(); return; }
+  if (open("modal-rp-action")) { e.preventDefault(); rpCloseAction(); return; }
+  if (rpCurrent?.edit) return;
+  e.preventDefault();
+  rpCloseDetail();
+});
